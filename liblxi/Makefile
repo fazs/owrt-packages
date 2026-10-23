@@ -26,8 +26,8 @@ include $(INCLUDE_DIR)/nls.mk
 
 # Package definition; instructs on how and where our package will appear in the overall configuration menu ('make menuconfig')
 define Package/liblxi
-  SECTION:=examples
-  CATEGORY:=Examples
+  SECTION:=libraries
+  CATEGORY:=Libraries
   TITLE:=liblxi
   DEPENDS:=+libavahi-client +avahi-daemon +libtirpc +libxml2-dev
 endef

@@ -26,15 +26,15 @@ include $(INCLUDE_DIR)/nls.mk
 
 # Package definition; instructs on how and where our package will appear in the overall configuration menu ('make menuconfig')
 define Package/lxi-tools
-  SECTION:=examples
-  CATEGORY:=Examples
+  SECTION:=utilities
+  CATEGORY:=Utilities
   TITLE:=lxi-tools
   DEPENDS:=+liblxi +liblua +libreadline +libtirpc
 endef
 
 # Package description; a more verbose description on what our package does
 define Package/lxi-tools/description
-  lxi-tools package from
+  lxi-tools package from github lxi-tools/lxi-tools
 endef
 
 #define Build/Prepare
