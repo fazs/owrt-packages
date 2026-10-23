@@ -53,6 +53,19 @@ crow::response serve_file(const std::string& root, std::string rel) {
     return r;
 }
 
+// Crow-Meldungen in das eigene Logging umleiten (Level bleibt erhalten)
+class CrowLogHandler : public crow::ILogHandler {
+public:
+    void log(std::string message, crow::LogLevel level) override {
+        switch (level) {
+        case crow::LogLevel::Debug: log_debug("crow: %s", message.c_str()); break;
+        case crow::LogLevel::Info: log_info("crow: %s", message.c_str()); break;
+        case crow::LogLevel::Warning: log_warn("crow: %s", message.c_str()); break;
+        default: log_error("crow: %s", message.c_str()); break;
+        }
+    }
+};
+
 struct WsHub {
     std::mutex m;
     std::unordered_set<crow::websocket::connection*> conns;
@@ -66,6 +79,8 @@ struct WsHub {
 } // namespace
 
 void run_web_server(Acquisition& acq, const HttpConfig& http) {
+    static CrowLogHandler crow_log;
+    crow::logger::setHandler(&crow_log);
     crow::SimpleApp app;
     app.loglevel(crow::LogLevel::Warning);
     WsHub hub;

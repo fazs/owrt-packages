@@ -57,9 +57,12 @@ bool write_settings(uint16_t slave, const DeviceConfig& dc, std::string& err) {
 // PRE-OP -> SAFE-OP: PDO-Zuordnung und CoE-Parameter setzen
 int po2so_hook(uint16 slave) {
     using namespace el3356;
-    bool ok = write_assign(slave, kSm2Assign, {kPdoControl}) &&
-              write_assign(slave, kSm3Assign, {kPdoStatus, kPdoValueReal});
-    if (!ok) log_error("PDO-Zuordnung 0x1C12/0x1C13 konnte nicht geschrieben werden");
+    if (!write_assign(slave, kSm2Assign, {kPdoControl}))
+        log_error("PDO-Zuordnung 0x1C12 (0x1600) konnte nicht geschrieben werden");
+    if (!write_assign(slave, kSm3Assign, {kPdoStatus, kPdoValueReal}))
+        log_error("PDO-Zuordnung 0x1C13 (0x1A00, 0x1A02) konnte nicht geschrieben werden");
+    else
+        log_info("PDO-Zuordnung gesetzt: 0x1C12 = 0x1600, 0x1C13 = 0x1A00, 0x1A02");
     if (g_cfg && g_cfg->device.write_on_start) {
         std::string err;
         if (!write_settings(slave, g_cfg->device, err)) log_error(err);
@@ -91,6 +94,34 @@ bool read_assigned(uint16_t slave, uint16_t sm_obj, std::vector<std::vector<el33
         out.push_back(std::move(m));
     }
     return true;
+}
+
+const char* state_name(uint16_t st) {
+    switch (st & 0x0F) {
+    case EC_STATE_INIT: return "INIT";
+    case EC_STATE_PRE_OP: return "PRE-OP";
+    case EC_STATE_BOOT: return "BOOT";
+    case EC_STATE_SAFE_OP: return "SAFE-OP";
+    case EC_STATE_OPERATIONAL: return "OP";
+    default: return "NONE";
+    }
+}
+
+// Zustand, Fehlerbit und AL-Statuscode aller Slaves, die 'expected' nicht erreicht haben.
+// Voraussetzung: ec_readstate() wurde unmittelbar zuvor aufgerufen.
+std::string slave_states(uint16_t expected) {
+    std::string out;
+    for (int i = 1; i <= ec_slavecount; ++i) {
+        const ec_slavet& sl = ec_slave[i];
+        if (sl.state == expected) continue;
+        char b[256];
+        std::snprintf(b, sizeof b, "%sSlave %d %s: %s%s, AL-Status 0x%04X (%s)",
+                      out.empty() ? "" : "; ", i, sl.name, state_name(sl.state),
+                      (sl.state & EC_STATE_ERROR) ? "+ERROR" : "", sl.ALstatuscode,
+                      ec_ALstatuscode2string(sl.ALstatuscode));
+        out += b;
+    }
+    return out.empty() ? "Gruppenzustand abweichend" : out;
 }
 
 void shift(el3356::EntryLoc& l, uint32_t bits) {
@@ -134,9 +165,12 @@ bool EthercatBackend::open(const Config& cfg, std::string& err) {
         err = "ec_config_map fehlgeschlagen";
         return false;
     }
+    // ec_statecheck(0, ...) aktualisiert nur ec_slave[0].state (Gruppenzustand per BRD);
+    // die Einzelzustände liefert erst ec_readstate().
     ec_statecheck(0, EC_STATE_SAFE_OP, EC_TIMEOUTSTATE * 4);
+    ec_readstate();
     if (ec_slave[slave_].state != EC_STATE_SAFE_OP) {
-        err = "Slave erreicht SAFE-OP nicht";
+        err = "SAFE-OP nicht erreicht: " + slave_states(EC_STATE_SAFE_OP);
         return false;
     }
     if (!read_layout(err)) return false;
@@ -155,10 +189,7 @@ bool EthercatBackend::open(const Config& cfg, std::string& err) {
     }
     if (ec_slave[0].state != EC_STATE_OPERATIONAL) {
         ec_readstate();
-        err = "OP nicht erreicht (AL-Status 0x" ;
-        char b[16];
-        std::snprintf(b, sizeof b, "%04X)", ec_slave[slave_].ALstatuscode);
-        err += b;
+        err = "OP nicht erreicht: " + slave_states(EC_STATE_OPERATIONAL);
         return false;
     }
     link_ok_ = true;

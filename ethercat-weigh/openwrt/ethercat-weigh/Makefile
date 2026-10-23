@@ -8,7 +8,7 @@
 # Do not add ethercat-weigh/openwrt as a separate feed in addition,
 # otherwise the package is defined twice.
 #
-# Required prerequisites:
+# prerequisites:
 # - Frontend built (web/dist)
 # - Submodules checked out
 #
@@ -17,10 +17,11 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=ethercat-weigh
 PKG_VERSION:=0.1.0
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
-PKG_MAINTAINER:=fazs <12977360+fazs@users.noreply.github.com>
+PKG_MAINTAINER:=Fabian <fabiannd@gmail.com>
 
+# Quellen liegen im selben Repository (zwei Ebenen über diesem Makefile)
 EW_SOURCE_ROOT:=$(abspath $(CURDIR)/../..)
 
 include $(INCLUDE_DIR)/package.mk
@@ -31,14 +32,14 @@ CMAKE_OPTIONS += -DEW_BUILD_TESTS=OFF
 define Package/ethercat-weigh
   SECTION:=utils
   CATEGORY:=Utilities
-  TITLE:=EtherCAT EL3356 Weighing with Webinterface
+  TITLE:=EtherCAT EL3356 Waegeauswertung mit Webinterface
   DEPENDS:=+libstdcpp
 endef
 
 define Package/ethercat-weigh/description
-  EtherCAT-Master (SOEM) to use with EK1100 and EL3356-0010, reckognizes "valid" 
-  measurement with user-defined parameters, shows temporary statistics.
-  Provides web-interface on port 8080 and live updates through REST/WebSocket-API
+  EtherCAT-Master (SOEM) fuer EK1100 + EL3356-0010, Erkennung gueltiger
+  Messungen (statische Waegung), temporaere Statistik, REST/WebSocket-API
+  und Web-Frontend.
 endef
 
 define Package/ethercat-weigh/conffiles
@@ -47,11 +48,11 @@ endef
 
 define Build/Prepare
 	@if [ ! -f "$(EW_SOURCE_ROOT)/web/dist/index.html" ]; then \
-		echo "web/dist missing: in repository; run 'cd web && npm ci && npm run build'"; \
+		echo "web/dist fehlt: im Repository 'cd web && npm ci && npm run build' ausfuehren"; \
 		exit 1; \
 	fi
 	@if [ ! -f "$(EW_SOURCE_ROOT)/third_party/SOEM/soem/ethercat.h" ]; then \
-		echo "third_party missing: run 'git submodule update --init'"; \
+		echo "third_party fehlt: 'git submodule update --init' ausfuehren"; \
 		exit 1; \
 	fi
 	mkdir -p $(PKG_BUILD_DIR)

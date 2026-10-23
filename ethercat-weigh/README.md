@@ -166,15 +166,14 @@ GL-MT3000: Target `mediatek/filogic`. SDK passend zur installierten OpenWrt-Vers
 git submodule update --init
 cd web && npm ci && npm run build && cd ..
 
-# im SDK – das gesamte owrt-packages-Repository ist der Feed
-# (nicht zusätzlich ethercat-weigh/openwrt eintragen, sonst ist das Paket doppelt definiert)
-echo "src-link fazs $(realpath ..)" >> <sdk>/feeds.conf.default
+# im SDK
+echo "src-link fazs $(pwd)/openwrt" >> <sdk>/feeds.conf.default
 cd <sdk>
 ./scripts/feeds update -a
 ./scripts/feeds install ethercat-weigh
 make defconfig
 make package/ethercat-weigh/compile V=s
-# Ergebnis: bin/packages/<arch>/fazs/ethercat-weigh_0.1.0-r1_*.ipk bzw. *.apk
+# Ergebnis: bin/packages/<arch>/fazs/ethercat-weigh_*.ipk bzw. *.apk
 ```
 
 ## Inbetriebnahme auf dem GL-MT3000
@@ -191,6 +190,7 @@ make package/ethercat-weigh/compile V=s
 3. In `/etc/ethercat-weigh/config.json` `ethercat.interface` setzen. Kennlinie entweder über den Dialog *Kalibrieren* erstellen oder `device.nominal_load`, `device.rated_output_mv_v` und `device.zero_balance` laut Prüfprotokoll der Wägezelle eintragen (`calibration.device_unit` = Einheit der Nennlast).
 4. `service ethercat-weigh enable && service ethercat-weigh start`
 5. Webinterface: `http://<router-ip>:8080`, Logausgabe: `logread -e ethercat-weigh`.
+   Der Dienst loggt per syslog mit Priorität je Level (`daemon.info`, `daemon.warn`, `daemon.err`; Option `--syslog` im Init-Script). Ohne `--syslog` gehen die Meldungen mit Zeitstempel nach stderr.
 
 Bei Inbetriebnahme zu prüfen:
 - Verfahren Klemme: Beziehung Value (Real) = Last in Einheit der Nennlast × Scale factor (laut Dokumentation von `0x8000:27`) mit einem bekannten Gewicht.

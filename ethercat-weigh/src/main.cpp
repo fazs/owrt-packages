@@ -14,9 +14,10 @@ namespace {
 
 void usage() {
     std::cout << "ethercat-weigh " EW_VERSION "\n"
-                 "Usage: ethercat-weigh [-c <config.json>] [--sim] [--write-default-config <pfad>]\n"
+                 "Usage: ethercat-weigh [-c <config.json>] [--sim] [--syslog] [--write-default-config <pfad>]\n"
                  "  -c, --config   Konfigurationsdatei (Default: /etc/ethercat-weigh/config.json)\n"
                  "  --sim          Simulation statt EtherCAT (ohne Hardware)\n"
+                 "  --syslog       Logausgabe per syslog (daemon.info/warn/err) statt stderr\n"
                  "  --write-default-config <pfad>  Default-Konfiguration schreiben und beenden\n";
 }
 
@@ -32,6 +33,8 @@ int main(int argc, char** argv) {
             config_path = argv[++i];
         } else if (a == "--sim") {
             sim = true;
+        } else if (a == "--syslog") {
+            ew::log_use_syslog("ethercat-weigh");
         } else if (a == "--write-default-config" && i + 1 < argc) {
             try {
                 ew::save_config(argv[++i], ew::Config{});
