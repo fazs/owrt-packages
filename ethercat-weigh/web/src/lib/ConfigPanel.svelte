@@ -1,5 +1,6 @@
 <script>
   import { live, saveConfig, notify } from './live.svelte.js';
+  import { FILTER_OPTIONS } from './coe.js';
 
   let { open = $bindable(false) } = $props();
 
@@ -71,10 +72,7 @@
         { k: 'scale_factor', l: 'Scale factor (0x8000:27)', t: 'num' },
         { k: 'reference_load', l: 'Reference load (0x8000:28)', t: 'num' },
         { k: 'mode0_enable_filter', l: 'Mode0 enable filter (0x8000:01)', t: 'bool' },
-        { k: 'mode0_filter_settings', l: 'Mode0 filter settings (0x8000:11)', t: 'select', o: [
-          [0, 'FIR 50 Hz'], [1, 'FIR 60 Hz'], [2, 'IIR 1'], [3, 'IIR 2'], [4, 'IIR 3'], [5, 'IIR 4'],
-          [6, 'IIR 5'], [7, 'IIR 6'], [8, 'IIR 7'], [9, 'IIR 8'], [10, 'Dynamic IIR'], [11, 'PDO-Filterfrequenz'],
-        ] },
+        { k: 'mode0_filter_settings', l: 'Mode0 filter settings (0x8000:11)', t: 'select', o: FILTER_OPTIONS },
         { k: 'mode0_enable_averager', l: 'Mode0 enable averager (0x8000:03)', t: 'bool' },
         { k: 'steady_state_window', l: 'Steady state window [ms] (0x8000:29)', t: 'int' },
         { k: 'steady_state_tolerance', l: 'Steady state tolerance (0x8000:2A)', t: 'int' },

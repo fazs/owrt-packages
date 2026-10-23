@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "config.hpp"
+#include "el3356.hpp"
 #include "sample.hpp"
 
 namespace ew {
@@ -29,6 +30,11 @@ public:
     virtual bool sdo_read(uint16_t index, uint8_t sub, size_t size, std::vector<uint8_t>& data,
                           std::string& err) = 0;
     virtual void close() = 0;
+
+    // Debug: alle PDOs der Klemme; zugeordnete mit Lage im Prozessabbild des Slaves
+    virtual std::vector<el3356::PdoInfo> pdos() const = 0;
+    // Debug: Prozessabbild des Slaves nach dem letzten Zyklus
+    virtual void process_image(std::vector<uint8_t>& in, std::vector<uint8_t>& out) const = 0;
 
     // Nur Simulation: aufgelegte Masse in Gramm vorgeben (nullopt = automatisches Profil).
     virtual bool set_sim_load(std::optional<double> /*grams*/) { return false; }

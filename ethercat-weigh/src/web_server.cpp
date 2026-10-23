@@ -157,6 +157,48 @@ void run_web_server(Acquisition& acq, const HttpConfig& http) {
         return result(acq.set_sim_load(g));
     });
 
+    // --- Debug (PDOs, Initialisierungssequenz) -----------------------------------
+    CROW_ROUTE(app, "/api/debug/pdos")([&] {
+        const auto j = acq.debug_pdos();
+        return json_response(j.value("ok", false) ? 200 : 409, j);
+    });
+
+    // {"sub": <0x7000-Subindex>, "value": true|false|null} oder {"clear": true}
+    CROW_ROUTE(app, "/api/debug/override").methods(crow::HTTPMethod::Post)([&](const crow::request& req) {
+        std::optional<uint8_t> sub;
+        std::optional<bool> value;
+        try {
+            const auto j = nlohmann::json::parse(req.body);
+            if (!j.value("clear", false)) {
+                const int s = j.at("sub").get<int>();
+                if (s < 0 || s > 0xFF) throw std::runtime_error("sub außerhalb des Wertebereichs");
+                sub = static_cast<uint8_t>(s);
+                if (j.contains("value") && j["value"].is_boolean()) value = j["value"].get<bool>();
+            }
+        } catch (const std::exception& ex) {
+            return json_response(400, {{"ok", false}, {"error", ex.what()}});
+        }
+        return result(acq.debug_override(sub, value));
+    });
+
+    // {"op": "read"|"write", "index", "sub", "type": "bool|u8|u16|u32|i8|i16|i32|f32", "value"}
+    CROW_ROUTE(app, "/api/debug/sdo").methods(crow::HTTPMethod::Post)([&](const crow::request& req) {
+        nlohmann::json j;
+        try {
+            j = acq.debug_sdo(nlohmann::json::parse(req.body));
+        } catch (const std::exception& ex) {
+            return json_response(400, {{"ok", false}, {"error", ex.what()}});
+        }
+        return json_response(j.value("ok", false) ? 200 : 409, j);
+    });
+
+    CROW_ROUTE(app, "/api/debug/init")([&] { return json_response(200, acq.debug_init_sequence()); });
+
+    CROW_ROUTE(app, "/api/debug/reinit").methods(crow::HTTPMethod::Post)([&] {
+        acq.reinit();
+        return json_response(200, {{"ok", true}});
+    });
+
     // --- WebSocket -------------------------------------------------------------
     CROW_WEBSOCKET_ROUTE(app, "/ws")
         .onopen([&](crow::websocket::connection& conn) {

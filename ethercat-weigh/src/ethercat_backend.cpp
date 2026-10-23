@@ -2,6 +2,7 @@
 
 #include <cstdio>
 #include <cstring>
+#include <memory>
 
 #include "ethercat.h"
 #include "log.hpp"
@@ -13,30 +14,11 @@ namespace {
 // Kontext für den PRE-OP -> SAFE-OP Hook (SOEM ruft eine freie Funktion auf)
 const Config* g_cfg = nullptr;
 
-bool sdo_write(uint16_t slave, uint16_t idx, uint8_t sub, const void* data, int size) {
-    std::vector<uint8_t> buf(static_cast<const uint8_t*>(data),
-                             static_cast<const uint8_t*>(data) + size);
-    return ec_SDOwrite(slave, idx, sub, FALSE, size, buf.data(), EC_TIMEOUTRXM) > 0;
-}
-
-template <typename T>
-bool sdo_write_v(uint16_t slave, uint16_t idx, uint8_t sub, T v) {
-    return sdo_write(slave, idx, sub, &v, sizeof(T));
-}
-
 template <typename T>
 bool sdo_read_v(uint16_t slave, uint16_t idx, uint8_t sub, T& v) {
     int size = sizeof(T);
     v = T{};
     return ec_SDOread(slave, idx, sub, FALSE, &size, &v, EC_TIMEOUTRXM) > 0;
-}
-
-bool write_assign(uint16_t slave, uint16_t sm_obj, const std::vector<uint16_t>& pdos) {
-    bool ok = sdo_write_v<uint8_t>(slave, sm_obj, 0, 0);
-    for (size_t i = 0; i < pdos.size(); ++i)
-        ok = ok && sdo_write_v<uint16_t>(slave, sm_obj, static_cast<uint8_t>(i + 1), pdos[i]);
-    ok = ok && sdo_write_v<uint8_t>(slave, sm_obj, 0, static_cast<uint8_t>(pdos.size()));
-    return ok;
 }
 
 bool write_settings(uint16_t slave, const DeviceConfig& dc, std::string& err) {
@@ -54,19 +36,20 @@ bool write_settings(uint16_t slave, const DeviceConfig& dc, std::string& err) {
     return true;
 }
 
-// PRE-OP -> SAFE-OP: PDO-Zuordnung und CoE-Parameter setzen
+// PRE-OP -> SAFE-OP: PDO-Zuordnung und CoE-Parameter setzen (el3356::init_sequence)
 int po2so_hook(uint16 slave) {
-    using namespace el3356;
-    if (!write_assign(slave, kSm2Assign, {kPdoControl}))
-        log_error("PDO-Zuordnung 0x1C12 (0x1600) konnte nicht geschrieben werden");
-    if (!write_assign(slave, kSm3Assign, {kPdoStatus, kPdoValueReal}))
-        log_error("PDO-Zuordnung 0x1C13 (0x1A00, 0x1A02) konnte nicht geschrieben werden");
-    else
-        log_info("PDO-Zuordnung gesetzt: 0x1C12 = 0x1600, 0x1C13 = 0x1A00, 0x1A02");
-    if (g_cfg && g_cfg->device.write_on_start) {
-        std::string err;
-        if (!write_settings(slave, g_cfg->device, err)) log_error(err);
+    if (!g_cfg) return 1;
+    int failed = 0;
+    for (const auto& w : el3356::init_sequence(g_cfg->device)) {
+        auto data = w.data;
+        if (ec_SDOwrite(slave, w.index, w.sub, FALSE, static_cast<int>(data.size()), data.data(),
+                        EC_TIMEOUTRXM) <= 0) {
+            log_error("SDO-Write 0x%04X:%02X (%s) fehlgeschlagen", w.index, w.sub, w.name.c_str());
+            ++failed;
+        }
     }
+    if (failed == 0) log_info("Initialisierungssequenz geschrieben (PDO-Zuordnung%s)",
+                              g_cfg->device.write_on_start ? ", 0x8000" : "");
     return 1;
 }
 
@@ -82,13 +65,16 @@ bool read_pdo_mapping(uint16_t slave, uint16_t pdo, std::vector<el3356::MapEntry
     return true;
 }
 
-bool read_assigned(uint16_t slave, uint16_t sm_obj, std::vector<std::vector<el3356::MapEntry>>& out) {
+bool read_assigned(uint16_t slave, uint16_t sm_obj, std::vector<std::vector<el3356::MapEntry>>& out,
+                   std::vector<uint16_t>& indices) {
     uint8_t n = 0;
     if (!sdo_read_v(slave, sm_obj, 0, n)) return false;
     out.clear();
+    indices.clear();
     for (uint8_t i = 1; i <= n; ++i) {
         uint16_t pdo = 0;
         if (!sdo_read_v(slave, sm_obj, i, pdo)) return false;
+        indices.push_back(pdo);
         std::vector<el3356::MapEntry> m;
         if (!read_pdo_mapping(slave, pdo, m)) return false;
         out.push_back(std::move(m));
@@ -127,6 +113,34 @@ std::string slave_states(uint16_t expected) {
 void shift(el3356::EntryLoc& l, uint32_t bits) {
     if (l.present) l.bit_offset += bits;
 }
+
+// Namen und Datentypen per SDO-Information (falls die Klemme sie unterstützt)
+struct SdoInfo {
+    uint16_t slave;
+    bool supported;
+    ec_ODlistt od{};
+    ec_OElistt oe{};
+
+    bool object_name(uint16_t index, std::string& name) {
+        if (!supported) return false;
+        od.Slave = slave;
+        od.Entries = 1;
+        od.Index[0] = index;
+        if (ec_readODdescription(0, &od) <= 0 || od.Name[0][0] == 0) return false;
+        name = od.Name[0];
+        return true;
+    }
+    bool entry(uint16_t index, uint8_t sub, std::string& name, uint16_t& type) {
+        if (!supported) return false;
+        od.Slave = slave;
+        od.Entries = 1;
+        od.Index[0] = index;
+        if (ec_readOEsingle(0, sub, &od, &oe) <= 0 || oe.Name[sub][0] == 0) return false;
+        name = oe.Name[sub];
+        type = oe.DataType[sub];
+        return true;
+    }
+};
 
 } // namespace
 
@@ -199,11 +213,13 @@ bool EthercatBackend::open(const Config& cfg, std::string& err) {
 
 bool EthercatBackend::read_layout(std::string& err) {
     std::vector<std::vector<el3356::MapEntry>> in, out;
-    if (!read_assigned(slave_, el3356::kSm3Assign, in) ||
-        !read_assigned(slave_, el3356::kSm2Assign, out)) {
+    std::vector<uint16_t> in_idx, out_idx;
+    if (!read_assigned(slave_, el3356::kSm3Assign, in, in_idx) ||
+        !read_assigned(slave_, el3356::kSm2Assign, out, out_idx)) {
         err = "PDO-Mapping konnte nicht gelesen werden";
         return false;
     }
+    discover_pdos(out_idx, in_idx);
     in_ = el3356::layout_inputs(in);
     out_ = el3356::layout_outputs(out);
     const uint32_t ib = ec_slave[slave_].Istartbit, ob = ec_slave[slave_].Ostartbit;
@@ -218,6 +234,69 @@ bool EthercatBackend::read_layout(std::string& err) {
         return false;
     }
     return true;
+}
+
+// Alle PDO-Mapping-Objekte 0x1600..0x1607 und 0x1A00..0x1A07 einlesen (nur beim Hochlauf)
+void EthercatBackend::discover_pdos(const std::vector<uint16_t>& rx_assign,
+                                    const std::vector<uint16_t>& tx_assign) {
+    auto info = std::make_unique<SdoInfo>();
+    info->slave = slave_;
+    info->supported = (ec_slave[slave_].CoEdetails & ECT_COEDET_SDOINFO) != 0;
+    const auto known = el3356::known_pdos();
+    pdos_.clear();
+    for (uint16_t base : {uint16_t{0x1600}, uint16_t{0x1A00}})
+        for (uint16_t idx = base; idx < base + 8; ++idx) {
+            std::vector<el3356::MapEntry> m;
+            if (!read_pdo_mapping(slave_, idx, m)) continue;
+            el3356::PdoInfo p;
+            p.index = idx;
+            p.rx = base == 0x1600;
+            if (!info->object_name(idx, p.name)) p.name = el3356::known_pdo_name(idx);
+            for (const auto& k : known)
+                if (k.index == idx) p.excludes = k.excludes;
+            for (const auto& me : m) {
+                el3356::PdoEntry e;
+                e.map = me;
+                if (me.index != 0) {
+                    uint16_t coe = 0;
+                    std::string known_name;
+                    el3356::DType known_type = el3356::DType::None;
+                    const bool known = el3356::known_entry(me.index, me.sub, known_name, known_type);
+                    if (!info->entry(me.index, me.sub, e.name, coe)) e.name = known_name;
+                    e.type = coe ? el3356::dtype_from_coe(coe, me.bits)
+                                 : known ? known_type : el3356::dtype_from_coe(0, me.bits);
+                    if (e.name.empty()) {
+                        char b[16];
+                        std::snprintf(b, sizeof b, "0x%04X:%02X", me.index, me.sub);
+                        e.name = b;
+                    }
+                }
+                p.entries.push_back(std::move(e));
+            }
+            pdos_.push_back(std::move(p));
+        }
+    el3356::locate_pdos(pdos_, rx_assign, tx_assign);
+    for (auto& p : pdos_)
+        for (auto& e : p.entries)
+            shift(e.loc, p.rx ? ec_slave[slave_].Ostartbit : ec_slave[slave_].Istartbit);
+    // SDO-Abbrüche der nicht vorhandenen Objekte nicht als Fehler stehen lassen
+    while (ec_iserror()) {
+        ec_errort e;
+        if (!ec_poperror(&e)) break;
+    }
+    log_info("%zu PDOs der Klemme eingelesen", pdos_.size());
+}
+
+void EthercatBackend::process_image(std::vector<uint8_t>& in, std::vector<uint8_t>& out) const {
+    in.clear();
+    out.clear();
+    if (!opened_ || slave_ == 0) return;
+    const ec_slavet& sl = ec_slave[slave_];
+    // Ibytes/Obytes sind 0 bei weniger als 8 Bit
+    const size_t ib = sl.Ibytes ? sl.Ibytes : (sl.Ibits ? 1 : 0);
+    const size_t ob = sl.Obytes ? sl.Obytes : (sl.Obits ? 1 : 0);
+    if (sl.inputs) in.assign(sl.inputs, sl.inputs + ib);
+    if (sl.outputs) out.assign(sl.outputs, sl.outputs + ob);
 }
 
 void EthercatBackend::cycle(double t, const El3356Control& ctrl, Sample& out) {
@@ -331,6 +410,7 @@ void EthercatBackend::close() {
     ec_writestate(0);
     ec_close();
     opened_ = false;
+    pdos_.clear();
     g_cfg = nullptr;
 }
 

@@ -202,6 +202,27 @@ export async function simLoad(grams) {
   }
 }
 
+async function getJson(path) {
+  const r = await fetch(path);
+  let j = {};
+  try {
+    j = await r.json();
+  } catch {
+    /* leere Antwort */
+  }
+  if (!r.ok || j.ok === false) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+}
+
+// Debug-Dialog: PDOs, Übersteuerung der Steuerbits, SDO-Zugriff, Initialisierungssequenz
+export const debugApi = {
+  pdos: () => getJson('/api/debug/pdos'),
+  init: () => getJson('/api/debug/init'),
+  sdo: (body) => post('/api/debug/sdo', body),
+  override: (body) => post('/api/debug/override', body),
+  reinit: () => post('/api/debug/reinit'),
+};
+
 export async function resetStatistics() {
   try {
     await post('/api/statistics/reset');

@@ -16,9 +16,11 @@
   import Stats from './lib/Stats.svelte';
   import Measurements from './lib/Measurements.svelte';
   import ConfigPanel from './lib/ConfigPanel.svelte';
+  import Debug from './lib/Debug.svelte';
 
   let configOpen = $state(false);
   let calOpen = $state(false);
+  let debugOpen = $state(false);
   const hasTare = $derived(live.sample?.tare != null);
 
   onMount(() => {
@@ -66,6 +68,7 @@
     {#if hasTare}<button onclick={clearTare}>Tara löschen</button>{/if}
     <button onclick={() => (calOpen = true)} disabled={!live.config}>Kalibrieren</button>
     <button onclick={() => (configOpen = true)} disabled={!live.config}>Parameter</button>
+    <button onclick={() => (debugOpen = true)} disabled={!live.connected}>Debug</button>
   </div>
 </header>
 
@@ -106,6 +109,7 @@
 
 <ConfigPanel bind:open={configOpen} />
 <Calibration bind:open={calOpen} />
+<Debug bind:open={debugOpen} />
 
 <style>
   .top {

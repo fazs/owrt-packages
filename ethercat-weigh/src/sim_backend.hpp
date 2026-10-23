@@ -1,5 +1,6 @@
 #pragma once
 
+#include <map>
 #include <optional>
 #include <random>
 
@@ -27,6 +28,11 @@ public:
                   std::string& err) override;
     void close() override {}
     bool set_sim_load(std::optional<double> grams) override;
+    std::vector<el3356::PdoInfo> pdos() const override { return pdos_; }
+    void process_image(std::vector<uint8_t>& in, std::vector<uint8_t>& out) const override {
+        in = img_in_;
+        out = img_out_;
+    }
 
     // Sensorparameter (für Tests)
     static constexpr double kZeroTrue = 0.0123;    // mV/V
@@ -48,6 +54,15 @@ private:
     uint16_t cmd_ = 0;
     uint8_t cmd_status_ = 0;
     int cmd_busy_reads_ = 0;
+
+    // Übrige Objekte: gespeicherte SDO-Daten (Schlüssel index << 8 | sub)
+    std::map<uint32_t, std::vector<uint8_t>> od_;
+
+    // Prozessabbild gemäß Standard-Zuordnung (el3356::rx_assignment/tx_assignment)
+    std::vector<el3356::PdoInfo> pdos_;
+    el3356::InputLayout in_;
+    el3356::OutputLayout out_;
+    std::vector<uint8_t> img_in_, img_out_;
 
     std::optional<double> fixed_kg_;
     double last_signal_ = 0.0;

@@ -20,11 +20,33 @@ double settle(double target, double tl) {
 }
 } // namespace
 
-SimBackend::SimBackend(unsigned seed) : rng_(seed) {}
+SimBackend::SimBackend(unsigned seed) : rng_(seed) {
+    using namespace el3356;
+    pdos_ = known_pdos();
+    locate_pdos(pdos_, rx_assignment(), tx_assignment());
+    std::vector<std::vector<MapEntry>> rx, tx;
+    uint32_t rx_bits = 0, tx_bits = 0;
+    for (const auto& p : pdos_) {
+        if (!p.assigned) continue;
+        std::vector<MapEntry> m;
+        for (const auto& e : p.entries) {
+            m.push_back(e.map);
+            (p.rx ? rx_bits : tx_bits) += e.map.bits;
+        }
+        (p.rx ? rx : tx).push_back(std::move(m));
+    }
+    in_ = layout_inputs(tx);
+    out_ = layout_outputs(rx);
+    img_in_.assign((tx_bits + 7) / 8, 0);
+    img_out_.assign((rx_bits + 7) / 8, 0);
+}
 
 bool SimBackend::open(const Config& cfg, std::string& err) {
     phase_start_ = 0.0;
     target_ = load_dist_(rng_);
+    // Wirkung des PO2SO-Hooks nachbilden
+    for (const auto& w : el3356::init_sequence(cfg.device))
+        od_[static_cast<uint32_t>(w.index) << 8 | w.sub] = w.data;
     return write_device_config(cfg.device, err);
 }
 
@@ -67,7 +89,7 @@ double SimBackend::signal_mvv(double mass) {
     return kZeroTrue + mass / kCapacityKg * kRatedTrue + noise;
 }
 
-void SimBackend::cycle(double t, const El3356Control&, Sample& out) {
+void SimBackend::cycle(double t, const El3356Control& ctrl, Sample& out) {
     last_signal_ = signal_mvv(mass_kg(t));
     const double load = (last_signal_ - zero_bal_) / rated_ * nominal_ * gain_ - tara_;
     const double v = load * scale_;
@@ -88,6 +110,8 @@ void SimBackend::cycle(double t, const El3356Control&, Sample& out) {
     out.status.steady_state = (t - steady_since_) >= 1.0;
     out.status.overrange = std::fabs(load) > nominal_ * 1.1;
     out.status.txpdo_toggle = toggle_;
+    el3356::encode_inputs(img_in_.data(), in_, out.status, out.raw);
+    el3356::encode_control(img_out_.data(), out_, ctrl);
 }
 
 bool SimBackend::sdo_write(uint16_t index, uint8_t sub, const std::vector<uint8_t>& d,
@@ -105,7 +129,7 @@ bool SimBackend::sdo_write(uint16_t index, uint8_t sub, const std::vector<uint8_
         case kSubScaleFactor: scale_ = f(); return true;
         case kSubReferenceLoad: reference_ = f(); return true;
         case kSubFilterMode0: filter_ = u16(); return true;
-        default: return true;  // übrige Parameter ohne Wirkung in der Simulation
+        default: break;  // übrige Parameter ohne Wirkung in der Simulation
         }
     }
     if (index == kObjCommand && sub == 1) {
@@ -122,10 +146,14 @@ bool SimBackend::sdo_write(uint16_t index, uint8_t sub, const std::vector<uint8_
         cmd_busy_reads_ = 3;
         return true;
     }
-    char b[64];
-    std::snprintf(b, sizeof b, "SDO-Write 0x%04X:%02X nicht unterstützt (Simulation)", index, sub);
-    err = b;
-    return false;
+    if (index == kObjInputs || (index & 0xFF00) == 0x1A00 || (index & 0xFF00) == 0x1600) {
+        char b[64];
+        std::snprintf(b, sizeof b, "SDO-Write 0x%04X:%02X: Objekt nur lesbar (Simulation)", index, sub);
+        err = b;
+        return false;
+    }
+    od_[static_cast<uint32_t>(index) << 8 | sub] = d;
+    return true;
 }
 
 bool SimBackend::sdo_read(uint16_t index, uint8_t sub, size_t, std::vector<uint8_t>& d,
@@ -150,8 +178,37 @@ bool SimBackend::sdo_read(uint16_t index, uint8_t sub, size_t, std::vector<uint8
         case kSubZeroBalance: d = le_f32(zero_bal_); return true;
         case kSubNominalLoad: d = le_f32(nominal_); return true;
         case kSubScaleFactor: d = le_f32(scale_); return true;
+        case kSubGain: d = le_f32(gain_); return true;
+        case kSubTara: d = le_f32(tara_); return true;
+        case kSubReferenceLoad: d = le_f32(reference_); return true;
+        case kSubFilterMode0: d = le_u16(filter_); return true;
         default: break;
         }
+    }
+    // PDO-Mapping und Eingangsobjekte aus dem Katalog bzw. dem Prozessabbild
+    for (const auto& p : pdos_) {
+        if (index == p.index) {
+            if (sub == 0) {
+                d = {static_cast<uint8_t>(p.entries.size())};
+                return true;
+            }
+            if (sub <= p.entries.size()) {
+                const auto& m = p.entries[sub - 1].map;
+                d = encode_value(DType::U32, static_cast<double>(static_cast<uint32_t>(m.index) << 16 |
+                                                                 m.sub << 8 | m.bits));
+                return true;
+            }
+        }
+        for (const auto& e : p.entries)
+            if (e.loc.present && e.map.index == index && e.map.sub == sub && index != 0) {
+                d = encode_value(e.type,
+                                 entry_value(p.rx ? img_out_.data() : img_in_.data(), e));
+                return true;
+            }
+    }
+    if (auto it = od_.find(static_cast<uint32_t>(index) << 8 | sub); it != od_.end()) {
+        d = it->second;
+        return true;
     }
     char b[64];
     std::snprintf(b, sizeof b, "SDO-Read 0x%04X:%02X nicht unterstützt (Simulation)", index, sub);

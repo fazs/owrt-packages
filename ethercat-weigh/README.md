@@ -49,7 +49,19 @@ Beim Übergang PRE-OP → SAFE-OP setzt der Master:
 Die Bitlage der Einträge wird nicht fest codiert, sondern nach Erreichen von SAFE-OP aus den gelesenen Mappings (`0x1C13`/`0x1C12` → `0x1Axx`/`0x16xx`) berechnet.
 
 Ausgewertete Statusbits: `0x6000:02` Overrange, `:04` Data invalid, `:07` Error, `:08` Calibration in progress, `:09` Steady state.
-Die Steuerbits `0x7000` werden nicht gesetzt; Tara erfolgt in der Anwendung.
+Sync error und TxPDO Toggle liegen ab Revision 0x0015 in `0x6000:0E`/`:10`, davor laut ESI in `0x1C32:20`/`0x1800:09`; beide Varianten werden erkannt.
+Die Steuerbits `0x7000` werden nicht gesetzt (außer per Debug-Dialog); Tara erfolgt in der Anwendung.
+
+Referenz für PDOs, Objektverzeichnis und Wertebereiche: `doc/Beckhoff-ESI/Beckhoff EL33xx.xml`.
+
+### Debug-Dialog
+
+Schaltfläche *Debug* in der Kopfzeile:
+
+- **Prozessdaten (PDO):** alle PDOs der Klemme (`0x1600`–`0x1607`, `0x1A00`–`0x1A07`, beim Hochlauf per SDO eingelesen, Namen per SDO-Information bzw. aus der ESI) mit Zuordnung, Bitlage und Live-Wert aus dem Prozessabbild. Zugeordnete Steuerbits `0x7000` werden im Prozessabbild übersteuert, bis sie freigegeben werden oder der Dialog geschlossen wird; nicht zugeordnete Einträge werden per SDO gelesen/geschrieben.
+- **Initialisierungssequenz:** die SDO-Schreibliste des PO2SO-Hooks (`el3356::init_sequence`) mit Sollwerten aus der Konfiguration; einzeln oder vollständig lesen/senden. `0x1C12`/`0x1C13` sind nur in PRE-OP beschreibbar; *Neu initialisieren* durchläuft INIT → OP mit der gespeicherten Sequenz.
+
+Auswahllisten für Bool-Objekte, Filtereinstellungen (`0x8000:11`/`:12`), Sample mode (`0x7000:04`), PDO-Zuordnung und Kommando `0xFB00:01`.
 
 ## Einheiten
 
@@ -125,6 +137,11 @@ Statistik (nur RAM): Anzahl, Mittelwert, Standardabweichung (n−1), Minimum, Ma
 | POST | `/api/calibration` | Kalibrierung, Body `{"action": …}` (siehe unten) |
 | POST | `/api/sim/load` | Nur Simulation: `{"grams": 2000}` bzw. `{"grams": null}` für das automatische Profil |
 | POST | `/api/statistics/reset` | Statistik und Messungen löschen |
+| GET | `/api/debug/pdos` | PDO-Katalog mit Zuordnung, Bitlage, Werten, Übersteuerungen und Prozessabbild (Hex) |
+| POST | `/api/debug/override` | Steuerbit übersteuern: `{"sub": 5, "value": true}`, aufheben mit `"value": null`, alle: `{"clear": true}` |
+| POST | `/api/debug/sdo` | `{"op": "read"\|"write", "index", "sub", "type": "bool\|u8\|u16\|u32\|u64\|i8\|i16\|i32\|f32", "value"}` |
+| GET | `/api/debug/init` | Initialisierungssequenz mit Sollwerten |
+| POST | `/api/debug/reinit` | Prozessdatenquelle schließen und neu initialisieren |
 | WS | `/ws` | `hello`, `sample` (mit `ui.rate_hz`), `measurement`, `statistics_reset`, `config`, `backend`, `device_config`, `calibration` |
 
 Aktionen für `/api/calibration`:
@@ -175,6 +192,21 @@ make defconfig
 make package/ethercat-weigh/compile V=s
 # Ergebnis: bin/packages/<arch>/fazs/ethercat-weigh_*.ipk bzw. *.apk
 ```
+
+### Automatischer Build und Deploy bei jedem Commit
+
+`scripts/deploy.sh` baut und testet die Anwendung auf dem Host (`build/host`, `ew_tests`; überspringen mit `EW_NO_TESTS=1`), baut das Frontend, führt im SDK (`../../openwrt-sdk-25.12.6-mediatek-filogic_…`, änderbar über `OPENWRT_DIR`) `feeds update fazs` (alle Feeds mit `EW_FEEDS_ALL=1`) und `feeds install -a -p fazs` aus, baut `package/ethercat-weigh/{clean,compile}`, lädt das `.apk` nach `root@waage:/root` (`EW_TARGET`) und aktualisiert es dort per `apk add --allow-untrusted` zwischen `stop` und `start` des Dienstes. Abschließend prüft es, dass der Prozess stabil läuft (keine Respawns) und `/api/info` antwortet.
+
+Git-Hooks (einmalig im Repository `owrt-packages` verlinken):
+
+```sh
+ln -sf ../../ethercat-weigh/scripts/git-hooks/pre-commit .git/hooks/pre-commit
+ln -sf ../../ethercat-weigh/scripts/git-hooks/post-commit .git/hooks/post-commit
+```
+
+- `pre-commit`: zählt `PKG_RELEASE` hoch und nimmt das Makefile in den Commit auf, sofern der Commit `ethercat-weigh/` betrifft (nicht bei rebase/merge/cherry-pick).
+- `post-commit`: ruft danach `scripts/deploy.sh` auf; Ausgabe auch in `.git/ew-deploy.log`.
+- Überspringen: `EW_NO_BUMP=1` (kein Hochzählen, kein Deploy) bzw. `EW_NO_DEPLOY=1` (nur Hochzählen).
 
 ## Inbetriebnahme auf dem GL-MT3000
 

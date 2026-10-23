@@ -2,6 +2,7 @@
 
 #include <array>
 #include <cstdint>
+#include <vector>
 
 #include "el3356.hpp"
 #include "io_backend.hpp"
@@ -24,9 +25,13 @@ public:
     bool sdo_read(uint16_t index, uint8_t sub, size_t size, std::vector<uint8_t>& data,
                   std::string& err) override;
     void close() override;
+    std::vector<el3356::PdoInfo> pdos() const override { return pdos_; }
+    void process_image(std::vector<uint8_t>& in, std::vector<uint8_t>& out) const override;
 
 private:
     bool read_layout(std::string& err);
+    void discover_pdos(const std::vector<uint16_t>& rx_assign,
+                       const std::vector<uint16_t>& tx_assign);
     void check_and_recover(double t);
 
     Config cfg_;  // stabile Kopie für den PO2SO-Hook (auch bei Rekonfiguration)
@@ -40,6 +45,7 @@ private:
     double last_check_t_ = -1.0;
     el3356::InputLayout in_;
     el3356::OutputLayout out_;
+    std::vector<el3356::PdoInfo> pdos_;
 };
 
 } // namespace ew

@@ -3,6 +3,7 @@
 #include <atomic>
 #include <deque>
 #include <functional>
+#include <map>
 #include <future>
 #include <memory>
 #include <mutex>
@@ -58,6 +59,15 @@ public:
     CalResult calibration(const nlohmann::json& request);
     CalResult set_sim_load(std::optional<double> grams);
 
+    // Debug (siehe README): PDO-Katalog mit aktuellen Werten, Übersteuerung der Steuerbits
+    // 0x7000:sub (nullopt hebt auf), einzelner SDO-Zugriff, Initialisierungssequenz
+    nlohmann::json debug_pdos();
+    CalResult debug_override(std::optional<uint8_t> sub, std::optional<bool> value);
+    nlohmann::json debug_sdo(const nlohmann::json& request);
+    nlohmann::json debug_init_sequence() const;
+    // Prozessdatenquelle schließen und neu öffnen (INIT -> OP inkl. Initialisierungssequenz)
+    void reinit();
+
 private:
     struct Request {
         std::function<CalResult()> fn;
@@ -66,6 +76,7 @@ private:
 
     void run();
     CalResult submit(std::function<CalResult()> fn, int timeout_ms = 3000);
+    nlohmann::json submit_json(std::function<nlohmann::json()> fn, int timeout_ms = 3000);
     void drain_requests(bool backend_ok);
     void apply_new_config_locked(const Config& next);
     void publish(const nlohmann::json& j);
@@ -77,6 +88,7 @@ private:
     std::string config_path_;
     std::thread thread_;
     std::atomic<bool> running_{false};
+    std::atomic<bool> reinit_{false};
 
     std::mutex req_mtx_;
     std::deque<std::shared_ptr<Request>> requests_;
@@ -95,6 +107,7 @@ private:
     std::deque<Measurement> history_;
     Sample last_;
     CalibrationController cal_;        // nur im Acquisition-Thread verändert
+    std::map<uint8_t, bool> ctrl_override_;  // Debug, nur im Acquisition-Thread
     nlohmann::json cal_json_;
     std::string backend_state_ = "init";  // init | op | error
     std::string backend_error_;

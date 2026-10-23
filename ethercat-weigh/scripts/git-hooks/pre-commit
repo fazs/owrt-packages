@@ -1,0 +1,28 @@
+#!/bin/sh
+# PKG_RELEASE von ethercat-weigh hochzählen, wenn der Commit ethercat-weigh/ betrifft.
+# Das geänderte Makefile wird in denselben Commit aufgenommen.
+# Überspringen: EW_NO_BUMP=1 git commit ...
+set -eu
+
+[ -z "${EW_NO_BUMP:-}" ] || exit 0
+git_dir=$(git rev-parse --git-dir)
+# Nicht während rebase/cherry-pick/merge
+[ -d "$git_dir/rebase-merge" ] || [ -d "$git_dir/rebase-apply" ] || \
+  [ -f "$git_dir/CHERRY_PICK_HEAD" ] || [ -f "$git_dir/MERGE_HEAD" ] && exit 0
+git diff --cached --quiet -- ethercat-weigh/ && exit 0
+
+mk=ethercat-weigh/openwrt/ethercat-weigh/Makefile
+# Nicht gestagete Änderungen am Makefile würden sonst mit in den Commit gelangen
+if ! git diff --quiet -- "$mk"; then
+  echo "pre-commit: $mk hat nicht gestagete Änderungen; bitte stagen oder EW_NO_BUMP=1 setzen" >&2
+  exit 1
+fi
+
+old=$(sed -n 's/^PKG_RELEASE:=//p' "$mk")
+new=$((old + 1))
+sed -i "s/^PKG_RELEASE:=.*/PKG_RELEASE:=$new/" "$mk"
+git add "$mk"
+echo "pre-commit: ethercat-weigh PKG_RELEASE $old -> $new"
+
+# Merker für post-commit: nach diesem Commit bauen und deployen
+touch "$git_dir/ew-deploy-pending"

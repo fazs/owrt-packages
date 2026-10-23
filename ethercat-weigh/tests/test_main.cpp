@@ -242,6 +242,67 @@ TEST(el3356_layout_and_decode) {
     CHECK(ew::el3356::settings_writes(ew::DeviceConfig{}).size() == 12);
 }
 
+TEST(el3356_debug_catalog_and_init_sequence) {
+    using namespace ew::el3356;
+    auto pdos = known_pdos();
+    locate_pdos(pdos, rx_assignment(), tx_assignment());
+    const PdoInfo* status = nullptr;
+    const PdoInfo* real = nullptr;
+    for (const auto& p : pdos) {
+        if (p.index == kPdoStatus) status = &p;
+        if (p.index == kPdoValueReal) real = &p;
+        if (p.index == 0x1A01) CHECK(!p.assigned);
+    }
+    CHECK(status && status->assigned && real && real->assigned);
+    CHECK(real->entries[0].loc.bit_offset == 16 && real->entries[0].type == DType::F32);
+
+    // Statusbits + Value (Real) schreiben und über Layout und Katalog zurücklesen
+    std::vector<std::vector<MapEntry>> tx;
+    for (const auto* p : {status, real}) {
+        std::vector<MapEntry> m;
+        for (const auto& e : p->entries) m.push_back(e.map);
+        tx.push_back(m);
+    }
+    const auto il = layout_inputs(tx);
+    uint8_t img[6] = {};
+    ew::El3356Status st;
+    st.steady_state = true;
+    st.txpdo_toggle = true;
+    encode_inputs(img, il, st, -12.25f);
+    const auto back = decode_status(img, il);
+    CHECK(back.steady_state && back.txpdo_toggle && !back.error);
+    CHECK_NEAR(entry_value(img, real->entries[0]), -12.25, 0);
+    CHECK(entry_value(img, status->entries[7]) == 1.0);  // 0x6000:09 Steady state
+
+    // Bis Revision 0x0014 (ESI): Sync error 0x1C32:20, TxPDO Toggle 0x1800:09
+    const auto old = layout_inputs({{{0, 0, 1}, {kObjInputs, 0x02, 1}, {0, 0, 1}, {kObjInputs, 0x04, 1},
+                                     {0, 0, 2}, {kObjInputs, 0x07, 1}, {kObjInputs, 0x08, 1},
+                                     {kObjInputs, 0x09, 1}, {0, 0, 4}, {kObjSmOutParam, 0x20, 1},
+                                     {0, 0, 1}, {kObjTxPdoPar, 0x09, 1}}});
+    CHECK(old.sync_error.present && old.sync_error.bit_offset == 13);
+    CHECK(old.toggle.present && old.toggle.bit_offset == 15);
+    CHECK(pdos.size() == 10);
+
+    // Typ-Kodierung
+    CHECK(encode_value(DType::U16, 0x1A02) == (std::vector<uint8_t>{0x02, 0x1A}));
+    CHECK(decode_value(DType::I16, {0xFE, 0xFF}) == -2.0);
+    CHECK_NEAR(decode_value(DType::F32, encode_value(DType::F32, 9.80665)), 9.80665, 1e-6);
+    DType t;
+    CHECK(dtype_from_name("i32", t) && t == DType::I32 && !dtype_from_name("x", t));
+    CHECK(decode_value(DType::U64, encode_value(DType::U64, 1e12)) == 1e12);
+
+    ew::El3356Control c;
+    CHECK(control_bit(c, 0x05) == &c.tare && control_bit(c, 0x06) == nullptr);
+
+    ew::DeviceConfig dc;
+    const auto seq = init_sequence(dc);
+    CHECK(seq.size() == 3 + 4 + 12);
+    CHECK(seq[0].index == kSm2Assign && seq[0].sub == 0 && seq[0].pre_op_only);
+    CHECK(seq[5].index == kSm3Assign && decode_value(DType::U16, seq[5].data) == kPdoValueReal);
+    dc.write_on_start = false;
+    CHECK(init_sequence(dc).size() == 7);
+}
+
 TEST(simulation_end_to_end) {
     ew::Config cfg;
     cfg.device.zero_balance = ew::SimBackend::kZeroTrue;  // Klemme als kalibriert annehmen

@@ -50,6 +50,24 @@ double num(const nlohmann::json& j, const char* key) {
     return j[key].get<double>();
 }
 
+std::string hex(const std::vector<uint8_t>& d) {
+    static const char* digits = "0123456789ABCDEF";
+    std::string out;
+    for (size_t i = 0; i < d.size(); ++i) {
+        if (i) out += ' ';
+        out += digits[d[i] >> 4];
+        out += digits[d[i] & 0x0F];
+    }
+    return out;
+}
+
+nlohmann::json typed(el3356::DType t, double v) {
+    if (t == el3356::DType::Bool) return v != 0.0;
+    if (t == el3356::DType::F32) return v;
+    if (t == el3356::DType::U64) return static_cast<uint64_t>(v);
+    return static_cast<int64_t>(v);
+}
+
 std::string str(const nlohmann::json& j, const char* key) {
     if (!j.contains(key) || !j[key].is_string())
         throw std::runtime_error(std::string("Feld '") + key + "' fehlt");
@@ -111,6 +129,18 @@ CalResult Acquisition::submit(std::function<CalResult()> fn, int timeout_ms) {
     return fut.get();
 }
 
+nlohmann::json Acquisition::submit_json(std::function<nlohmann::json()> fn, int timeout_ms) {
+    auto out = std::make_shared<nlohmann::json>();  // überlebt eine Zeitüberschreitung
+    const auto r = submit(
+        [out, fn = std::move(fn)]() -> CalResult {
+            *out = fn();
+            return {true, {}};
+        },
+        timeout_ms);
+    if (!r.ok) return {{"ok", false}, {"error", r.error}};
+    return *out;
+}
+
 void Acquisition::drain_requests(bool backend_ok) {
     std::deque<std::shared_ptr<Request>> q;
     {
@@ -164,6 +194,113 @@ CalResult Acquisition::set_sim_load(std::optional<double> grams) {
 
 CalResult Acquisition::calibration(const nlohmann::json& request) {
     return submit([this, request]() { return handle_calibration(request, now_); }, 5000);
+}
+
+// --- Debug -------------------------------------------------------------------------
+
+nlohmann::json Acquisition::debug_pdos() {
+    return submit_json([this] {
+        std::vector<uint8_t> in, out;
+        backend_->process_image(in, out);
+        nlohmann::json pdos = nlohmann::json::array();
+        for (const auto& p : backend_->pdos()) {
+            const auto& img = p.rx ? out : in;
+            nlohmann::json entries = nlohmann::json::array();
+            for (const auto& e : p.entries) {
+                const bool in_img = e.loc.present && e.type != el3356::DType::None &&
+                                    (e.loc.bit_offset + e.loc.bit_len + 7) / 8 <= img.size();
+                nlohmann::json ov = nullptr;
+                if (p.rx && e.map.index == el3356::kObjControl)
+                    if (auto it = ctrl_override_.find(e.map.sub); it != ctrl_override_.end())
+                        ov = it->second;
+                entries.push_back(
+                    {{"index", e.map.index},
+                     {"sub", e.map.sub},
+                     {"bits", e.map.bits},
+                     {"name", e.name},
+                     {"type", el3356::dtype_name(e.type)},
+                     {"offset", e.loc.present ? nlohmann::json(e.loc.bit_offset) : nlohmann::json(nullptr)},
+                     {"value", in_img ? typed(e.type, el3356::entry_value(img.data(), e))
+                                      : nlohmann::json(nullptr)},
+                     {"override", ov}});
+            }
+            pdos.push_back({{"index", p.index},
+                            {"name", p.name},
+                            {"rx", p.rx},
+                            {"assigned", p.assigned},
+                            {"excludes", p.excludes},
+                            {"entries", entries}});
+        }
+        return nlohmann::json{{"ok", true}, {"pdos", pdos}, {"inputs", hex(in)}, {"outputs", hex(out)}};
+    });
+}
+
+CalResult Acquisition::debug_override(std::optional<uint8_t> sub, std::optional<bool> value) {
+    if (sub) {
+        El3356Control probe;
+        if (!el3356::control_bit(probe, *sub)) return {false, "Kein Steuerbit 0x7000:" + std::to_string(*sub)};
+    }
+    return submit([this, sub, value]() -> CalResult {
+        if (!sub)
+            ctrl_override_.clear();
+        else if (value)
+            ctrl_override_[*sub] = *value;
+        else
+            ctrl_override_.erase(*sub);
+        return {true, {}};
+    });
+}
+
+nlohmann::json Acquisition::debug_sdo(const nlohmann::json& req) {
+    const std::string op = str(req, "op");
+    const double index = num(req, "index"), sub = num(req, "sub");
+    if (index < 0 || index > 0xFFFF || sub < 0 || sub > 0xFF)
+        throw std::runtime_error("Index oder Subindex außerhalb des Wertebereichs");
+    el3356::DType type;
+    if (!el3356::dtype_from_name(str(req, "type"), type)) throw std::runtime_error("Unbekannter Datentyp");
+    if (op != "read" && op != "write") throw std::runtime_error("op muss read oder write sein");
+    std::vector<uint8_t> data;
+    if (op == "write") {
+        if (!req.contains("value") || !(req["value"].is_number() || req["value"].is_boolean()))
+            throw std::runtime_error("Feld 'value' fehlt");
+        data = el3356::encode_value(type, req["value"].is_boolean() ? req["value"].get<bool>()
+                                                                     : req["value"].get<double>());
+    }
+    const auto idx = static_cast<uint16_t>(index);
+    const auto si = static_cast<uint8_t>(sub);
+    return submit_json([this, op, idx, si, type, data]() mutable {
+        std::string err;
+        bool ok;
+        if (op == "write") {
+            ok = backend_->sdo_write(idx, si, data, err);
+        } else {
+            ok = backend_->sdo_read(idx, si, 64, data, err);  // Puffer > Objektgröße
+        }
+        if (!ok) return nlohmann::json{{"ok", false}, {"error", err}};
+        log_info("Debug: SDO-%s 0x%04X:%02X = %s", op == "write" ? "Write" : "Read", idx, si,
+                 hex(data).c_str());
+        return nlohmann::json{{"ok", true},
+                              {"value", typed(type, el3356::decode_value(type, data))},
+                              {"hex", hex(data)}};
+    });
+}
+
+nlohmann::json Acquisition::debug_init_sequence() const {
+    nlohmann::json steps = nlohmann::json::array();
+    for (const auto& w : el3356::init_sequence(config().device))
+        steps.push_back({{"index", w.index},
+                         {"sub", w.sub},
+                         {"name", w.name},
+                         {"type", el3356::dtype_name(w.type)},
+                         {"value", typed(w.type, el3356::decode_value(w.type, w.data))},
+                         {"hex", hex(w.data)},
+                         {"pre_op_only", w.pre_op_only}});
+    return {{"steps", steps}};
+}
+
+void Acquisition::reinit() {
+    log_info("Neuinitialisierung angefordert");
+    reinit_ = true;
 }
 
 // Läuft im Acquisition-Thread
@@ -384,6 +521,8 @@ void Acquisition::run() {
             c = cfg_;
             backend_state_ = "init";
         }
+        publish({{"type", "backend"}, {"state", "init"}, {"error", ""}});
+        reinit_ = false;
         if (!backend_->open(c, err)) {
             log_error("Backend %s: %s", backend_->name().c_str(), err.c_str());
             backend_->close();
@@ -416,6 +555,11 @@ void Acquisition::run() {
         double last_ui = -1.0;
 
         while (running_) {
+            if (reinit_) {
+                drain_requests(false);
+                backend_->close();
+                break;
+            }
             bool apply_device = false;
             DeviceConfig dc;
             {
@@ -446,6 +590,7 @@ void Acquisition::run() {
             now_ = t;
 
             El3356Control ctrl;
+            for (const auto& [sub, v] : ctrl_override_) *el3356::control_bit(ctrl, sub) = v;
             Sample s;
             backend_->cycle(t, ctrl, s);
 

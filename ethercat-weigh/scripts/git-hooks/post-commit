@@ -1,0 +1,20 @@
+#!/bin/sh
+# Nach einem Commit mit Release-Erhöhung (pre-commit) bauen und auf das Zielgerät deployen.
+# Überspringen: EW_NO_DEPLOY=1 git commit ...
+# Ausgabe zusätzlich in .git/ew-deploy.log; ein Fehler macht den Commit nicht rückgängig.
+
+git_dir=$(git rev-parse --git-dir)
+marker=$git_dir/ew-deploy-pending
+[ -f "$marker" ] || exit 0
+rm -f "$marker"
+[ -z "${EW_NO_DEPLOY:-}" ] || exit 0
+
+deploy=$(git rev-parse --show-toplevel)/ethercat-weigh/scripts/deploy.sh
+log=$git_dir/ew-deploy.log
+# Mit Terminal: stdin von /dev/tty, damit ssh/scp nach Passphrase/Host-Key fragen können.
+# Ohne Terminal (IDE): BatchMode-Verhalten über </dev/null.
+if (: </dev/tty) 2>/dev/null; then in=/dev/tty; else in=/dev/null; fi
+{ "$deploy" <"$in" 2>&1; echo $? >"$log.rc"; } | tee "$log"
+rc=$(cat "$log.rc"); rm -f "$log.rc"
+[ "$rc" = 0 ] || echo "post-commit: Deploy fehlgeschlagen (Exit $rc), siehe $log" >&2
+exit 0
