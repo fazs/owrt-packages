@@ -80,7 +80,7 @@ function applySnapshot(s) {
 
 function handle(msg) {
   switch (msg.type) {
-    case 'hello':
+    case 'init':
       applySnapshot(msg.snapshot);
       live.config = msg.config;
       trend.t.length = 0;

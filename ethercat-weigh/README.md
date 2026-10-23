@@ -166,14 +166,15 @@ GL-MT3000: Target `mediatek/filogic`. SDK passend zur installierten OpenWrt-Vers
 git submodule update --init
 cd web && npm ci && npm run build && cd ..
 
-# im SDK
-echo "src-link ew $(pwd)/openwrt" >> <sdk>/feeds.conf.default
+# im SDK – das gesamte owrt-packages-Repository ist der Feed
+# (nicht zusätzlich ethercat-weigh/openwrt eintragen, sonst ist das Paket doppelt definiert)
+echo "src-link fazs $(realpath ..)" >> <sdk>/feeds.conf.default
 cd <sdk>
 ./scripts/feeds update -a
 ./scripts/feeds install ethercat-weigh
 make defconfig
 make package/ethercat-weigh/compile V=s
-# Ergebnis: bin/packages/<arch>/ew/ethercat-weigh_0.1.0-r1_*.ipk bzw. *.apk
+# Ergebnis: bin/packages/<arch>/fazs/ethercat-weigh_0.1.0-r1_*.ipk bzw. *.apk
 ```
 
 ## Inbetriebnahme auf dem GL-MT3000

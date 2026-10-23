@@ -145,12 +145,13 @@ void run_web_server(Acquisition& acq, const HttpConfig& http) {
     // --- WebSocket -------------------------------------------------------------
     CROW_WEBSOCKET_ROUTE(app, "/ws")
         .onopen([&](crow::websocket::connection& conn) {
-            nlohmann::json hello = {{"type", "hello"},
-                                    {"snapshot", acq.snapshot()},
-                                    {"config", acq.config()}};
+            // Erste Nachricht nach dem Connect: vollständiger Zustand zur Initialisierung des Clients
+            nlohmann::json initial_state = {{"type", "init"},
+                                            {"snapshot", acq.snapshot()},
+                                            {"config", acq.config()}};
             std::lock_guard<std::mutex> lk(hub.m);
             hub.conns.insert(&conn);
-            conn.send_text(hello.dump());
+            conn.send_text(initial_state.dump());
         })
         .onclose([&](crow::websocket::connection& conn, const std::string&) {
             std::lock_guard<std::mutex> lk(hub.m);

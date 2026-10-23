@@ -1,9 +1,12 @@
 #
 # OpenWrt-Package ethercat-weigh
 #
-# import feed:
-#   echo "src-link ew /my-path/ethercat-weigh/openwrt" >> feeds.conf.default
-#   ./scripts/feeds update ew && ./scripts/feeds install ethercat-weigh
+# import feed (the whole owrt-packages repository is the feed):
+#   echo "src-link fazs /my-path/owrt-packages" >> feeds.conf.default
+#   ./scripts/feeds update fazs && ./scripts/feeds install ethercat-weigh
+#
+# Do not add ethercat-weigh/openwrt as a separate feed in addition,
+# otherwise the package is defined twice.
 #
 # Required prerequisites:
 # - Frontend built (web/dist)
