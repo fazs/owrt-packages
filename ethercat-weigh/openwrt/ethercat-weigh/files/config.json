@@ -13,9 +13,9 @@
     "mode0_enable_averager": true,
     "mode0_enable_filter": true,
     "mode0_filter_settings": 0,
-    "nominal_load": 5.0,
-    "rated_output_mv_v": 2.0,
-    "reference_load": 5.0,
+    "nominal_load": 500.0,
+    "rated_output_mv_v": 0.9,
+    "reference_load": 50.0,
     "scale_factor": 1000.0,
     "steady_state_tolerance": 5,
     "steady_state_window": 1000,
@@ -24,7 +24,7 @@
   },
   "ethercat": {
     "cycle_ms": 10,
-    "interface": "eth1",
+    "interface": "eth0",
     "rt_priority": 0,
     "slave_name": "EL3356-0010",
     "wkc_fault_cycles": 3

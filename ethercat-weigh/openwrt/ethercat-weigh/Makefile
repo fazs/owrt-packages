@@ -1,11 +1,13 @@
 #
-# OpenWrt-Package für ethercat-weigh
+# OpenWrt-Package ethercat-weigh
 #
-# Einbindung als Feed (Pfad anpassen):
-#   echo "src-link ew /pfad/zu/ethercat-weigh/openwrt" >> feeds.conf.default
+# import feed:
+#   echo "src-link ew /my-path/ethercat-weigh/openwrt" >> feeds.conf.default
 #   ./scripts/feeds update ew && ./scripts/feeds install ethercat-weigh
 #
-# Voraussetzung: Frontend gebaut (web/dist), Submodules ausgecheckt.
+# Required prerequisites:
+# - Frontend built (web/dist)
+# - Submodules checked out
 #
 
 include $(TOPDIR)/rules.mk
@@ -16,7 +18,6 @@ PKG_RELEASE:=1
 
 PKG_MAINTAINER:=fazs <12977360+fazs@users.noreply.github.com>
 
-# Quellen liegen im selben Repository (zwei Ebenen über diesem Makefile)
 EW_SOURCE_ROOT:=$(abspath $(CURDIR)/../..)
 
 include $(INCLUDE_DIR)/package.mk
@@ -27,14 +28,14 @@ CMAKE_OPTIONS += -DEW_BUILD_TESTS=OFF
 define Package/ethercat-weigh
   SECTION:=utils
   CATEGORY:=Utilities
-  TITLE:=EtherCAT EL3356 Waegeauswertung mit Webinterface
+  TITLE:=EtherCAT EL3356 Weighing with Webinterface
   DEPENDS:=+libstdcpp
 endef
 
 define Package/ethercat-weigh/description
-  EtherCAT-Master (SOEM) fuer EK1100 + EL3356-0010, Erkennung gueltiger
-  Messungen (statische Waegung), temporaere Statistik, REST/WebSocket-API
-  und Web-Frontend.
+  EtherCAT-Master (SOEM) to use with EK1100 and EL3356-0010, reckognizes "valid" 
+  measurement with user-defined parameters, shows temporary statistics.
+  Provides web-interface on port 8080 and live updates through REST/WebSocket-API
 endef
 
 define Package/ethercat-weigh/conffiles
@@ -43,11 +44,11 @@ endef
 
 define Build/Prepare
 	@if [ ! -f "$(EW_SOURCE_ROOT)/web/dist/index.html" ]; then \
-		echo "web/dist fehlt: im Repository 'cd web && npm ci && npm run build' ausfuehren"; \
+		echo "web/dist missing: in repository; run 'cd web && npm ci && npm run build'"; \
 		exit 1; \
 	fi
 	@if [ ! -f "$(EW_SOURCE_ROOT)/third_party/SOEM/soem/ethercat.h" ]; then \
-		echo "third_party fehlt: 'git submodule update --init' ausfuehren"; \
+		echo "third_party missing: run 'git submodule update --init'"; \
 		exit 1; \
 	fi
 	mkdir -p $(PKG_BUILD_DIR)

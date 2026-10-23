@@ -196,6 +196,9 @@ Bei Inbetriebnahme zu prüfen:
 - Verfahren Klemme: Byte-Reihenfolge des Kommandos in `0xFB00:01` (OCTET-STRING[2], geschrieben als UINT16 little endian, d. h. 257 → `01 01`, 258 → `02 01`).
 - Zykluszeit-Reserve im Footer (Überläufe, max. Zykluszeit) unter Last von Routing/WLAN; ggf. `ethercat.rt_priority` > 0 setzen.
 
+### Optional: open Firewall port
+
+
 ## Lizenzen der Abhängigkeiten
 
 | Komponente | Lizenz |
