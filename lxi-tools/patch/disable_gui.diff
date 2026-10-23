@@ -1,0 +1,17 @@
+Subject: [PATCH] disable_gui
+---
+Index: meson_options.txt
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/meson_options.txt b/meson_options.txt
+--- a/meson_options.txt	(revision e292eb8a6f4a722ff91f1f4625f2ae387140a7ea)
++++ b/meson_options.txt	(date 1715245386953)
+@@ -3,5 +3,5 @@
+        description : 'Directory for bash completion scripts ["no" disables]')
+ 
+ option('gui',
+-       type : 'boolean', value: true,
++       type : 'boolean', value: false,
+        description : 'Install lxi-gui')
