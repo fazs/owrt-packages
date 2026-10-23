@@ -1,0 +1,12 @@
+[submodule "third_party/SOEM"]
+	path = third_party/SOEM
+	url = https://github.com/OpenEtherCATsociety/SOEM
+[submodule "third_party/json"]
+	path = third_party/json
+	url = https://github.com/nlohmann/json
+[submodule "third_party/Crow"]
+	path = third_party/Crow
+	url = https://github.com/CrowCpp/Crow
+[submodule "third_party/asio"]
+	path = third_party/asio
+	url = https://github.com/chriskohlhoff/asio

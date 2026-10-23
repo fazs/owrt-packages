@@ -1,0 +1,20 @@
+#!/bin/sh /etc/rc.common
+# procd-Init-Script für ethercat-weigh
+# Logausgabe: logread -e ethercat-weigh
+
+START=95
+STOP=10
+USE_PROCD=1
+
+PROG=/usr/bin/ethercat-weigh
+CONF=/etc/ethercat-weigh/config.json
+
+start_service() {
+	procd_open_instance
+	procd_set_param command "$PROG" -c "$CONF"
+	# Neustart bei Absturz: unbegrenzte Versuche, 5 s Abstand
+	procd_set_param respawn 3600 5 0
+	procd_set_param stdout 1
+	procd_set_param stderr 1
+	procd_close_instance
+}
