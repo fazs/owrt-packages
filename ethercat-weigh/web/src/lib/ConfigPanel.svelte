@@ -2,6 +2,7 @@
   import { live, saveConfig, notify } from './live.svelte.js';
   import { FILTER_OPTIONS } from './coe.js';
 
+  /** @type {{open?: boolean}} Dialog geöffnet (bindbar) */
   let { open = $bindable(false) } = $props();
 
   let dialog;
@@ -117,6 +118,13 @@
     }
   });
 
+  /**
+   * Übernimmt eine Eingabe in den Entwurf; Zahlenfelder mit Komma oder Punkt,
+   * ungültige Zahlen werden als null gespeichert (Validierung beim Speichern).
+   * @param {string} g Gruppe (Abschnitt der Konfiguration)
+   * @param {{k: string, t: string, o?: Array}} f Felddefinition
+   * @param {string|boolean} raw Eingabewert
+   */
   function setField(g, f, raw) {
     if (f.t === 'bool' || f.t === 'text') draft[g][f.k] = raw;
     else if (f.t === 'select') draft[g][f.k] = typeof f.o[0][0] === 'number' ? Number(raw) : raw;
@@ -130,8 +138,18 @@
 
   const NUM_PATTERN = '\\s*-?(\\d+([.,]\\d*)?|[.,]\\d+)([eE][\\-+]?\\d+)?\\s*';
   const INT_PATTERN = '\\s*-?\\d+\\s*';
+  /**
+   * Anzeigetext eines Zahlenfelds: letzte Eingabe, sonst Wert mit Dezimalkomma.
+   * @param {string} g Gruppe
+   * @param {string} k Feld
+   * @returns {string}
+   */
   const numText = (g, k) => texts[`${g}.${k}`] ?? String(draft[g][k] ?? '').replace('.', ',');
 
+  /**
+   * Speichert den Entwurf; bei Fehlern bleibt der Dialog mit Fehlerliste offen.
+   * @param {SubmitEvent} e Formularereignis
+   */
   async function save(e) {
     e.preventDefault();
     saving = true;

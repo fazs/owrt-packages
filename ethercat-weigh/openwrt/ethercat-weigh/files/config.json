@@ -1,7 +1,7 @@
 {
   "calibration": {
     "capture_time_ms": 2000,
-    "device_unit": "kg",
+    "device_unit": "g",
     "mode": "device",
     "points": [],
     "stable_band_rel": 0.0005,
@@ -13,7 +13,7 @@
     "mode0_enable_averager": true,
     "mode0_enable_filter": true,
     "mode0_filter_settings": 0,
-    "nominal_load": 500.0,
+    "nominal_load": 50.0,
     "rated_output_mv_v": 0.9,
     "reference_load": 50.0,
     "scale_factor": 1000.0,
@@ -36,12 +36,12 @@
     "web_root": "/www/ethercat-weigh"
   },
   "measurement": {
-    "min_load": 100.0,
+    "min_load": 3.0,
     "sigma_max": 1.0,
     "stable_time_ms": 500,
     "tolerance": 2.0,
     "use_device_steady_state": false,
-    "zero_threshold": 20.0
+    "zero_threshold": 1.0
   },
   "statistics": {
     "history_size": 500,

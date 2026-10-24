@@ -6,6 +6,11 @@
 
 namespace ew::el3356 {
 
+/**
+ * @brief Zerlegt einen Mapping-Eintrag aus 0x16xx/0x1Axx.
+ * @param raw UINT32: index<<16 | sub<<8 | bitlen
+ * @return Index, Subindex, Bitlänge
+ */
 MapEntry decode_map_entry(uint32_t raw) {
     return {static_cast<uint16_t>(raw >> 16), static_cast<uint8_t>((raw >> 8) & 0xFF),
             static_cast<uint8_t>(raw & 0xFF)};
@@ -13,6 +18,11 @@ MapEntry decode_map_entry(uint32_t raw) {
 
 namespace {
 
+/**
+ * @brief Durchläuft alle Einträge der PDOs in Zuordnungsreihenfolge.
+ * @param pdos Mappings je PDO
+ * @param on_entry Aufruf (Eintrag, Bitoffset ab Beginn des Abbilds)
+ */
 template <typename F>
 void walk(const std::vector<std::vector<MapEntry>>& pdos, F&& on_entry) {
     uint32_t off = 0;
@@ -23,6 +33,13 @@ void walk(const std::vector<std::vector<MapEntry>>& pdos, F&& on_entry) {
         }
 }
 
+/**
+ * @brief Liest ein Bitfeld (little endian, bis 64 Bit).
+ * @param img Prozessabbild
+ * @param off Bitoffset
+ * @param len Länge in Bit
+ * @return Rohwert
+ */
 uint64_t get_bits(const uint8_t* img, uint32_t off, uint8_t len) {
     uint64_t v = 0;
     for (uint8_t i = 0; i < len && i < 64; ++i, ++off)
@@ -30,6 +47,13 @@ uint64_t get_bits(const uint8_t* img, uint32_t off, uint8_t len) {
     return v;
 }
 
+/**
+ * @brief Schreibt ein Bitfeld (little endian, bis 64 Bit).
+ * @param img Prozessabbild
+ * @param off Bitoffset
+ * @param len Länge in Bit
+ * @param v Rohwert
+ */
 void set_bits(uint8_t* img, uint32_t off, uint8_t len, uint64_t v) {
     for (uint8_t i = 0; i < len && i < 64; ++i, ++off) {
         const uint8_t mask = static_cast<uint8_t>(1u << (off % 8));
@@ -40,11 +64,13 @@ void set_bits(uint8_t* img, uint32_t off, uint8_t len, uint64_t v) {
     }
 }
 
+/// @brief Liest ein Bit; false, wenn der Eintrag nicht gemappt ist.
 bool get_bit(const uint8_t* img, const EntryLoc& l) {
     if (!l.present) return false;
     return (img[l.bit_offset / 8] >> (l.bit_offset % 8)) & 1u;
 }
 
+/// @brief Setzt oder löscht ein Bit; ohne Wirkung, wenn der Eintrag nicht gemappt ist.
 void set_bit(uint8_t* img, const EntryLoc& l, bool v) {
     if (!l.present) return;
     const uint8_t mask = static_cast<uint8_t>(1u << (l.bit_offset % 8));
@@ -54,6 +80,7 @@ void set_bit(uint8_t* img, const EntryLoc& l, bool v) {
         img[l.bit_offset / 8] &= static_cast<uint8_t>(~mask);
 }
 
+/// @brief Bytes eines Werts in Speicherreihenfolge (Zielplattformen sind little endian).
 template <typename T>
 std::vector<uint8_t> le(T v) {
     std::vector<uint8_t> out(sizeof(T));
@@ -61,7 +88,12 @@ std::vector<uint8_t> le(T v) {
     return out;
 }
 
-// Rohwert (bis 64 Bit, little endian) als Zahl gemäß Typ
+/**
+ * @brief Rohwert (bis 64 Bit, little endian) als Zahl gemäß Typ.
+ * @param t Datentyp
+ * @param raw Rohbits
+ * @return Wert; U64 als double gerundet
+ */
 double from_raw(DType t, uint64_t raw) {
     switch (t) {
     case DType::Bool: return raw & 1u;
@@ -78,6 +110,12 @@ double from_raw(DType t, uint64_t raw) {
     }
 }
 
+/**
+ * @brief Zahl als Rohwert gemäß Typ (Ganzzahlen gerundet, vorzeichenlose ab 0).
+ * @param t Datentyp
+ * @param v Wert
+ * @return Rohbits
+ */
 uint64_t to_raw(DType t, double v) {
     switch (t) {
     case DType::Bool: return v != 0.0 ? 1u : 0u;
@@ -95,14 +133,15 @@ uint64_t to_raw(DType t, double v) {
     }
 }
 
+/// Bekannter Objekteintrag laut ESI.
 struct KnownEntry {
-    uint16_t index;
-    uint8_t sub;
-    const char* name;
-    DType type;
+    uint16_t index;    ///< Objektindex
+    uint8_t sub;       ///< Subindex
+    const char* name;  ///< Name laut ESI
+    DType type;        ///< Datentyp
 };
 
-// Objektverzeichnis laut ESI (Revision 0x0019): RMB 0x6000/0x7000, AI-Kanäle 0x6010/0x6020
+/// Objektverzeichnis laut ESI (Revision 0x0019): RMB 0x6000/0x7000, AI-Kanäle 0x6010/0x6020
 const KnownEntry kKnownEntries[] = {
     {kObjInputs, 0x02, "Overrange", DType::Bool},
     {kObjInputs, 0x04, "Data invalid", DType::Bool},
@@ -134,6 +173,13 @@ const KnownEntry kKnownEntries[] = {
     {kObjControl, 0x11, "Filter frequency", DType::U16},
 };
 
+/**
+ * @brief PDO-Eintrag mit Name und Typ aus der ESI-Tabelle.
+ * @param index Objektindex (0 = Lücke)
+ * @param sub Subindex
+ * @param bits Länge in Bit
+ * @return Eintrag; unbekannte Objekte heißen "0xIIII:SS", Typ nach Bitlänge
+ */
 PdoEntry known(uint16_t index, uint8_t sub, uint8_t bits) {
     PdoEntry e;
     e.map = {index, sub, bits};
@@ -148,6 +194,11 @@ PdoEntry known(uint16_t index, uint8_t sub, uint8_t bits) {
 
 } // namespace
 
+/**
+ * @brief Kurzname eines Datentyps für JSON.
+ * @param t Datentyp
+ * @return "bool", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "f32" bzw. "" für None
+ */
 const char* dtype_name(DType t) {
     switch (t) {
     case DType::Bool: return "bool";
@@ -163,6 +214,12 @@ const char* dtype_name(DType t) {
     }
 }
 
+/**
+ * @brief Datentyp aus seinem Kurznamen.
+ * @param s Kurzname (siehe dtype_name())
+ * @param[out] t Datentyp
+ * @return false bei unbekanntem Namen
+ */
 bool dtype_from_name(const std::string& s, DType& t) {
     for (DType c : {DType::Bool, DType::U8, DType::U16, DType::U32, DType::U64, DType::I8, DType::I16,
                     DType::I32, DType::F32})
@@ -173,6 +230,12 @@ bool dtype_from_name(const std::string& s, DType& t) {
     return false;
 }
 
+/**
+ * @brief Datentyp aus dem CoE-Datentypcode (ETG.1000.6).
+ * @param coe ECT_*-Code aus der SDO-Information, 0 = unbekannt
+ * @param bits Bitlänge, Rückfall bei unbekanntem Code
+ * @return Datentyp
+ */
 DType dtype_from_coe(uint16_t coe, uint8_t bits) {
     switch (coe) {  // ECT_BOOLEAN .. ECT_REAL32 (ETG.1000.6)
     case 0x0001: return DType::Bool;
@@ -193,6 +256,11 @@ DType dtype_from_coe(uint16_t coe, uint8_t bits) {
     return DType::U64;
 }
 
+/**
+ * @brief Größe für SDO-Zugriffe.
+ * @param t Datentyp
+ * @return Bytes, 0 für None
+ */
 size_t dtype_size(DType t) {
     switch (t) {
     case DType::Bool:
@@ -208,6 +276,12 @@ size_t dtype_size(DType t) {
     }
 }
 
+/**
+ * @brief Kodiert einen Wert für einen SDO-Schreibzugriff.
+ * @param t Datentyp
+ * @param v Wert
+ * @return dtype_size(t) Bytes, little endian
+ */
 std::vector<uint8_t> encode_value(DType t, double v) {
     const uint64_t raw = to_raw(t, v);
     std::vector<uint8_t> out(dtype_size(t));
@@ -215,6 +289,12 @@ std::vector<uint8_t> encode_value(DType t, double v) {
     return out;
 }
 
+/**
+ * @brief Dekodiert SDO-Daten.
+ * @param t Datentyp
+ * @param d Daten, little endian; überzählige Bytes werden ignoriert
+ * @return Wert
+ */
 double decode_value(DType t, const std::vector<uint8_t>& d) {
     uint64_t raw = 0;
     const size_t n = dtype_size(t) ? dtype_size(t) : 8;
@@ -222,6 +302,15 @@ double decode_value(DType t, const std::vector<uint8_t>& d) {
     return from_raw(t, raw);
 }
 
+/**
+ * @brief Berechnet die Lage der ausgewerteten Eingänge.
+ *
+ * Erkennt Sync error und TxPDO Toggle sowohl in 0x6000 als auch (bis Revision 0x0014)
+ * in 0x1C32:20 bzw. 0x1800:09.
+ *
+ * @param pdos Mappings der TxPDOs in Reihenfolge von 0x1C13
+ * @return Lage relativ zum Beginn des Eingangsabbilds
+ */
 InputLayout layout_inputs(const std::vector<std::vector<MapEntry>>& pdos) {
     InputLayout l;
     walk(pdos, [&](const MapEntry& e, uint32_t off) {
@@ -245,6 +334,11 @@ InputLayout layout_inputs(const std::vector<std::vector<MapEntry>>& pdos) {
     return l;
 }
 
+/**
+ * @brief Berechnet die Lage der Steuerbits 0x7000.
+ * @param pdos Mappings der RxPDOs in Reihenfolge von 0x1C12
+ * @return Lage relativ zum Beginn des Ausgangsabbilds
+ */
 OutputLayout layout_outputs(const std::vector<std::vector<MapEntry>>& pdos) {
     OutputLayout l;
     walk(pdos, [&](const MapEntry& e, uint32_t off) {
@@ -262,6 +356,12 @@ OutputLayout layout_outputs(const std::vector<std::vector<MapEntry>>& pdos) {
     return l;
 }
 
+/**
+ * @brief Liest die Statusbits aus dem Eingangsabbild.
+ * @param img Eingangsabbild des Slaves
+ * @param l Lage der Einträge
+ * @return Statusbits; nicht gemappte Bits sind false
+ */
 El3356Status decode_status(const uint8_t* img, const InputLayout& l) {
     El3356Status s;
     s.overrange = get_bit(img, l.overrange);
@@ -274,6 +374,12 @@ El3356Status decode_status(const uint8_t* img, const InputLayout& l) {
     return s;
 }
 
+/**
+ * @brief Liest Value (Real) 0x6000:12 aus dem Eingangsabbild.
+ * @param img Eingangsabbild des Slaves
+ * @param l Lage der Einträge
+ * @return Wert, 0 wenn nicht byteweise mit 32 Bit gemappt
+ */
 float decode_value_real(const uint8_t* img, const InputLayout& l) {
     float f = 0.0f;
     if (!l.value_real.present || l.value_real.bit_len != 32 || (l.value_real.bit_offset % 8) != 0)
@@ -282,6 +388,12 @@ float decode_value_real(const uint8_t* img, const InputLayout& l) {
     return f;
 }
 
+/**
+ * @brief Schreibt die Steuerbits in das Ausgangsabbild.
+ * @param img Ausgangsabbild des Slaves
+ * @param l Lage der Steuerbits
+ * @param c Steuerbits
+ */
 void encode_control(uint8_t* img, const OutputLayout& l, const El3356Control& c) {
     set_bit(img, l.start_calibration, c.start_calibration);
     set_bit(img, l.disable_calibration, c.disable_calibration);
@@ -290,6 +402,13 @@ void encode_control(uint8_t* img, const OutputLayout& l, const El3356Control& c)
     set_bit(img, l.tare, c.tare);
 }
 
+/**
+ * @brief Schreibt Statusbits und Value (Real) in ein Eingangsabbild (Simulation).
+ * @param img Eingangsabbild
+ * @param l Lage der Einträge
+ * @param s Statusbits
+ * @param value_real Value (Real)
+ */
 void encode_inputs(uint8_t* img, const InputLayout& l, const El3356Status& s, float value_real) {
     set_bit(img, l.overrange, s.overrange);
     set_bit(img, l.data_invalid, s.data_invalid);
@@ -302,6 +421,12 @@ void encode_inputs(uint8_t* img, const InputLayout& l, const El3356Status& s, fl
         set_bits(img, l.value_real.bit_offset, 32, to_raw(DType::F32, value_real));
 }
 
+/**
+ * @brief Zugriff auf das Steuerbit 0x7000:@p sub.
+ * @param c Steuerbits
+ * @param sub Subindex 1..5
+ * @return Zeiger auf das Feld in @p c, nullptr bei unbekanntem Subindex
+ */
 bool* control_bit(El3356Control& c, uint8_t sub) {
     switch (sub) {
     case 0x01: return &c.start_calibration;
@@ -313,6 +438,14 @@ bool* control_bit(El3356Control& c, uint8_t sub) {
     }
 }
 
+/**
+ * @brief Name und Typ eines Eintrags laut ESI.
+ * @param index Objektindex
+ * @param sub Subindex
+ * @param[out] name Name
+ * @param[out] type Datentyp
+ * @return false, wenn der Eintrag unbekannt ist
+ */
 bool known_entry(uint16_t index, uint8_t sub, std::string& name, DType& type) {
     for (const auto& k : kKnownEntries)
         if (k.index == index && k.sub == sub) {
@@ -323,6 +456,11 @@ bool known_entry(uint16_t index, uint8_t sub, std::string& name, DType& type) {
     return false;
 }
 
+/**
+ * @brief Name eines PDOs laut ESI.
+ * @param pdo Index 0x16xx/0x1Axx
+ * @return Name, sonst "0xIIII"
+ */
 std::string known_pdo_name(uint16_t pdo) {
     switch (pdo) {
     case kPdoControl: return "RMB Control";
@@ -343,6 +481,13 @@ std::string known_pdo_name(uint16_t pdo) {
     }
 }
 
+/**
+ * @brief PDOs der EL3356-0010 laut ESI (Revision 0x0019) mit Mapping und Exclude-Listen.
+ *
+ * Grundlage für die Simulation und Rückfall für Namen ohne SDO-Information.
+ *
+ * @return alle PDOs, nicht zugeordnet
+ */
 std::vector<PdoInfo> known_pdos() {
     auto pdo = [](uint16_t idx, bool rx, std::vector<PdoEntry> e, std::vector<uint16_t> ex) {
         return PdoInfo{idx, known_pdo_name(idx), rx, false, std::move(e), std::move(ex)};
@@ -377,6 +522,12 @@ std::vector<PdoInfo> known_pdos() {
     };
 }
 
+/**
+ * @brief Setzt assigned und die Lage der Einträge gemäß Zuordnungsreihenfolge.
+ * @param pdos PDO-Katalog
+ * @param rx_assign Inhalt von 0x1C12
+ * @param tx_assign Inhalt von 0x1C13
+ */
 void locate_pdos(std::vector<PdoInfo>& pdos, const std::vector<uint16_t>& rx_assign,
                  const std::vector<uint16_t>& tx_assign) {
     for (auto& p : pdos) {
@@ -397,11 +548,22 @@ void locate_pdos(std::vector<PdoInfo>& pdos, const std::vector<uint16_t>& rx_ass
     }
 }
 
+/**
+ * @brief Wert eines zugeordneten Eintrags aus dem Abbild.
+ * @param img Ein- bzw. Ausgangsabbild des Slaves
+ * @param e Eintrag mit Lage
+ * @return Wert (Bitfeld bis 64 Bit; U64 als double gerundet), 0 für Lücken
+ */
 double entry_value(const uint8_t* img, const PdoEntry& e) {
     if (!e.loc.present || e.type == DType::None) return 0.0;
     return from_raw(e.type, get_bits(img, e.loc.bit_offset, e.loc.bit_len));
 }
 
+/**
+ * @brief Schreibliste für 0x8000 aus der Konfiguration.
+ * @param dc Klemmenparameter
+ * @return SDO-Schreibzugriffe (auch in OP zulässig)
+ */
 std::vector<SdoWrite> settings_writes(const DeviceConfig& dc) {
     auto w = [](uint8_t sub, DType t, double v, const char* name) {
         return SdoWrite{kObjSettings, sub, encode_value(t, v), name, t, false};
@@ -422,16 +584,24 @@ std::vector<SdoWrite> settings_writes(const DeviceConfig& dc) {
     };
 }
 
+/// @brief Feste RxPDO-Zuordnung dieser Anwendung (0x1C12): RMB Control.
 const std::vector<uint16_t>& rx_assignment() {
     static const std::vector<uint16_t> a = {kPdoControl};
     return a;
 }
 
+/// @brief Feste TxPDO-Zuordnung dieser Anwendung (0x1C13): RMB Status, RMB Value (Real).
 const std::vector<uint16_t>& tx_assignment() {
     static const std::vector<uint16_t> a = {kPdoStatus, kPdoValueReal};
     return a;
 }
 
+/**
+ * @brief Schreibliste für eine PDO-Zuordnung: Anzahl 0, Einträge, Anzahl.
+ * @param sm_obj 0x1C12 oder 0x1C13
+ * @param pdos zuzuordnende PDOs in Reihenfolge
+ * @return SDO-Schreibzugriffe (nur in PRE-OP zulässig)
+ */
 std::vector<SdoWrite> assign_writes(uint16_t sm_obj, const std::vector<uint16_t>& pdos) {
     const char* what = sm_obj == kSm2Assign ? "RxPDO assign" : "TxPDO assign";
     std::vector<SdoWrite> out;
@@ -445,6 +615,11 @@ std::vector<SdoWrite> assign_writes(uint16_t sm_obj, const std::vector<uint16_t>
     return out;
 }
 
+/**
+ * @brief Vollständige Sequenz des Übergangs PRE-OP -> SAFE-OP.
+ * @param dc Klemmenparameter; 0x8000 nur bei write_on_start
+ * @return PDO-Zuordnung 0x1C12/0x1C13, danach ggf. 0x8000
+ */
 std::vector<SdoWrite> init_sequence(const DeviceConfig& dc) {
     auto seq = assign_writes(kSm2Assign, rx_assignment());
     for (auto& w : assign_writes(kSm3Assign, tx_assignment())) seq.push_back(std::move(w));
@@ -453,8 +628,11 @@ std::vector<SdoWrite> init_sequence(const DeviceConfig& dc) {
     return seq;
 }
 
+/// @brief UINT16 als Bytes, little endian.
 std::vector<uint8_t> le_u16(uint16_t v) { return le<uint16_t>(v); }
+/// @brief REAL32 als Bytes, little endian.
 std::vector<uint8_t> le_f32(float v) { return le<float>(v); }
+/// @brief REAL32 aus Bytes, little endian; 0 bei weniger als 4 Byte.
 float f32_from_le(const std::vector<uint8_t>& d) {
     float f = 0.0f;
     if (d.size() >= sizeof(f)) std::memcpy(&f, d.data(), sizeof(f));

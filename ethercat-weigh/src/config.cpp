@@ -21,7 +21,9 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(StatisticsConfig, rolling_window
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(UiConfig, rate_hz, display_unit)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(HttpConfig, bind, port, web_root, threads)
 
+/// @brief JSON-Darstellung eines Stützpunkts ({"raw", "mass_g"}).
 void to_json(nlohmann::json& j, const CalPoint& p) { j = {{"raw", p.raw}, {"mass_g", p.mass_g}}; }
+/// @brief Liest einen Stützpunkt; "raw" und "mass_g" sind Pflicht.
 void from_json(const nlohmann::json& j, CalPoint& p) {
     p.raw = j.at("raw").get<double>();
     p.mass_g = j.at("mass_g").get<double>();
@@ -30,6 +32,7 @@ void from_json(const nlohmann::json& j, CalPoint& p) {
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(CalibrationConfig,
     mode, device_unit, points, capture_time_ms, stable_time_s, stable_band_rel)
 
+/// @brief JSON-Darstellung der gesamten Konfiguration.
 void to_json(nlohmann::json& j, const Config& c) {
     j = nlohmann::json{{"ethercat", c.ethercat},       {"device", c.device},
                        {"calibration", c.calibration}, {"measurement", c.measurement},
@@ -37,6 +40,7 @@ void to_json(nlohmann::json& j, const Config& c) {
                        {"http", c.http}};
 }
 
+/// @brief Liest die Konfiguration; fehlende Abschnitte behalten den Default.
 void from_json(const nlohmann::json& j, Config& c) {
     const Config d;
     c.ethercat = j.value("ethercat", d.ethercat);
@@ -48,11 +52,28 @@ void from_json(const nlohmann::json& j, Config& c) {
     c.http = j.value("http", d.http);
 }
 
+/**
+ * @brief Konfiguration aus JSON.
+ *
+ * Unbekannte Schlüssel werden ignoriert, fehlende behalten den Default.
+ *
+ * @param j JSON-Objekt
+ * @return Konfiguration (nicht validiert)
+ * @throws std::runtime_error wenn @p j kein Objekt ist oder Typen nicht passen
+ */
 Config config_from_json(const nlohmann::json& j) {
     if (!j.is_object()) throw std::runtime_error("Config muss ein JSON-Objekt sein");
     return j.get<Config>();
 }
 
+/**
+ * @brief Prüft Stützpunkte der Kennlinie.
+ *
+ * Gefordert: mindestens 2 Punkte, raw paarweise verschieden, Masse streng monoton über raw.
+ *
+ * @param pts Stützpunkte (beliebige Reihenfolge)
+ * @return Fehlermeldungen; leer = gültig
+ */
 std::vector<std::string> validate_points(const std::vector<CalPoint>& pts) {
     std::vector<std::string> e;
     if (pts.size() < 2) {
@@ -78,6 +99,10 @@ std::vector<std::string> validate_points(const std::vector<CalPoint>& pts) {
     return e;
 }
 
+/**
+ * @brief Prüft Wertebereiche und Abhängigkeiten aller Parameter.
+ * @return Fehlermeldungen; leer = gültig
+ */
 std::vector<std::string> Config::validate() const {
     std::vector<std::string> e;
     if (ethercat.interface.empty()) e.push_back("ethercat.interface: leer");
@@ -126,6 +151,12 @@ std::vector<std::string> Config::validate() const {
     return e;
 }
 
+/**
+ * @brief Lädt und validiert eine Konfigurationsdatei.
+ * @param path Pfad zur JSON-Datei
+ * @return gültige Konfiguration
+ * @throws std::runtime_error bei nicht lesbarer Datei, ungültigem JSON oder ungültigen Werten
+ */
 Config load_config(const std::string& path) {
     std::ifstream f(path);
     if (!f) throw std::runtime_error("Config nicht lesbar: " + path);
@@ -146,6 +177,12 @@ Config load_config(const std::string& path) {
     return c;
 }
 
+/**
+ * @brief Speichert die Konfiguration atomar (temporäre Datei + rename).
+ * @param path Zielpfad
+ * @param c Konfiguration
+ * @throws std::runtime_error bei Schreib- oder rename-Fehler
+ */
 void save_config(const std::string& path, const Config& c) {
     const std::string tmp = path + ".tmp";
     {
@@ -159,11 +196,23 @@ void save_config(const std::string& path, const Config& c) {
         throw std::runtime_error("rename fehlgeschlagen: " + tmp + " -> " + path);
 }
 
+/**
+ * @brief Prüft, ob eine Änderung einen Neustart des Dienstes erfordert.
+ * @param a bisherige Konfiguration
+ * @param b neue Konfiguration
+ * @return true bei Änderungen an ethercat oder http
+ */
 bool requires_restart(const Config& a, const Config& b) {
     return nlohmann::json(a.ethercat) != nlohmann::json(b.ethercat) ||
            nlohmann::json(a.http) != nlohmann::json(b.http);
 }
 
+/**
+ * @brief Prüft, ob sich die Klemmenparameter (0x8000) geändert haben.
+ * @param a bisherige Konfiguration
+ * @param b neue Konfiguration
+ * @return true, wenn device neu in die Klemme geschrieben werden muss
+ */
 bool device_config_changed(const Config& a, const Config& b) {
     return nlohmann::json(a.device) != nlohmann::json(b.device);
 }

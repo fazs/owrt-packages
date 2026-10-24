@@ -1,4 +1,7 @@
-// Unit-Tests ohne externes Framework: ew_tests liefert Exit-Code != 0 bei Fehlern.
+/**
+ * @file
+ * @brief Unit-Tests ohne externes Framework: ew_tests liefert Exit-Code != 0 bei Fehlern.
+ */
 #include <cmath>
 #include <cstdio>
 #include <cstring>
@@ -17,9 +20,10 @@
 
 namespace {
 
-int g_fail = 0;
-int g_checks = 0;
+int g_fail = 0;    ///< fehlgeschlagene Prüfungen
+int g_checks = 0;  ///< ausgeführte Prüfungen
 
+/// Prüft @p cond und zählt Fehler, ohne den Test abzubrechen.
 #define CHECK(cond)                                                              \
     do {                                                                         \
         ++g_checks;                                                              \
@@ -29,24 +33,38 @@ int g_checks = 0;
         }                                                                        \
     } while (0)
 
+/// Prüft |a - b| <= eps.
 #define CHECK_NEAR(a, b, eps) CHECK(std::fabs((a) - (b)) <= (eps))
 
+/// Registrierter Test.
 struct TestCase {
-    const char* name;
-    std::function<void()> fn;
+    const char* name;          ///< Name
+    std::function<void()> fn;  ///< Testfunktion
 };
+/// @brief Liste aller registrierten Tests.
 std::vector<TestCase>& registry() {
     static std::vector<TestCase> r;
     return r;
 }
+/// Registriert einen Test bei der statischen Initialisierung.
 struct Reg {
     Reg(const char* n, std::function<void()> f) { registry().push_back({n, std::move(f)}); }
 };
+/// Definiert und registriert einen Test.
 #define TEST(name)                         \
     void name();                           \
     Reg reg_##name(#name, name);           \
     void name()
 
+/// @brief Ausgelieferte Konfiguration (openwrt/ethercat-weigh/files/config.json).
+ew::Config package_config() { return ew::load_config(EW_PACKAGE_CONFIG); }
+
+/// @brief Kapazität des simulierten Sensors in Gramm.
+double capacity_g(const ew::Config& cfg) {
+    return ew::SimBackend::sensor_for(cfg).capacity_kg * 1000.0;
+}
+
+/// @brief Gültiges Sample mit Nettowert @p v [g] zum Zeitpunkt @p t [s].
 ew::Sample valid_sample(double t, double v) {
     ew::Sample s;
     s.t = t;
@@ -56,6 +74,7 @@ ew::Sample valid_sample(double t, double v) {
     return s;
 }
 
+/// @brief Messparameter für die Engine-Tests.
 ew::MeasurementConfig mparams() {
     ew::MeasurementConfig p;
     p.min_load = 0.1;
@@ -80,6 +99,30 @@ TEST(running_stats_basic) {
     CHECK_NEAR(s.last, 5.0, 0);
     r.reset();
     CHECK(r.summary().n == 0);
+}
+
+TEST(statistics_remove_measurement) {
+    // Alle Werte gehalten: Ergebnis identisch zur Neuberechnung ohne den Wert
+    ew::TemporaryStatistics st(3);
+    const std::vector<double> v = {10.0, 12.0, 11.0, 30.0, 13.0};
+    for (double x : v) st.add(x);
+    st.remove(30.0, {10.0, 12.0, 11.0, 13.0});
+    auto j = st.to_json();
+    CHECK(j["session"]["n"] == 4);
+    CHECK_NEAR(j["session"]["mean"].get<double>(), 11.5, 1e-12);
+    CHECK_NEAR(j["session"]["max"].get<double>(), 13.0, 0);
+    CHECK(j["rolling"]["n"] == 3);
+    CHECK_NEAR(j["rolling"]["mean"].get<double>(), 12.0, 1e-12);  // 12, 11, 13
+
+    // Nur ein Teil gehalten: n/Mittelwert/Standardabweichung exakt per Welford rückwärts
+    ew::RunningStats r, ref;
+    for (double x : v) r.add(x);
+    for (double x : {10.0, 12.0, 30.0, 13.0}) ref.add(x);
+    r.remove(11.0, {30.0, 13.0});
+    CHECK(r.summary().n == 4);
+    CHECK_NEAR(r.summary().mean, ref.summary().mean, 1e-12);
+    CHECK_NEAR(r.summary().stddev, ref.summary().stddev, 1e-12);
+    CHECK(r.summary().last == 13.0);
 }
 
 TEST(rolling_stats_window) {
@@ -310,9 +353,11 @@ TEST(el3356_debug_catalog_and_init_sequence) {
 }
 
 TEST(simulation_end_to_end) {
-    ew::Config cfg;
-    cfg.device.zero_balance = ew::SimBackend::kZeroTrue;  // Klemme als kalibriert annehmen
-    cfg.device.rated_output_mv_v = ew::SimBackend::kRatedTrue;
+    ew::Config cfg = package_config();
+    const auto sensor = ew::SimBackend::sensor_for(cfg);
+    const double cap = capacity_g(cfg);
+    cfg.device.zero_balance = sensor.zero_mv_v;  // Klemme als kalibriert annehmen
+    cfg.device.rated_output_mv_v = sensor.rated_mv_v;
     ew::SimBackend sim(42);
     std::string err;
     CHECK(sim.open(cfg, err));
@@ -327,7 +372,7 @@ TEST(simulation_end_to_end) {
         s.value = s.gross = *ch.to_grams(s.raw);
         if (auto m = e.process(s)) {
             ++captures;
-            CHECK(m->value > 400.0 && m->value < 4700.0);
+            CHECK(m->value > 0.09 * cap && m->value < 0.91 * cap);  // Lastprofil 10..90 %
             CHECK(m->range <= cfg.measurement.tolerance);
         }
     }
@@ -380,7 +425,16 @@ TEST(validate_points_rules) {
     CHECK(ew::validate_points({{0, 0}, {1, 100}, {3, 300}}).empty());
 }
 
-// Hilfsfunktion: Zyklen mit Simulation und Kalibriersteuerung
+/**
+ * @brief Führt Zyklen (10 ms) mit Simulation und Kalibriersteuerung aus.
+ * @param sim Simulation
+ * @param cc Kalibriersteuerung
+ * @param cfg Konfiguration
+ * @param t Startzeit [s]
+ * @param seconds Dauer [s]
+ * @param[out] last letztes Sample (optional)
+ * @return Endzeit [s]
+ */
 static double run_cycles(ew::SimBackend& sim, ew::CalibrationController& cc, const ew::Config& cfg,
                          double t, double seconds, ew::Sample* last = nullptr) {
     ew::El3356Control ctrl;
@@ -395,7 +449,8 @@ static double run_cycles(ew::SimBackend& sim, ew::CalibrationController& cc, con
 }
 
 TEST(calibration_application_flow) {
-    ew::Config cfg;
+    const ew::Config cfg = package_config();
+    const double cap = capacity_g(cfg);
     ew::SimBackend sim(7);
     std::string err;
     CHECK(sim.open(cfg, err));
@@ -407,9 +462,11 @@ TEST(calibration_application_flow) {
     CHECK(cc.capture(0.0, t).ok);
     t = run_cycles(sim, cc, cfg, t, 2.5);
     CHECK(cc.points().size() == 1);
-    sim.set_sim_load(2000.0);
+    const double m2 = 0.4 * cap;
+    const double m2_gr = ew::from_grams(m2, "gr");  // Masse in Grain angeben
+    sim.set_sim_load(m2);
     t = run_cycles(sim, cc, cfg, t, 2.0);
-    CHECK(cc.capture(ew::to_grams(30864.7, "gr"), t).ok);  // ca. 2000 g in Grain angegeben
+    CHECK(cc.capture(ew::to_grams(m2_gr, "gr"), t).ok);
     t = run_cycles(sim, cc, cfg, t, 2.5);
     CHECK(cc.points().size() == 2);
     CHECK(cc.remove_point(5).ok == false);
@@ -420,19 +477,39 @@ TEST(calibration_application_flow) {
     CHECK(out.calibration.points.size() == 2);
 
     const auto ch = ew::Characteristic::from_config(out.calibration, out.device);
-    sim.set_sim_load(1000.0);
+    sim.set_sim_load(0.2 * cap);
     ew::Sample s;
     t = run_cycles(sim, cc, cfg, t, 3.0, &s);
-    CHECK_NEAR(*ch.to_grams(s.raw), 1000.0 * 2000.0 / ew::to_grams(30864.7, "gr"), 2.0);
+    CHECK_NEAR(*ch.to_grams(s.raw), 0.2 * cap, 1e-3 * cap);
+}
+
+TEST(calibration_capture_abort_reason) {
+    // Last über 1,1 × Nennlast -> Overrange (Simulation)
+    const ew::Config cfg = package_config();
+    const double cap = capacity_g(cfg);
+    ew::SimBackend sim(3);
+    std::string err;
+    CHECK(sim.open(cfg, err));
+    ew::CalibrationController cc;
+    CHECK(cc.start_application(cfg).ok);
+    sim.set_sim_load(0.0);
+    double t = run_cycles(sim, cc, cfg, 0.0, 1.0);
+    CHECK(cc.capture(1.5 * cap, t).ok);
+    sim.set_sim_load(1.5 * cap);
+    t = run_cycles(sim, cc, cfg, t, 2.5);
+    CHECK(cc.points().empty());
+    CHECK(cc.to_json()["error"] == "Erfassung abgebrochen: Messbereich überschritten (Overrange)");
 }
 
 TEST(calibration_device_flow) {
-    ew::Config cfg;  // Klemme unkalibriert: Rated output 2,0, Zero balance 0
+    const ew::Config cfg = package_config();  // Klemme mit Nennwerten der Config (unkalibriert)
+    const auto sensor = ew::SimBackend::sensor_for(cfg);
+    const double cap = capacity_g(cfg);
     ew::SimBackend sim(9);
     std::string err;
     CHECK(sim.open(cfg, err));
     ew::CalibrationController cc;
-    CHECK(cc.start_device(cfg, 5000.0, "g", sim).ok);
+    CHECK(cc.start_device(cfg, cap, "g", sim).ok);
     double t = 0.0;
     sim.set_sim_load(0.0);
     t = run_cycles(sim, cc, cfg, t, 2.0);
@@ -441,30 +518,37 @@ TEST(calibration_device_flow) {
     CHECK(cc.device_zero(sim, t).ok);
     t = run_cycles(sim, cc, cfg, t, 1.0);
     CHECK(cc.phase() == "zero_done");
-    sim.set_sim_load(500.0);
+    sim.set_sim_load(0.1 * cap);
     t = run_cycles(sim, cc, cfg, t, 12.0);
-    CHECK(!cc.device_reference(500.0, sim, t).ok);  // < 20 % Nennlast
-    sim.set_sim_load(2000.0);
+    CHECK(!cc.device_reference(0.1 * cap, sim, t).ok);  // < 20 % Nennlast
+    sim.set_sim_load(0.4 * cap);
     t = run_cycles(sim, cc, cfg, t, 12.0);
-    CHECK(cc.device_reference(2000.0, sim, t).ok);
+    CHECK(cc.device_reference(0.4 * cap, sim, t).ok);
     t = run_cycles(sim, cc, cfg, t, 1.0);
     CHECK(cc.phase() == "done");
     ew::Config out;
     CHECK(cc.commit(cfg, out).ok);
     CHECK(out.calibration.mode == "device" && out.calibration.device_unit == "g");
-    CHECK_NEAR(out.device.zero_balance, ew::SimBackend::kZeroTrue, 1e-4);
-    CHECK_NEAR(out.device.rated_output_mv_v, ew::SimBackend::kRatedTrue, 2e-3);
+    // Ergebnis trifft den simulierten Sensor (nicht die Nennwerte der Config)
+    CHECK(std::fabs(sensor.rated_mv_v - cfg.device.rated_output_mv_v) > 1e-3);
+    CHECK_NEAR(out.device.zero_balance, sensor.zero_mv_v, 1e-4 * std::fabs(sensor.rated_mv_v));
+    CHECK_NEAR(out.device.rated_output_mv_v, sensor.rated_mv_v, 2e-3 * std::fabs(sensor.rated_mv_v));
+    // Gespeicherte Kalibrierung verschiebt den simulierten Sensor nicht
+    const auto again = ew::SimBackend::sensor_for(out);
+    CHECK_NEAR(again.rated_mv_v, sensor.rated_mv_v, 1e-12);
+    CHECK_NEAR(again.zero_mv_v, sensor.zero_mv_v, 1e-12);
 
-    // Nach dem Abschluss gilt wieder der Scale factor der Config (1000)
+    // Nach dem Abschluss gilt wieder der Scale factor der Config
     const auto ch = ew::Characteristic::from_config(out.calibration, out.device);
-    sim.set_sim_load(3000.0);
+    sim.set_sim_load(0.6 * cap);
     ew::Sample s;
     t = run_cycles(sim, cc, cfg, t, 3.0, &s);
-    CHECK_NEAR(*ch.to_grams(s.raw), 3000.0, 3.0);
+    CHECK_NEAR(*ch.to_grams(s.raw), 0.6 * cap, 1e-3 * cap);
 }
 
 } // namespace
 
+/// @brief Führt alle registrierten Tests aus; Exit-Code 1 bei Fehlern.
 int main() {
     for (const auto& tc : registry()) {
         const int before = g_fail;

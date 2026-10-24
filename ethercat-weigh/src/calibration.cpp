@@ -6,6 +6,13 @@
 
 namespace ew {
 
+/**
+ * @brief Erzeugt die Kennlinie aus der Konfiguration.
+ * @param cal Kalibrierverfahren, Einheit der Klemme und Stützpunkte
+ * @param dev Klemmenparameter (Scale factor)
+ * @return Kennlinie; valid() == false bei ungültiger Einheit, Scale factor 0 oder
+ *         ungültigen Stützpunkten
+ */
 Characteristic Characteristic::from_config(const CalibrationConfig& cal, const DeviceConfig& dev) {
     Characteristic c;
     c.mode_ = cal.mode;
@@ -22,6 +29,11 @@ Characteristic Characteristic::from_config(const CalibrationConfig& cal, const D
     return c;
 }
 
+/**
+ * @brief Rechnet einen Rohwert in Gramm um.
+ * @param raw Value (Real) der Klemme
+ * @return Masse in Gramm, std::nullopt bei ungültiger Kennlinie
+ */
 std::optional<double> Characteristic::to_grams(double raw) const {
     if (!valid_) return std::nullopt;
     if (mode_ != "application") return raw * factor_;
@@ -34,6 +46,11 @@ std::optional<double> Characteristic::to_grams(double raw) const {
     return a.mass_g + (raw - a.raw) * (b.mass_g - a.mass_g) / (b.raw - a.raw);
 }
 
+/**
+ * @brief Steigung in Gramm je Rohwert-Einheit.
+ * @return device: konstanter Faktor; application: mittlere Steigung über alle Punkte;
+ *         0 bei ungültiger Kennlinie
+ */
 double Characteristic::sensitivity() const {
     if (!valid_) return 0.0;
     if (mode_ != "application") return factor_;

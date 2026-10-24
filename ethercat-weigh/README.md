@@ -52,7 +52,7 @@ Ausgewertete Statusbits: `0x6000:02` Overrange, `:04` Data invalid, `:07` Error,
 Sync error und TxPDO Toggle liegen ab Revision 0x0015 in `0x6000:0E`/`:10`, davor laut ESI in `0x1C32:20`/`0x1800:09`; beide Varianten werden erkannt.
 Die Steuerbits `0x7000` werden nicht gesetzt (außer per Debug-Dialog); Tara erfolgt in der Anwendung.
 
-Referenz für PDOs, Objektverzeichnis und Wertebereiche: `doc/Beckhoff-ESI/Beckhoff EL33xx.xml`.
+Referenz für PDOs, Objektverzeichnis und Wertebereiche: `misc/Beckhoff-ESI/Beckhoff EL33xx.xml`.
 
 ### Debug-Dialog
 
@@ -135,7 +135,7 @@ Statistik (nur RAM): Anzahl, Mittelwert, Standardabweichung (n−1), Minimum, Ma
 | GET | `/api/measurements`, `/api/measurements.csv?unit=` | Gehaltene Messungen (JSON in g, CSV in gewählter Einheit) |
 | POST | `/api/tare`, `/api/tare/clear` | Tara aus dem Mittel der letzten 0,5 s setzen / löschen |
 | POST | `/api/calibration` | Kalibrierung, Body `{"action": …}` (siehe unten) |
-| POST | `/api/sim/load` | Nur Simulation: `{"grams": 2000}` bzw. `{"grams": null}` für das automatische Profil |
+| POST | `/api/sim/load` | Nur Simulation: `{"grams": 25}` bzw. `{"grams": null}` für das automatische Profil |
 | POST | `/api/statistics/reset` | Statistik und Messungen löschen |
 | GET | `/api/debug/pdos` | PDO-Katalog mit Zuordnung, Bitlage, Werten, Übersteuerungen und Prozessabbild (Hex) |
 | POST | `/api/debug/override` | Steuerbit übersteuern: `{"sub": 5, "value": true}`, aufheben mit `"value": null`, alle: `{"clear": true}` |
@@ -170,7 +170,7 @@ cd web && npm ci && npm run build && cd ..
 ./build/ethercat-weigh --sim -c /tmp/ew.json      # http://localhost:8080
 ```
 
-Die Simulation bildet einen Sensor mit Nullpunktfehler und abweichendem Kennwert nach; ohne Kalibrierung zeigt sie daher einen Offset. Im Kalibrierdialog lässt sich im Simulationsbetrieb eine definierte Masse auflegen.
+Die Simulation leitet den Sensor aus der Konfiguration ab: Kapazität = `nominal_load` (in `calibration.device_unit`), Kennwert und Nullpunkt = `rated_output_mv_v`/`zero_balance` mit kleiner Abweichung (+0,5 % bzw. +1 % des Kennwerts), Rauschen 6·10⁻⁵ der Kapazität, Lastprofil 10–90 % der Kapazität, Overrange ab 110 % der Nennlast. Ohne Kalibrierung zeigt sie daher einen kleinen Offset. Eine in der Simulation gespeicherte Kalibrierung verschiebt den simulierten Sensor nicht (Nennwerte werden gerundet). Im Kalibrierdialog lässt sich im Simulationsbetrieb eine definierte Masse auflegen (Enter im Feld legt auf). Die Unit-Tests verwenden `openwrt/ethercat-weigh/files/config.json`.
 
 Frontend-Entwicklung mit Hot Reload: `cd web && npm run dev` (Proxy auf `http://127.0.0.1:8080`, abweichend über `EW_BACKEND`).
 

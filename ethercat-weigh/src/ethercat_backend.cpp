@@ -11,9 +11,17 @@ namespace ew {
 
 namespace {
 
-// Kontext für den PRE-OP -> SAFE-OP Hook (SOEM ruft eine freie Funktion auf)
+/// Kontext für den PRE-OP -> SAFE-OP Hook (SOEM ruft eine freie Funktion auf)
 const Config* g_cfg = nullptr;
 
+/**
+ * @brief Liest ein SDO fester Größe.
+ * @param slave Slave-Nummer
+ * @param idx Index
+ * @param sub Subindex
+ * @param[out] v Wert (bei Fehler T{})
+ * @return true bei Erfolg
+ */
 template <typename T>
 bool sdo_read_v(uint16_t slave, uint16_t idx, uint8_t sub, T& v) {
     int size = sizeof(T);
@@ -21,6 +29,13 @@ bool sdo_read_v(uint16_t slave, uint16_t idx, uint8_t sub, T& v) {
     return ec_SDOread(slave, idx, sub, FALSE, &size, &v, EC_TIMEOUTRXM) > 0;
 }
 
+/**
+ * @brief Schreibt die Parameter 0x8000; bricht beim ersten Fehler ab.
+ * @param slave Slave-Nummer
+ * @param dc Klemmenparameter
+ * @param[out] err Fehlertext mit Objekt und Name
+ * @return true bei Erfolg
+ */
 bool write_settings(uint16_t slave, const DeviceConfig& dc, std::string& err) {
     for (const auto& w : el3356::settings_writes(dc)) {
         auto data = w.data;
@@ -36,7 +51,15 @@ bool write_settings(uint16_t slave, const DeviceConfig& dc, std::string& err) {
     return true;
 }
 
-// PRE-OP -> SAFE-OP: PDO-Zuordnung und CoE-Parameter setzen (el3356::init_sequence)
+/**
+ * @brief SOEM-Hook PRE-OP -> SAFE-OP: sendet die Initialisierungssequenz.
+ *
+ * PDO-Zuordnung und CoE-Parameter gemäß el3356::init_sequence(); fehlgeschlagene
+ * Schritte werden geloggt, die übrigen trotzdem gesendet.
+ *
+ * @param slave Slave-Nummer
+ * @return immer 1 (SOEM setzt den Übergang fort)
+ */
 int po2so_hook(uint16 slave) {
     if (!g_cfg) return 1;
     int failed = 0;
@@ -53,6 +76,13 @@ int po2so_hook(uint16 slave) {
     return 1;
 }
 
+/**
+ * @brief Liest das Mapping eines PDOs (0x16xx/0x1Axx).
+ * @param slave Slave-Nummer
+ * @param pdo PDO-Index
+ * @param[out] out Einträge
+ * @return false, wenn das Objekt nicht existiert oder nicht lesbar ist
+ */
 bool read_pdo_mapping(uint16_t slave, uint16_t pdo, std::vector<el3356::MapEntry>& out) {
     uint8_t n = 0;
     if (!sdo_read_v(slave, pdo, 0, n)) return false;
@@ -65,6 +95,14 @@ bool read_pdo_mapping(uint16_t slave, uint16_t pdo, std::vector<el3356::MapEntry
     return true;
 }
 
+/**
+ * @brief Liest eine PDO-Zuordnung (0x1C12/0x1C13) samt Mappings.
+ * @param slave Slave-Nummer
+ * @param sm_obj 0x1C12 oder 0x1C13
+ * @param[out] out Mappings in Zuordnungsreihenfolge
+ * @param[out] indices zugeordnete PDO-Indizes
+ * @return true bei Erfolg
+ */
 bool read_assigned(uint16_t slave, uint16_t sm_obj, std::vector<std::vector<el3356::MapEntry>>& out,
                    std::vector<uint16_t>& indices) {
     uint8_t n = 0;
@@ -82,6 +120,11 @@ bool read_assigned(uint16_t slave, uint16_t sm_obj, std::vector<std::vector<el33
     return true;
 }
 
+/**
+ * @brief Name eines EtherCAT-Zustands (ohne Fehlerbit).
+ * @param st Zustand aus ec_slave[].state
+ * @return "INIT", "PRE-OP", "BOOT", "SAFE-OP", "OP" oder "NONE"
+ */
 const char* state_name(uint16_t st) {
     switch (st & 0x0F) {
     case EC_STATE_INIT: return "INIT";
@@ -93,8 +136,14 @@ const char* state_name(uint16_t st) {
     }
 }
 
-// Zustand, Fehlerbit und AL-Statuscode aller Slaves, die 'expected' nicht erreicht haben.
-// Voraussetzung: ec_readstate() wurde unmittelbar zuvor aufgerufen.
+/**
+ * @brief Zustand, Fehlerbit und AL-Statuscode aller Slaves, die @p expected nicht erreicht haben.
+ *
+ * Voraussetzung: ec_readstate() wurde unmittelbar zuvor aufgerufen.
+ *
+ * @param expected erwarteter Zustand
+ * @return Beschreibung für die Fehlermeldung
+ */
 std::string slave_states(uint16_t expected) {
     std::string out;
     for (int i = 1; i <= ec_slavecount; ++i) {
@@ -110,17 +159,24 @@ std::string slave_states(uint16_t expected) {
     return out.empty() ? "Gruppenzustand abweichend" : out;
 }
 
+/// @brief Verschiebt eine gemappte Lage um @p bits (Startbit des Slaves im IOmap).
 void shift(el3356::EntryLoc& l, uint32_t bits) {
     if (l.present) l.bit_offset += bits;
 }
 
-// Namen und Datentypen per SDO-Information (falls die Klemme sie unterstützt)
+/// Namen und Datentypen per SDO-Information (falls die Klemme sie unterstützt).
 struct SdoInfo {
     uint16_t slave;
     bool supported;
     ec_ODlistt od{};
     ec_OElistt oe{};
 
+    /**
+     * @brief Name eines Objekts (ODdescription).
+     * @param index Objektindex
+     * @param[out] name Name
+     * @return false ohne SDO-Information oder bei Fehler
+     */
     bool object_name(uint16_t index, std::string& name) {
         if (!supported) return false;
         od.Slave = slave;
@@ -130,6 +186,14 @@ struct SdoInfo {
         name = od.Name[0];
         return true;
     }
+    /**
+     * @brief Name und Datentyp eines Eintrags (OEsingle).
+     * @param index Objektindex
+     * @param sub Subindex
+     * @param[out] name Name
+     * @param[out] type CoE-Datentypcode (ECT_*)
+     * @return false ohne SDO-Information oder bei Fehler
+     */
     bool entry(uint16_t index, uint8_t sub, std::string& name, uint16_t& type) {
         if (!supported) return false;
         od.Slave = slave;
@@ -144,6 +208,16 @@ struct SdoInfo {
 
 } // namespace
 
+/**
+ * @brief Initialisiert SOEM, sucht die EL3356 und fährt alle Slaves nach OP.
+ *
+ * Die Initialisierungssequenz läuft im PO2SO-Hook; nach SAFE-OP werden Mapping und
+ * PDO-Katalog eingelesen.
+ *
+ * @param cfg Konfiguration (Interface, Slave-Name, Klemmenparameter)
+ * @param[out] err Ursache bei false, inkl. Zustand und AL-Status der Slaves
+ * @return true in OP
+ */
 bool EthercatBackend::open(const Config& cfg, std::string& err) {
     cfg_ = cfg;
     g_cfg = &cfg_;
@@ -211,6 +285,11 @@ bool EthercatBackend::open(const Config& cfg, std::string& err) {
     return true;
 }
 
+/**
+ * @brief Liest die PDO-Zuordnung und berechnet die Lage der Ein- und Ausgänge.
+ * @param[out] err Fehlertext
+ * @return false, wenn das Mapping nicht lesbar ist oder Value (Real) fehlt
+ */
 bool EthercatBackend::read_layout(std::string& err) {
     std::vector<std::vector<el3356::MapEntry>> in, out;
     std::vector<uint16_t> in_idx, out_idx;
@@ -236,7 +315,14 @@ bool EthercatBackend::read_layout(std::string& err) {
     return true;
 }
 
-// Alle PDO-Mapping-Objekte 0x1600..0x1607 und 0x1A00..0x1A07 einlesen (nur beim Hochlauf)
+/**
+ * @brief Liest alle PDO-Mapping-Objekte 0x1600..0x1607 und 0x1A00..0x1A07 (nur beim Hochlauf).
+ *
+ * Namen und Typen per SDO-Information, sonst aus der ESI; Exclude-Listen aus der ESI.
+ *
+ * @param rx_assign Inhalt von 0x1C12
+ * @param tx_assign Inhalt von 0x1C13
+ */
 void EthercatBackend::discover_pdos(const std::vector<uint16_t>& rx_assign,
                                     const std::vector<uint16_t>& tx_assign) {
     auto info = std::make_unique<SdoInfo>();
@@ -287,6 +373,7 @@ void EthercatBackend::discover_pdos(const std::vector<uint16_t>& rx_assign,
     log_info("%zu PDOs der Klemme eingelesen", pdos_.size());
 }
 
+/// @copydoc IoBackend::process_image
 void EthercatBackend::process_image(std::vector<uint8_t>& in, std::vector<uint8_t>& out) const {
     in.clear();
     out.clear();
@@ -299,6 +386,12 @@ void EthercatBackend::process_image(std::vector<uint8_t>& in, std::vector<uint8_
     if (sl.outputs) out.assign(sl.outputs, sl.outputs + ob);
 }
 
+/**
+ * @brief Prozessdatenzyklus; nach wkc_fault_cycles WKC-Fehlern folgt check_and_recover().
+ * @param t Zeit seit Start [s]
+ * @param ctrl Steuerbits
+ * @param[out] out Sample
+ */
 void EthercatBackend::cycle(double t, const El3356Control& ctrl, Sample& out) {
     out = {};
     out.t = t;
@@ -320,7 +413,14 @@ void EthercatBackend::cycle(double t, const El3356Control& ctrl, Sample& out) {
     out.raw = el3356::decode_value_real(ec_slave[slave_].inputs, in_);
 }
 
-// Zustandsprüfung und Wiederanlauf (angelehnt an SOEM simple_test/ecatcheck)
+/**
+ * @brief Zustandsprüfung und Wiederanlauf (angelehnt an SOEM simple_test/ecatcheck).
+ *
+ * Höchstens alle 0,5 s: Fehler quittieren, SAFE-OP -> OP, Slaves rekonfigurieren
+ * oder wiederherstellen.
+ *
+ * @param t Zeit seit Start [s]
+ */
 void EthercatBackend::check_and_recover(double t) {
     if (last_check_t_ >= 0.0 && t - last_check_t_ < 0.5) return;
     last_check_t_ = t;
@@ -359,6 +459,7 @@ void EthercatBackend::check_and_recover(double t) {
     }
 }
 
+/// @copydoc IoBackend::write_device_config
 bool EthercatBackend::write_device_config(const DeviceConfig& dc, std::string& err) {
     if (!opened_ || slave_ == 0) {
         err = "EtherCAT nicht initialisiert";
@@ -369,6 +470,7 @@ bool EthercatBackend::write_device_config(const DeviceConfig& dc, std::string& e
     return true;
 }
 
+/// @copydoc IoBackend::sdo_write
 bool EthercatBackend::sdo_write(uint16_t index, uint8_t sub, const std::vector<uint8_t>& data,
                                 std::string& err) {
     if (!opened_ || slave_ == 0) {
@@ -386,6 +488,7 @@ bool EthercatBackend::sdo_write(uint16_t index, uint8_t sub, const std::vector<u
     return true;
 }
 
+/// @copydoc IoBackend::sdo_read
 bool EthercatBackend::sdo_read(uint16_t index, uint8_t sub, size_t size, std::vector<uint8_t>& data,
                                std::string& err) {
     if (!opened_ || slave_ == 0) {
@@ -404,6 +507,7 @@ bool EthercatBackend::sdo_read(uint16_t index, uint8_t sub, size_t size, std::ve
     return true;
 }
 
+/// @brief Alle Slaves nach INIT, SOEM schließen, PDO-Katalog verwerfen.
 void EthercatBackend::close() {
     if (!opened_) return;
     ec_slave[0].state = EC_STATE_INIT;

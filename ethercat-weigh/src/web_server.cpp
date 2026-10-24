@@ -12,6 +12,12 @@ namespace ew {
 
 namespace {
 
+/**
+ * @brief JSON-Antwort ohne Caching.
+ * @param code HTTP-Statuscode
+ * @param j Antwortkörper
+ * @return Crow-Antwort mit Content-Type application/json
+ */
 crow::response json_response(int code, const nlohmann::json& j) {
     crow::response r(code, j.dump());
     r.set_header("Content-Type", "application/json");
@@ -19,6 +25,11 @@ crow::response json_response(int code, const nlohmann::json& j) {
     return r;
 }
 
+/**
+ * @brief Content-Type anhand der Dateiendung.
+ * @param path Dateipfad
+ * @return MIME-Typ, application/octet-stream bei unbekannter Endung
+ */
 std::string mime_type(const std::string& path) {
     auto ends = [&](const char* ext) {
         const std::string e(ext);
@@ -35,6 +46,16 @@ std::string mime_type(const std::string& path) {
     return "application/octet-stream";
 }
 
+/**
+ * @brief Liefert eine Datei des statischen Frontends aus.
+ *
+ * Pfade mit ".." oder führendem "/" werden abgewiesen. Unbekannte Pfade ohne
+ * Dateiendung liefern index.html (SPA-Fallback).
+ *
+ * @param root Frontend-Verzeichnis (http.web_root)
+ * @param rel Pfad relativ zu @p root; leer = index.html
+ * @return Datei, 400 oder 404
+ */
 crow::response serve_file(const std::string& root, std::string rel) {
     if (rel.empty()) rel = "index.html";
     if (rel.find("..") != std::string::npos || rel.front() == '/')
@@ -53,7 +74,7 @@ crow::response serve_file(const std::string& root, std::string rel) {
     return r;
 }
 
-// Crow-Meldungen in das eigene Logging umleiten (Level bleibt erhalten)
+/// Leitet Crow-Meldungen in das eigene Logging um (Level bleibt erhalten).
 class CrowLogHandler : public crow::ILogHandler {
 public:
     void log(std::string message, crow::LogLevel level) override {
@@ -66,10 +87,12 @@ public:
     }
 };
 
+/// Offene WebSocket-Verbindungen.
 struct WsHub {
-    std::mutex m;
-    std::unordered_set<crow::websocket::connection*> conns;
+    std::mutex m;                                            ///< schützt conns
+    std::unordered_set<crow::websocket::connection*> conns;  ///< offene Verbindungen
 
+    /// Sendet @p msg an alle offenen Verbindungen.
     void broadcast(const std::string& msg) {
         std::lock_guard<std::mutex> lk(m);
         for (auto* c : conns) c->send_text(msg);
@@ -78,6 +101,15 @@ struct WsHub {
 
 } // namespace
 
+/**
+ * @brief HTTP-Server (Crow): REST-API, WebSocket /ws und statisches Frontend.
+ *
+ * Registriert sich als Publisher der Acquisition und verteilt deren Ereignisse
+ * an alle WebSocket-Clients. Blockiert bis SIGINT/SIGTERM.
+ *
+ * @param acq Acquisition (Datenquelle und Kommandoziel)
+ * @param http Adresse, Port, Threads und Frontend-Verzeichnis
+ */
 void run_web_server(Acquisition& acq, const HttpConfig& http) {
     static CrowLogHandler crow_log;
     crow::logger::setHandler(&crow_log);
@@ -117,6 +149,12 @@ void run_web_server(Acquisition& acq, const HttpConfig& http) {
         r.set_header("Content-Type", "text/csv; charset=utf-8");
         r.set_header("Content-Disposition", "attachment; filename=\"measurements.csv\"");
         return r;
+    });
+
+    CROW_ROUTE(app, "/api/measurements/<uint>").methods(crow::HTTPMethod::Delete)([&](uint64_t id) {
+        if (!acq.delete_measurement(id))
+            return json_response(404, {{"ok", false}, {"error", "Messung nicht gefunden"}});
+        return json_response(200, {{"ok", true}});
     });
 
     CROW_ROUTE(app, "/api/statistics/reset").methods(crow::HTTPMethod::Post)([&] {
@@ -181,7 +219,7 @@ void run_web_server(Acquisition& acq, const HttpConfig& http) {
         return result(acq.debug_override(sub, value));
     });
 
-    // {"op": "read"|"write", "index", "sub", "type": "bool|u8|u16|u32|i8|i16|i32|f32", "value"}
+    // {"op": "read"|"write", "index", "sub", "type": "bool|u8|u16|u32|u64|i8|i16|i32|f32", "value"}
     CROW_ROUTE(app, "/api/debug/sdo").methods(crow::HTTPMethod::Post)([&](const crow::request& req) {
         nlohmann::json j;
         try {

@@ -6,10 +6,20 @@
 
   let el;
   let plot = null;
+  let tNow = 0; // Zeitstempel des neuesten Werts; x-Achse relativ dazu (-TREND_SECONDS .. 0)
+
+  /**
+   * Festes Raster: Teilstriche alle 5 s, unabhängig vom Zeitfortschritt.
+   * @returns {number[]} -TREND_SECONDS .. 0
+   */
+  const xSplits = () => Array.from({ length: TREND_SECONDS / 5 + 1 }, (_, i) => -TREND_SECONDS + i * 5);
 
   const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
-  // Schwellen und erfasste Messungen direkt auf die Zeichenfläche
+  /**
+   * uPlot-Hook: zeichnet Schwellen und erfasste Messungen direkt auf die Zeichenfläche.
+   * @param {uPlot} u Plot
+   */
   function drawOverlay(u) {
     const ctx = u.ctx;
     const m = live.config?.measurement;
@@ -34,11 +44,10 @@
       }
       ctx.setLineDash([]);
     }
-    const tMin = u.scales.x.min;
     ctx.fillStyle = css('--st-captured');
     for (const meas of live.measurements) {
-      if (meas.t < tMin) break;
-      const x = u.valToPos(meas.t, 'x', true);
+      if (meas.t < tNow - TREND_SECONDS) break;
+      const x = u.valToPos(meas.t - tNow, 'x', true);
       const y = u.valToPos(fromG(meas.value, displayUnit()), 'y', true);
       ctx.beginPath();
       ctx.arc(x, y, 5 * devicePixelRatio, 0, 2 * Math.PI);
@@ -47,6 +56,7 @@
     ctx.restore();
   }
 
+  /** Erzeugt den Plot neu (Start und Wechsel des Farbschemas). */
   function build() {
     const ink = css('--muted');
     const grid = css('--line');
@@ -57,10 +67,7 @@
       legend: { show: false },
       cursor: { show: true, drag: { x: false, y: false }, points: { show: false } },
       scales: {
-        x: {
-          time: false,
-          range: (u, min, max) => [Math.max(max - TREND_SECONDS, 0), Math.max(max, TREND_SECONDS)],
-        },
+        x: { time: false, auto: false, range: () => [-TREND_SECONDS, 0] },
         y: {
           range: (u, min, max) => {
             const lo = Math.min(min ?? 0, 0);
@@ -76,7 +83,8 @@
           font,
           grid: { stroke: grid, width: 1 },
           ticks: { show: false },
-          values: (u, vals) => vals.map((v) => `${Math.round(v - u.scales.x.max)} s`),
+          splits: xSplits,
+          values: (u, vals) => vals.map((v) => `${v} s`),
         },
         {
           stroke: ink,
@@ -107,10 +115,15 @@
     };
   });
 
-  // Trend in Gramm gespeichert, Darstellung in der Anzeigeeinheit
+  /**
+   * Plotdaten: Trend in Gramm gespeichert, Darstellung in der Anzeigeeinheit,
+   * Zeit relativ zum neuesten Wert.
+   * @returns {[number[], (number|null)[]]} [Zeit [s], Wert]
+   */
   function data() {
     const u = displayUnit();
-    return [trend.t, trend.v.map((v) => (v == null ? null : fromG(v, u)))];
+    tNow = trend.t.length ? trend.t[trend.t.length - 1] : 0;
+    return [trend.t.map((t) => t - tNow), trend.v.map((v) => (v == null ? null : fromG(v, u)))];
   }
 
   $effect(() => {

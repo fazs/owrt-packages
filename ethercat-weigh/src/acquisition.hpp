@@ -23,18 +23,24 @@
 
 namespace ew {
 
+/// Ergebnis von Acquisition::update_config().
 struct ConfigUpdateResult {
-    bool ok = false;
-    bool restart_required = false;
-    std::vector<std::string> errors;
+    bool ok = false;                  ///< gespeichert und angewendet
+    bool restart_required = false;    ///< ethercat/http geändert, wirkt erst nach Neustart
+    std::vector<std::string> errors;  ///< Validierungs- bzw. Speicherfehler
 };
 
-// Zyklischer Acquisition-Thread: Prozessdaten -> Kennlinie -> Tara -> MeasurementEngine
-// -> TemporaryStatistics. Ereignisse werden als JSON über den Publisher verteilt.
-// Kommandos aus dem Web-Server (Tara, Kalibrierung) werden über eine Queue im
-// Acquisition-Thread ausgeführt, da SOEM nicht threadsicher ist.
+/**
+ * @brief Zyklischer Acquisition-Thread.
+ *
+ * Prozessdaten -> Kennlinie -> Tara -> MeasurementEngine -> TemporaryStatistics.
+ * Ereignisse werden als JSON über den Publisher verteilt. Kommandos aus dem Web-Server
+ * (Tara, Kalibrierung, Debug) werden über eine Queue im Acquisition-Thread ausgeführt,
+ * da SOEM nicht threadsicher ist.
+ */
 class Acquisition {
 public:
+    /// Empfänger der JSON-Ereignisse (WebSocket-Broadcast)
     using Publisher = std::function<void(const std::string&)>;
 
     Acquisition(std::unique_ptr<IoBackend> backend, Config cfg, std::string config_path);
@@ -51,6 +57,7 @@ public:
     Config config() const;
     ConfigUpdateResult update_config(const Config& next);
     void reset_statistics();
+    bool delete_measurement(uint64_t id);
     nlohmann::json info() const;
 
     // Im Acquisition-Thread ausgeführt; Ergebnis innerhalb von timeout_ms
@@ -59,19 +66,18 @@ public:
     CalResult calibration(const nlohmann::json& request);
     CalResult set_sim_load(std::optional<double> grams);
 
-    // Debug (siehe README): PDO-Katalog mit aktuellen Werten, Übersteuerung der Steuerbits
-    // 0x7000:sub (nullopt hebt auf), einzelner SDO-Zugriff, Initialisierungssequenz
+    // Debug (siehe README)
     nlohmann::json debug_pdos();
     CalResult debug_override(std::optional<uint8_t> sub, std::optional<bool> value);
     nlohmann::json debug_sdo(const nlohmann::json& request);
     nlohmann::json debug_init_sequence() const;
-    // Prozessdatenquelle schließen und neu öffnen (INIT -> OP inkl. Initialisierungssequenz)
     void reinit();
 
 private:
+    /// Kommando für den Acquisition-Thread
     struct Request {
-        std::function<CalResult()> fn;
-        std::promise<CalResult> result;
+        std::function<CalResult()> fn;   ///< auszuführende Funktion
+        std::promise<CalResult> result;  ///< Ergebnis für den Aufrufer
     };
 
     void run();
@@ -84,40 +90,40 @@ private:
     nlohmann::json measurement_json(const Measurement& m) const;
     CalResult handle_calibration(const nlohmann::json& req, double t);
 
-    std::unique_ptr<IoBackend> backend_;
-    std::string config_path_;
-    std::thread thread_;
-    std::atomic<bool> running_{false};
-    std::atomic<bool> reinit_{false};
+    std::unique_ptr<IoBackend> backend_;  ///< Prozessdatenquelle
+    std::string config_path_;             ///< Pfad der Konfigurationsdatei
+    std::thread thread_;                  ///< Acquisition-Thread
+    std::atomic<bool> running_{false};    ///< Thread läuft
+    std::atomic<bool> reinit_{false};     ///< Neuinitialisierung angefordert
 
-    std::mutex req_mtx_;
-    std::deque<std::shared_ptr<Request>> requests_;
+    std::mutex req_mtx_;                             ///< schützt requests_
+    std::deque<std::shared_ptr<Request>> requests_;  ///< wartende Kommandos
 
-    mutable std::mutex mtx_;           // schützt alles darunter
-    Config cfg_;        // aktiv
-    Config cfg_saved_;  // gespeichert (inkl. Änderungen, die einen Neustart erfordern)
-    bool restart_required_ = false;
-    bool cfg_pending_ = false;
-    bool device_pending_ = false;
-    Characteristic char_;
-    std::optional<double> tare_g_;
-    std::deque<double> gross_hist_;    // gültige Bruttowerte für die Tara-Mittelung
-    MeasurementEngine engine_;
-    TemporaryStatistics stats_;
-    std::deque<Measurement> history_;
-    Sample last_;
-    CalibrationController cal_;        // nur im Acquisition-Thread verändert
-    std::map<uint8_t, bool> ctrl_override_;  // Debug, nur im Acquisition-Thread
-    nlohmann::json cal_json_;
-    std::string backend_state_ = "init";  // init | op | error
-    std::string backend_error_;
-    uint64_t cycles_ = 0;
-    uint64_t overruns_ = 0;
-    double max_cycle_ms_ = 0.0;
-    double now_ = 0.0;
+    mutable std::mutex mtx_;           ///< schützt alle folgenden Member
+    Config cfg_;                       ///< aktive Konfiguration
+    Config cfg_saved_;                 ///< gespeichert (inkl. Änderungen, die einen Neustart erfordern)
+    bool restart_required_ = false;    ///< gespeicherte Änderungen erfordern Neustart
+    bool cfg_pending_ = false;         ///< neue Konfiguration im nächsten Zyklus übernehmen
+    bool device_pending_ = false;      ///< Klemmenparameter im nächsten Zyklus schreiben
+    Characteristic char_;              ///< Kennlinie
+    std::optional<double> tare_g_;     ///< Tara [g], std::nullopt = keine
+    std::deque<double> gross_hist_;    ///< gültige Bruttowerte für die Tara-Mittelung
+    MeasurementEngine engine_;         ///< Erkennung gültiger Messungen
+    TemporaryStatistics stats_;        ///< Statistik
+    std::deque<Measurement> history_;  ///< gehaltene Messungen
+    Sample last_;                      ///< letztes Sample
+    CalibrationController cal_;        ///< nur im Acquisition-Thread verändert
+    std::map<uint8_t, bool> ctrl_override_;  ///< Debug: übersteuerte Steuerbits, nur im Acquisition-Thread
+    nlohmann::json cal_json_;          ///< letzter Kalibrierzustand für Snapshots
+    std::string backend_state_ = "init";  ///< init | op | error
+    std::string backend_error_;        ///< Fehlertext bei error
+    uint64_t cycles_ = 0;              ///< ausgeführte Zyklen
+    uint64_t overruns_ = 0;            ///< Zyklen mit Überlauf
+    double max_cycle_ms_ = 0.0;        ///< längste Zyklusdauer
+    double now_ = 0.0;                 ///< Zeit des aktuellen Zyklus [s]
 
-    std::mutex pub_mtx_;
-    Publisher publisher_;
+    std::mutex pub_mtx_;               ///< schützt publisher_
+    Publisher publisher_;              ///< Empfänger der Ereignisse
 };
 
 } // namespace ew

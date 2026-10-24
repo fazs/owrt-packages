@@ -1,7 +1,11 @@
-// Verbindung zum Backend: WebSocket /ws (Live-Daten) + REST /api (Kommandos, Config)
+/**
+ * @file Verbindung zum Backend: WebSocket /ws (Live-Daten) + REST /api (Kommandos, Config).
+ */
 
+/** Länge des Verlaufs [s]. */
 export const TREND_SECONDS = 30;
 
+/** Reaktiver Zustand der Anwendung (Svelte 5 `$state`). */
 export const live = $state({
   connected: false,
   sample: null,
@@ -16,6 +20,10 @@ export const live = $state({
   unit: readUnit(), // Anzeigeeinheit (lokal gespeichert), sonst config.ui.display_unit
 });
 
+/**
+ * Liest die im Browser gespeicherte Anzeigeeinheit.
+ * @returns {string|null} Einheit oder null (nicht gesetzt bzw. Speicher nicht verfügbar)
+ */
 function readUnit() {
   try {
     return localStorage.getItem('ew.unit');
@@ -24,6 +32,10 @@ function readUnit() {
   }
 }
 
+/**
+ * Setzt die Anzeigeeinheit und speichert sie im Browser.
+ * @param {string} u Einheit ("mg", "g", "kg", "gr")
+ */
 export function setUnit(u) {
   live.unit = u;
   try {
@@ -33,25 +45,42 @@ export function setUnit(u) {
   }
 }
 
-// Wirksame Anzeigeeinheit
+/**
+ * Wirksame Anzeigeeinheit: Browser, sonst config.ui.display_unit, sonst g.
+ * @returns {string} Einheit
+ */
 export function displayUnit() {
   return live.unit ?? live.config?.ui?.display_unit ?? 'g';
 }
 
-// Trenddaten bewusst nicht tief reaktiv (Performance); trendVersion signalisiert Änderungen
+/**
+ * Trenddaten (Zeit [s], Nettowert [g] bzw. null bei ungültigem Wert); bewusst nicht
+ * tief reaktiv (Performance), Änderungen signalisiert {@link trendTick}.
+ */
 export const trend = { t: [], v: [] };
+/** Zähler, der bei jeder Änderung von {@link trend} erhöht wird. */
 export const trendTick = $state({ version: 0 });
 
 let ws = null;
 let retryMs = 1000;
 let noticeTimer = null;
 
+/**
+ * Zeigt einen Hinweis für 4 s an.
+ * @param {'ok'|'error'} kind Art
+ * @param {string} text Text
+ */
 export function notify(kind, text) {
   live.notice = { kind, text };
   clearTimeout(noticeTimer);
   noticeTimer = setTimeout(() => (live.notice = null), 4000);
 }
 
+/**
+ * Hängt einen Wert an den Verlauf an und verwirft Werte älter als TREND_SECONDS.
+ * @param {number} t Zeit [s]
+ * @param {number|null} v Nettowert [g], null bei ungültigem Wert
+ */
 function pushTrend(t, v) {
   trend.t.push(t);
   trend.v.push(v);
@@ -65,10 +94,15 @@ function pushTrend(t, v) {
   trendVersion();
 }
 
+/** Signalisiert eine Änderung des Verlaufs. */
 function trendVersion() {
   trendTick.version++;
 }
 
+/**
+ * Übernimmt einen vollständigen Zustand (init-Nachricht bzw. /api/state).
+ * @param {object} s Snapshot: sample, statistics, measurements, info
+ */
 function applySnapshot(s) {
   live.sample = s.sample;
   live.calibration = s.sample?.calibration ?? null;
@@ -78,11 +112,32 @@ function applySnapshot(s) {
   live.restartRequired = !!s.info?.restart_required;
 }
 
+/**
+ * Anzahl der im Backend gehaltenen Messungen; der Snapshot enthält nur die letzten 50.
+ * @returns {number}
+ */
+const historySize = () => live.config?.statistics?.history_size ?? 500;
+
+/** Lädt alle gehaltenen Messungen über /api/measurements (neueste zuerst). */
+async function loadMeasurements() {
+  try {
+    const r = await fetch('/api/measurements');
+    if (r.ok) live.measurements = (await r.json()).reverse().slice(0, historySize());
+  } catch {
+    /* Snapshot bleibt als Grundlage */
+  }
+}
+
+/**
+ * Verarbeitet eine WebSocket-Nachricht.
+ * @param {{type: string}} msg Nachricht (init, sample, measurement, measurement_deleted, ...)
+ */
 function handle(msg) {
   switch (msg.type) {
     case 'init':
       applySnapshot(msg.snapshot);
       live.config = msg.config;
+      loadMeasurements();
       trend.t.length = 0;
       trend.v.length = 0;
       trendVersion();
@@ -93,9 +148,13 @@ function handle(msg) {
       pushTrend(msg.t, msg.valid ? msg.value : null);
       break;
     case 'measurement':
-      live.measurements = [msg.measurement, ...live.measurements].slice(0, 200);
+      live.measurements = [msg.measurement, ...live.measurements].slice(0, historySize());
       live.statistics = msg.statistics;
       live.lastCapture = { id: msg.measurement.id, at: performance.now() };
+      break;
+    case 'measurement_deleted':
+      live.measurements = live.measurements.filter((m) => m.id !== msg.id);
+      live.statistics = msg.statistics;
       break;
     case 'statistics_reset':
       live.statistics = msg.statistics;
@@ -118,6 +177,7 @@ function handle(msg) {
   }
 }
 
+/** Verbindet den WebSocket; bei Abbruch Wiederverbindung mit wachsendem Abstand (max. 8 s). */
 export function connect() {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(`${proto}//${location.host}/ws`);
@@ -140,6 +200,7 @@ export function connect() {
   ws.onerror = () => ws.close();
 }
 
+/** Aktualisiert live.info über /api/info. */
 export async function refreshInfo() {
   try {
     const r = await fetch('/api/info');
@@ -149,6 +210,13 @@ export async function refreshInfo() {
   }
 }
 
+/**
+ * POST mit optionalem JSON-Körper.
+ * @param {string} path Pfad
+ * @param {object} [body] Körper
+ * @returns {Promise<object>} Antwort
+ * @throws {Error} bei HTTP-Fehler oder `ok: false`
+ */
 async function post(path, body) {
   const r = await fetch(path, {
     method: 'POST',
@@ -165,6 +233,7 @@ async function post(path, body) {
   return j;
 }
 
+/** Setzt Tara; Ergebnis als Hinweis. */
 export async function tare() {
   try {
     await post('/api/tare');
@@ -174,6 +243,7 @@ export async function tare() {
   }
 }
 
+/** Löscht Tara; Ergebnis als Hinweis. */
 export async function clearTare() {
   try {
     await post('/api/tare/clear');
@@ -183,7 +253,11 @@ export async function clearTare() {
   }
 }
 
-// Kalibrierkommando; liefert true bei Erfolg, Fehler als Hinweis
+/**
+ * Sendet ein Kalibrierkommando; Fehler als Hinweis.
+ * @param {{action: string}} body Kommando (siehe README)
+ * @returns {Promise<boolean>} true bei Erfolg
+ */
 export async function calibrate(body) {
   try {
     await post('/api/calibration', body);
@@ -194,6 +268,10 @@ export async function calibrate(body) {
   }
 }
 
+/**
+ * Nur Simulation: aufgelegte Masse vorgeben.
+ * @param {number|null} grams Masse [g], null = automatisches Lastprofil
+ */
 export async function simLoad(grams) {
   try {
     await post('/api/sim/load', { grams });
@@ -202,6 +280,12 @@ export async function simLoad(grams) {
   }
 }
 
+/**
+ * GET mit JSON-Antwort.
+ * @param {string} path Pfad
+ * @returns {Promise<object>} Antwort
+ * @throws {Error} bei HTTP-Fehler oder `ok: false`
+ */
 async function getJson(path) {
   const r = await fetch(path);
   let j = {};
@@ -214,7 +298,7 @@ async function getJson(path) {
   return j;
 }
 
-// Debug-Dialog: PDOs, Übersteuerung der Steuerbits, SDO-Zugriff, Initialisierungssequenz
+/** Debug-Dialog: PDOs, Übersteuerung der Steuerbits, SDO-Zugriff, Initialisierungssequenz. */
 export const debugApi = {
   pdos: () => getJson('/api/debug/pdos'),
   init: () => getJson('/api/debug/init'),
@@ -223,6 +307,22 @@ export const debugApi = {
   reinit: () => post('/api/debug/reinit'),
 };
 
+/**
+ * Löscht eine gehaltene Messung; Ergebnis als Hinweis.
+ * @param {number} id Nummer der Messung
+ */
+export async function deleteMeasurement(id) {
+  try {
+    const r = await fetch(`/api/measurements/${id}`, { method: 'DELETE' });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) throw new Error(j.error || `HTTP ${r.status}`);
+    notify('ok', `Messung ${id} gelöscht`);
+  } catch (e) {
+    notify('error', `Löschen fehlgeschlagen: ${e.message}`);
+  }
+}
+
+/** Setzt die Statistik zurück und löscht alle Messungen; Ergebnis als Hinweis. */
 export async function resetStatistics() {
   try {
     await post('/api/statistics/reset');
@@ -232,7 +332,11 @@ export async function resetStatistics() {
   }
 }
 
-// Liefert {ok, errors, restart_required}
+/**
+ * Speichert die Konfiguration.
+ * @param {object} cfg vollständige Konfiguration
+ * @returns {Promise<{ok: boolean, errors?: string[], restart_required?: boolean}>}
+ */
 export async function saveConfig(cfg) {
   const r = await fetch('/api/config', {
     method: 'PUT',

@@ -2,60 +2,91 @@
 
 #include <cstdint>
 #include <deque>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
 namespace ew {
+    /// Kennzahlen einer Wertereihe.
+    struct StatSummary {
+        uint64_t n = 0;      ///< Anzahl
+        double mean = 0.0;   ///< Mittelwert
+        double stddev = 0.0; ///< Stichproben-Standardabweichung (n-1)
+        double min = 0.0;    ///< Minimum
+        double max = 0.0;    ///< Maximum
+        double range = 0.0;  ///< Spannweite max - min
+        double last = 0.0;   ///< zuletzt hinzugefügter Wert
+    };
 
-struct StatSummary {
-    uint64_t n = 0;
-    double mean = 0.0;
-    double stddev = 0.0;  // Stichproben-Standardabweichung (n-1)
-    double min = 0.0;
-    double max = 0.0;
-    double range = 0.0;
-    double last = 0.0;
-};
-void to_json(nlohmann::json& j, const StatSummary& s);
+    void to_json(nlohmann::json &j, const StatSummary &s);
 
-// Online-Statistik (Welford), O(1) pro Wert.
-class RunningStats {
-public:
-    void add(double x);
-    void reset();
-    StatSummary summary() const;
+    /// Online-Statistik (Welford), O(1) pro Wert.
+    class RunningStats {
+    public:
+        void add(double x);
 
-private:
-    uint64_t n_ = 0;
-    double mean_ = 0.0, m2_ = 0.0, min_ = 0.0, max_ = 0.0, last_ = 0.0;
-};
+        void remove(double x, const std::vector<double> &held);
 
-// Statistik über die letzten N Werte.
-class RollingStats {
-public:
-    explicit RollingStats(uint32_t size = 50) : size_(size) {}
-    void add(double x);
-    void reset() { buf_.clear(); }
-    void resize(uint32_t size);
-    StatSummary summary() const;
+        void reset();
 
-private:
-    uint32_t size_;
-    std::deque<double> buf_;
-};
+        StatSummary summary() const;
 
-// Temporäre Statistik: Session (seit Reset) + gleitendes Fenster.
-class TemporaryStatistics {
-public:
-    explicit TemporaryStatistics(uint32_t rolling = 50) : rolling_(rolling) {}
-    void add(double x) { session_.add(x); rolling_.add(x); }
-    void reset() { session_.reset(); rolling_.reset(); }
-    void set_rolling_window(uint32_t n) { rolling_.resize(n); }
-    nlohmann::json to_json() const;
+    private:
+        uint64_t n_ = 0;
+        double mean_ = 0.0, m2_ = 0.0, min_ = 0.0, max_ = 0.0, last_ = 0.0;
+    };
 
-private:
-    RunningStats session_;
-    RollingStats rolling_;
-};
+    /// Statistik über die letzten N Werte.
+    class RollingStats {
+    public:
+        /// @param size Fenstergröße N
+        explicit RollingStats(uint32_t size = 50) : size_(size) {
+        }
 
+        void add(double x);
+
+        /// Leert das Fenster.
+        void reset() { buf_.clear(); }
+
+        void resize(uint32_t size);
+
+        void rebuild(const std::vector<double> &held);
+
+        StatSummary summary() const;
+
+    private:
+        uint32_t size_;
+        std::deque<double> buf_;
+    };
+
+    /// Temporäre Statistik (nur RAM): Session (seit Reset) + gleitendes Fenster.
+    class TemporaryStatistics {
+    public:
+        /// @param rolling Größe des gleitenden Fensters
+        explicit TemporaryStatistics(uint32_t rolling = 50) : rolling_(rolling) {
+        }
+
+        /// Fügt eine Messung zu Session und Fenster hinzu.
+        void add(double x) {
+            session_.add(x);
+            rolling_.add(x);
+        }
+
+        /// Setzt Session und Fenster zurück.
+        void reset() {
+            session_.reset();
+            rolling_.reset();
+        }
+
+        void remove(double x, const std::vector<double> &held);
+
+        /// Ändert die Größe des gleitenden Fensters.
+        void set_rolling_window(uint32_t n) { rolling_.resize(n); }
+
+        nlohmann::json to_json() const;
+
+    private:
+        RunningStats session_;  ///< seit Reset
+        RollingStats rolling_;  ///< letzte N
+    };
 } // namespace ew

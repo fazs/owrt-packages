@@ -3,6 +3,7 @@
 #include <pthread.h>
 #include <sched.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <cstring>
@@ -17,8 +18,9 @@ using clock_t_ = std::chrono::steady_clock;
 
 namespace {
 
-constexpr size_t kTareSamples = 50;  // Mittelung für Tara (bei 10 ms: 0,5 s)
+constexpr size_t kTareSamples = 50;  ///< Mittelung für Tara (bei 10 ms: 0,5 s)
 
+/// @brief Statusbits als JSON für das Frontend.
 nlohmann::json status_json(const El3356Status& s) {
     return {{"overrange", s.overrange},
             {"data_invalid", s.data_invalid},
@@ -28,11 +30,16 @@ nlohmann::json status_json(const El3356Status& s) {
             {"sync_error", s.sync_error}};
 }
 
+/// @brief Kennzahlen des Stabilitätsfensters als JSON.
 nlohmann::json window_json(const WindowStats& w) {
     return {{"n", w.n},         {"span_ms", w.span_ms}, {"mean", w.mean},
             {"range", w.range}, {"stddev", w.stddev}};
 }
 
+/**
+ * @brief Setzt SCHED_FIFO für den aufrufenden Thread.
+ * @param prio 1..99; <= 0 lässt SCHED_OTHER
+ */
 void set_rt_priority(int prio) {
     if (prio <= 0) return;
     sched_param sp{};
@@ -44,12 +51,17 @@ void set_rt_priority(int prio) {
         log_info("Acquisition-Thread: SCHED_FIFO %d", prio);
 }
 
+/**
+ * @brief Pflichtfeld als Zahl.
+ * @throws std::runtime_error wenn das Feld fehlt oder keine Zahl ist
+ */
 double num(const nlohmann::json& j, const char* key) {
     if (!j.contains(key) || !j[key].is_number())
         throw std::runtime_error(std::string("Feld '") + key + "' fehlt oder ist keine Zahl");
     return j[key].get<double>();
 }
 
+/// @brief Bytes als Hex-Text ("01 A0 ...").
 std::string hex(const std::vector<uint8_t>& d) {
     static const char* digits = "0123456789ABCDEF";
     std::string out;
@@ -61,6 +73,7 @@ std::string hex(const std::vector<uint8_t>& d) {
     return out;
 }
 
+/// @brief Wert als JSON gemäß Typ: bool, Ganzzahl oder Gleitkomma.
 nlohmann::json typed(el3356::DType t, double v) {
     if (t == el3356::DType::Bool) return v != 0.0;
     if (t == el3356::DType::F32) return v;
@@ -68,6 +81,10 @@ nlohmann::json typed(el3356::DType t, double v) {
     return static_cast<int64_t>(v);
 }
 
+/**
+ * @brief Pflichtfeld als Text.
+ * @throws std::runtime_error wenn das Feld fehlt oder kein Text ist
+ */
 std::string str(const nlohmann::json& j, const char* key) {
     if (!j.contains(key) || !j[key].is_string())
         throw std::runtime_error(std::string("Feld '") + key + "' fehlt");
@@ -76,6 +93,11 @@ std::string str(const nlohmann::json& j, const char* key) {
 
 } // namespace
 
+/**
+ * @param backend Prozessdatenquelle (EtherCAT oder Simulation)
+ * @param cfg Startkonfiguration
+ * @param config_path Pfad, unter dem Änderungen gespeichert werden
+ */
 Acquisition::Acquisition(std::unique_ptr<IoBackend> backend, Config cfg, std::string config_path)
     : backend_(std::move(backend)),
       config_path_(std::move(config_path)),
@@ -86,18 +108,22 @@ Acquisition::Acquisition(std::unique_ptr<IoBackend> backend, Config cfg, std::st
       stats_(cfg.statistics.rolling_window),
       cal_json_(cal_.to_json()) {}
 
+/// @brief Stoppt den Thread und schließt die Prozessdatenquelle.
 Acquisition::~Acquisition() { stop(); }
 
+/// @brief Setzt den Empfänger der JSON-Ereignisse (nullptr = keiner).
 void Acquisition::set_publisher(Publisher p) {
     std::lock_guard<std::mutex> lk(pub_mtx_);
     publisher_ = std::move(p);
 }
 
+/// @brief Startet den Acquisition-Thread (mehrfacher Aufruf ohne Wirkung).
 void Acquisition::start() {
     if (running_.exchange(true)) return;
     thread_ = std::thread([this] { run(); });
 }
 
+/// @brief Stoppt den Thread, beantwortet offene Kommandos mit Fehler und schließt die Quelle.
 void Acquisition::stop() {
     if (!running_.exchange(false)) return;
     if (thread_.joinable()) thread_.join();
@@ -105,6 +131,7 @@ void Acquisition::stop() {
     backend_->close();
 }
 
+/// @brief Verteilt ein Ereignis an den Publisher.
 void Acquisition::publish(const nlohmann::json& j) {
     Publisher p;
     {
@@ -116,6 +143,12 @@ void Acquisition::publish(const nlohmann::json& j) {
 
 // --- Request-Queue -------------------------------------------------------------
 
+/**
+ * @brief Führt @p fn im Acquisition-Thread aus und wartet auf das Ergebnis.
+ * @param fn Kommando
+ * @param timeout_ms maximale Wartezeit
+ * @return Ergebnis von @p fn oder Fehler bei Zeitüberschreitung
+ */
 CalResult Acquisition::submit(std::function<CalResult()> fn, int timeout_ms) {
     auto r = std::make_shared<Request>();
     r->fn = std::move(fn);
@@ -129,6 +162,12 @@ CalResult Acquisition::submit(std::function<CalResult()> fn, int timeout_ms) {
     return fut.get();
 }
 
+/**
+ * @brief Wie submit(), aber mit JSON-Ergebnis.
+ * @param fn Abfrage
+ * @param timeout_ms maximale Wartezeit
+ * @return Ergebnis von @p fn oder {"ok": false, "error": ...}
+ */
 nlohmann::json Acquisition::submit_json(std::function<nlohmann::json()> fn, int timeout_ms) {
     auto out = std::make_shared<nlohmann::json>();  // überlebt eine Zeitüberschreitung
     const auto r = submit(
@@ -141,6 +180,10 @@ nlohmann::json Acquisition::submit_json(std::function<nlohmann::json()> fn, int 
     return *out;
 }
 
+/**
+ * @brief Arbeitet alle wartenden Kommandos ab.
+ * @param backend_ok false: Kommandos mit "Prozessdatenquelle nicht aktiv" beantworten
+ */
 void Acquisition::drain_requests(bool backend_ok) {
     std::deque<std::shared_ptr<Request>> q;
     {
@@ -162,6 +205,10 @@ void Acquisition::drain_requests(bool backend_ok) {
     }
 }
 
+/**
+ * @brief Setzt Tara aus dem Mittel der letzten gültigen Bruttowerte.
+ * @return Fehler, wenn der Messwert ungültig ist oder zu wenige Werte vorliegen
+ */
 CalResult Acquisition::tare() {
     return submit([this]() -> CalResult {
         std::lock_guard<std::mutex> lk(mtx_);
@@ -176,6 +223,7 @@ CalResult Acquisition::tare() {
     });
 }
 
+/// @brief Löscht Tara.
 CalResult Acquisition::clear_tare() {
     return submit([this]() -> CalResult {
         std::lock_guard<std::mutex> lk(mtx_);
@@ -185,6 +233,10 @@ CalResult Acquisition::clear_tare() {
     });
 }
 
+/**
+ * @brief Nur Simulation: aufgelegte Masse vorgeben.
+ * @param grams Masse [g], std::nullopt = automatisches Lastprofil
+ */
 CalResult Acquisition::set_sim_load(std::optional<double> grams) {
     return submit([this, grams]() -> CalResult {
         if (!backend_->set_sim_load(grams)) return {false, "Nur im Simulationsbetrieb verfügbar"};
@@ -192,12 +244,20 @@ CalResult Acquisition::set_sim_load(std::optional<double> grams) {
     });
 }
 
+/**
+ * @brief Kalibrierkommando aus der REST-API (siehe README).
+ * @param request {"action": ..., weitere Felder je Aktion}
+ */
 CalResult Acquisition::calibration(const nlohmann::json& request) {
     return submit([this, request]() { return handle_calibration(request, now_); }, 5000);
 }
 
 // --- Debug -------------------------------------------------------------------------
 
+/**
+ * @brief Debug: PDO-Katalog mit aktuellen Werten aus dem Prozessabbild.
+ * @return {"ok", "pdos": [...], "inputs", "outputs"} (Abbild als Hex)
+ */
 nlohmann::json Acquisition::debug_pdos() {
     return submit_json([this] {
         std::vector<uint8_t> in, out;
@@ -235,6 +295,11 @@ nlohmann::json Acquisition::debug_pdos() {
     });
 }
 
+/**
+ * @brief Debug: übersteuert ein Steuerbit 0x7000 im Prozessabbild.
+ * @param sub Subindex 1..5; std::nullopt hebt alle Übersteuerungen auf
+ * @param value Wert; std::nullopt hebt die Übersteuerung von @p sub auf
+ */
 CalResult Acquisition::debug_override(std::optional<uint8_t> sub, std::optional<bool> value) {
     if (sub) {
         El3356Control probe;
@@ -251,6 +316,12 @@ CalResult Acquisition::debug_override(std::optional<uint8_t> sub, std::optional<
     });
 }
 
+/**
+ * @brief Debug: einzelner SDO-Zugriff.
+ * @param req {"op": "read"|"write", "index", "sub", "type", "value"}
+ * @return {"ok", "value", "hex"} bzw. {"ok": false, "error"}
+ * @throws std::runtime_error bei ungültiger Anfrage
+ */
 nlohmann::json Acquisition::debug_sdo(const nlohmann::json& req) {
     const std::string op = str(req, "op");
     const double index = num(req, "index"), sub = num(req, "sub");
@@ -285,6 +356,10 @@ nlohmann::json Acquisition::debug_sdo(const nlohmann::json& req) {
     });
 }
 
+/**
+ * @brief Debug: Initialisierungssequenz mit den Werten der aktuellen Konfiguration.
+ * @return {"steps": [{index, sub, name, type, value, hex, pre_op_only}]}
+ */
 nlohmann::json Acquisition::debug_init_sequence() const {
     nlohmann::json steps = nlohmann::json::array();
     for (const auto& w : el3356::init_sequence(config().device))
@@ -298,12 +373,18 @@ nlohmann::json Acquisition::debug_init_sequence() const {
     return {{"steps", steps}};
 }
 
+/// @brief Schließt die Prozessdatenquelle und öffnet sie neu (INIT -> OP inkl. Initialisierungssequenz).
 void Acquisition::reinit() {
     log_info("Neuinitialisierung angefordert");
     reinit_ = true;
 }
 
-// Läuft im Acquisition-Thread
+/**
+ * @brief Führt ein Kalibrierkommando aus (im Acquisition-Thread).
+ * @param req Anfrage mit "action"
+ * @param t aktuelle Zeit [s]
+ * @return Ergebnis; bei "commit" wird die neue Konfiguration gespeichert und veröffentlicht
+ */
 CalResult Acquisition::handle_calibration(const nlohmann::json& req, double t) {
     const std::string action = str(req, "action");
     Config cfg;
@@ -364,11 +445,13 @@ CalResult Acquisition::handle_calibration(const nlohmann::json& req, double t) {
 
 // --- Abfragen ------------------------------------------------------------------
 
+/// @brief Messung als JSON.
 nlohmann::json Acquisition::measurement_json(const Measurement& m) const {
     return {{"id", m.id},       {"t", m.t}, {"value", m.value}, {"stddev", m.stddev},
             {"range", m.range}, {"n", m.n}, {"settle_ms", m.settle_ms}};
 }
 
+/// @brief Letztes Sample als "sample"-Nachricht; mtx_ muss gehalten werden.
 nlohmann::json Acquisition::sample_json_locked() const {
     return {{"type", "sample"},
             {"t", last_.t},
@@ -387,6 +470,7 @@ nlohmann::json Acquisition::sample_json_locked() const {
             {"calibration", cal_json_}};
 }
 
+/// @brief Version, Backend-Zustand, Zyklen, Überläufe, max. Zykluszeit.
 nlohmann::json Acquisition::info() const {
     std::lock_guard<std::mutex> lk(mtx_);
     return {{"version", EW_VERSION},
@@ -403,6 +487,7 @@ nlohmann::json Acquisition::info() const {
             {"max_cycle_ms", max_cycle_ms_}};
 }
 
+/// @brief Letztes Sample, Statistik, letzte 50 Messungen und info().
 nlohmann::json Acquisition::snapshot() const {
     nlohmann::json j;
     {
@@ -418,6 +503,7 @@ nlohmann::json Acquisition::snapshot() const {
     return j;
 }
 
+/// @brief Alle gehaltenen Messungen als JSON (Massen in Gramm).
 nlohmann::json Acquisition::measurements_json() const {
     std::lock_guard<std::mutex> lk(mtx_);
     nlohmann::json a = nlohmann::json::array();
@@ -425,6 +511,10 @@ nlohmann::json Acquisition::measurements_json() const {
     return a;
 }
 
+/**
+ * @brief Alle gehaltenen Messungen als CSV (Trennzeichen ';').
+ * @param unit Einheit der Massen; ungültig = g
+ */
 std::string Acquisition::measurements_csv(const std::string& unit) const {
     const std::string u = valid_unit(unit) ? unit : "g";
     std::lock_guard<std::mutex> lk(mtx_);
@@ -438,6 +528,7 @@ std::string Acquisition::measurements_csv(const std::string& unit) const {
     return os.str();
 }
 
+/// @brief Gespeicherte Konfiguration (inkl. Änderungen, die einen Neustart erfordern).
 Config Acquisition::config() const {
     std::lock_guard<std::mutex> lk(mtx_);
     return cfg_saved_;
@@ -445,6 +536,14 @@ Config Acquisition::config() const {
 
 // --- Konfiguration -----------------------------------------------------------
 
+/**
+ * @brief Übernimmt eine neue Konfiguration; mtx_ muss gehalten werden.
+ *
+ * ethercat/http wirken erst nach Neustart. Ändert sich die Kennlinie, werden Tara und
+ * Stabilitätsfenster verworfen.
+ *
+ * @param next neue Konfiguration
+ */
 void Acquisition::apply_new_config_locked(const Config& next) {
     // ethercat/http wirken erst nach Neustart; alles andere sofort
     Config applied = next;
@@ -467,6 +566,11 @@ void Acquisition::apply_new_config_locked(const Config& next) {
     }
 }
 
+/**
+ * @brief Validiert, speichert und übernimmt eine neue Konfiguration.
+ * @param next neue Konfiguration
+ * @return Ergebnis; abgelehnt während einer laufenden Kalibrierung
+ */
 ConfigUpdateResult Acquisition::update_config(const Config& next) {
     ConfigUpdateResult r;
     r.errors = next.validate();
@@ -494,6 +598,7 @@ ConfigUpdateResult Acquisition::update_config(const Config& next) {
     return r;
 }
 
+/// @brief Setzt die Statistik zurück und löscht alle gehaltenen Messungen.
 void Acquisition::reset_statistics() {
     nlohmann::json st;
     {
@@ -505,8 +610,39 @@ void Acquisition::reset_statistics() {
     publish({{"type", "statistics_reset"}, {"statistics", st}});
 }
 
+/**
+ * @brief Löscht eine gehaltene Messung und führt die Statistik nach.
+ * @param id Nummer der Messung
+ * @return false, wenn die Messung nicht (mehr) gehalten wird
+ */
+bool Acquisition::delete_measurement(uint64_t id) {
+    nlohmann::json st;
+    {
+        std::lock_guard<std::mutex> lk(mtx_);
+        const auto it = std::find_if(history_.begin(), history_.end(),
+                                     [id](const Measurement& m) { return m.id == id; });
+        if (it == history_.end()) return false;
+        const double x = it->value;
+        history_.erase(it);
+        std::vector<double> held;
+        held.reserve(history_.size());
+        for (const auto& m : history_) held.push_back(m.value);
+        stats_.remove(x, held);
+        st = stats_.to_json();
+    }
+    log_info("Messung %llu gelöscht", static_cast<unsigned long long>(id));
+    publish({{"type", "measurement_deleted"}, {"id", id}, {"statistics", st}});
+    return true;
+}
+
 // --- Zyklus --------------------------------------------------------------------
 
+/**
+ * @brief Thread-Funktion: Initialisierung mit Wiederholung, danach zyklischer Betrieb.
+ *
+ * Je Zyklus: Konfigurationsänderungen übernehmen, Prozessdaten, Kalibrierung, Kennlinie,
+ * Tara, Messung, Statistik, Ereignisse, Kommandos.
+ */
 void Acquisition::run() {
     set_rt_priority(config().ethercat.rt_priority);
     const auto t0 = clock_t_::now();

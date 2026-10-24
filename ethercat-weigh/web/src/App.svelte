@@ -7,12 +7,13 @@
     tare,
     clearTare,
     setUnit,
-    displayUnit,
+    displayUnit, simLoad,
   } from './lib/live.svelte.js';
   import { UNITS } from './lib/format.js';
   import Calibration from './lib/Calibration.svelte';
   import Readout from './lib/Readout.svelte';
   import Trend from './lib/Trend.svelte';
+  import Histogram from './lib/Histogram.svelte';
   import Stats from './lib/Stats.svelte';
   import Measurements from './lib/Measurements.svelte';
   import ConfigPanel from './lib/ConfigPanel.svelte';
@@ -21,7 +22,10 @@
   let configOpen = $state(false);
   let calOpen = $state(false);
   let debugOpen = $state(false);
+  const isSim = $derived(live.info?.backend === 'simulation');
   const hasTare = $derived(live.sample?.tare != null);
+
+  let simGrams = $state(1000);
 
   onMount(() => {
     connect();
@@ -87,9 +91,19 @@
   <div class="col-main">
     <Readout />
     <Trend />
+    <Histogram />
   </div>
   <div class="col-side">
     <Stats />
+    {#if isSim}
+      <div class="sim">
+        <span class="muted">Simulation: <br />aufgelegte Masse [g]</span>
+        <input type="number" step="0.1" min="0" bind:value={simGrams} />
+        <button onclick={() => simLoad(Number(simGrams))}>Auflegen</button>
+        <button onclick={() => simLoad(0)}>Entlasten</button>
+        <button onclick={() => simLoad(null)}>Automatik</button>
+      </div>
+    {/if}
     <Measurements />
   </div>
 </main>

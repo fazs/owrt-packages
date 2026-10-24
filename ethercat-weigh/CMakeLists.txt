@@ -69,5 +69,8 @@ if(EW_BUILD_TESTS)
   enable_testing()
   add_executable(ew_tests tests/test_main.cpp)
   target_link_libraries(ew_tests PRIVATE ew_core)
+  # Simulation und Tests verwenden die ausgelieferte Konfiguration
+  target_compile_definitions(ew_tests PRIVATE
+    EW_PACKAGE_CONFIG="${CMAKE_CURRENT_SOURCE_DIR}/openwrt/ethercat-weigh/files/config.json")
   add_test(NAME ew_tests COMMAND ew_tests)
 endif()

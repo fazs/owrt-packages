@@ -14,24 +14,59 @@ namespace {
 constexpr double kPollInterval = 0.1;   // s zwischen Statusabfragen 0xFB00:02
 constexpr double kCmdTimeout = 30.0;    // s bis Abbruch eines Kommandos
 
-// Hardwareseitige Gültigkeit (ohne Kalibrier-/Kennlinienstatus der Anwendung)
-bool hw_valid(const Sample& s) {
-    return s.link_ok && s.wkc_ok && !s.status.error && !s.status.overrange &&
-           !s.status.data_invalid && !s.status.calibration_in_progress;
+/**
+ * @brief Hardwareseitiger Fehlergrund eines Samples.
+ *
+ * Ohne Kalibrier-/Kennlinienstatus der Anwendung. Texte wie FAULT_TEXT im Frontend.
+ *
+ * @param s Sample
+ * @return Fehlertext oder nullptr bei gültigem Sample
+ */
+const char* hw_fault(const Sample& s) {
+    if (!s.link_ok) return "Keine Verbindung zur Klemme";
+    if (!s.wkc_ok) return "Working Counter fehlerhaft";
+    if (s.status.error) return "Klemme meldet Fehler (Error)";
+    if (s.status.overrange) return "Messbereich überschritten (Overrange)";
+    if (s.status.data_invalid) return "Messdaten ungültig (Data invalid)";
+    if (s.status.calibration_in_progress) return "Selbstkalibrierung der Klemme läuft";
+    return nullptr;
 }
 
+/// @brief true, wenn @p s hardwareseitig gültig ist (siehe hw_fault()).
+bool hw_valid(const Sample& s) { return hw_fault(s) == nullptr; }
+
+/// @brief Fehlerergebnis mit Text @p e.
 CalResult fail(const std::string& e) { return {false, e}; }
+/// @brief Erfolgsergebnis.
 CalResult ok() { return {true, {}}; }
 
+/**
+ * @brief Schreibt einen REAL32-Parameter in 0x8000.
+ * @param io Backend
+ * @param sub Subindex in 0x8000
+ * @param v Wert
+ * @param[out] err Fehlertext
+ * @return true bei Erfolg
+ */
 bool write_f32(IoBackend& io, uint8_t sub, double v, std::string& err) {
     return io.sdo_write(el3356::kObjSettings, sub, el3356::le_f32(static_cast<float>(v)), err);
 }
+/**
+ * @brief Schreibt ein UINT16-Objekt.
+ * @param io Backend
+ * @param idx Index
+ * @param sub Subindex
+ * @param v Wert
+ * @param[out] err Fehlertext
+ * @return true bei Erfolg
+ */
 bool write_u16(IoBackend& io, uint16_t idx, uint8_t sub, uint16_t v, std::string& err) {
     return io.sdo_write(idx, sub, el3356::le_u16(v), err);
 }
 
 } // namespace
 
+/// @brief Beendet die Session und verwirft alle Zwischenergebnisse.
 void CalibrationController::reset() {
     kind_ = Kind::None;
     phase_.clear();
@@ -46,6 +81,11 @@ void CalibrationController::reset() {
 
 // --- Anwendung ---------------------------------------------------------------
 
+/**
+ * @brief Startet die Kalibrierung in der Anwendung.
+ * @param cfg Config (calibration.capture_time_ms)
+ * @return Fehler, wenn bereits eine Kalibrierung läuft
+ */
 CalResult CalibrationController::start_application(const Config& cfg) {
     if (active()) return fail("Kalibrierung bereits aktiv");
     reset();
@@ -56,6 +96,16 @@ CalResult CalibrationController::start_application(const Config& cfg) {
     return ok();
 }
 
+/**
+ * @brief Startet die Erfassung eines Stützpunkts.
+ *
+ * Die Mittelung läuft in step() über capture_time_ms; ein Punkt mit gleicher Masse
+ * wird ersetzt.
+ *
+ * @param mass_g aufgelegte Masse [g], 0 = Nullpunkt
+ * @param t aktuelle Zeit [s]
+ * @return Fehler, wenn keine Kalibrierung in der Anwendung läuft oder bereits erfasst wird
+ */
 CalResult CalibrationController::capture(double mass_g, double t) {
     if (kind_ != Kind::Application) return fail("Keine Kalibrierung in der Anwendung aktiv");
     if (capturing_) return fail("Erfassung läuft bereits");
@@ -70,6 +120,11 @@ CalResult CalibrationController::capture(double mass_g, double t) {
     return ok();
 }
 
+/**
+ * @brief Entfernt einen erfassten Stützpunkt.
+ * @param index Position in points()
+ * @return Fehler bei ungültigem Index oder laufender Erfassung
+ */
 CalResult CalibrationController::remove_point(size_t index) {
     if (kind_ != Kind::Application) return fail("Keine Kalibrierung in der Anwendung aktiv");
     if (capturing_) return fail("Erfassung läuft");
@@ -80,6 +135,18 @@ CalResult CalibrationController::remove_point(size_t index) {
 
 // --- Klemme ------------------------------------------------------------------
 
+/**
+ * @brief Startet die Kalibrierung in der Klemme und bereitet 0x8000 vor.
+ *
+ * Setzt Scale factor 1, Gain 1, Tara 0, Filter IIR8, Gravity und Nominal load.
+ * Schlägt das fehl, wird die Config wieder in die Klemme geschrieben.
+ *
+ * @param cfg Config (Gravity, Stillstandskriterien)
+ * @param nominal_load Nennlast der Wägezelle in @p unit
+ * @param unit Einheit von Nominal/Reference load in der Klemme
+ * @param io Backend
+ * @return Fehler bei laufender Kalibrierung, ungültigen Eingaben oder SDO-Fehler
+ */
 CalResult CalibrationController::start_device(const Config& cfg, double nominal_load,
                                               const std::string& unit, IoBackend& io) {
     using namespace el3356;
@@ -111,6 +178,12 @@ CalResult CalibrationController::start_device(const Config& cfg, double nominal_
     return ok();
 }
 
+/**
+ * @brief Löst den Nullabgleich (Kommando 0x0101) aus.
+ * @param io Backend
+ * @param t aktuelle Zeit [s]
+ * @return Fehler, wenn der Schritt nicht zulässig ist oder der Stillstand zu kurz ist
+ */
 CalResult CalibrationController::device_zero(IoBackend& io, double t) {
     if (kind_ != Kind::Device) return fail("Keine Kalibrierung in der Klemme aktiv");
     if (phase_ != "prepared" && phase_ != "zero_done")
@@ -126,6 +199,13 @@ CalResult CalibrationController::device_zero(IoBackend& io, double t) {
     return ok();
 }
 
+/**
+ * @brief Schreibt die Referenzlast und löst die Kalibrierung (Kommando 0x0102) aus.
+ * @param mass_g aufgelegte Referenzmasse [g], mindestens 20 % der Nennlast
+ * @param io Backend
+ * @param t aktuelle Zeit [s]
+ * @return Fehler ohne vorherigen Nullabgleich, bei zu kleiner Last oder zu kurzem Stillstand
+ */
 CalResult CalibrationController::device_reference(double mass_g, IoBackend& io, double t) {
     using namespace el3356;
     if (kind_ != Kind::Device) return fail("Keine Kalibrierung in der Klemme aktiv");
@@ -147,6 +227,11 @@ CalResult CalibrationController::device_reference(double mass_g, IoBackend& io, 
     return ok();
 }
 
+/**
+ * @brief Liest das Ergebnis (0x8000:23/25) und stellt Kommando, Filter und Scale factor zurück.
+ * @param io Backend
+ * @param cfg Config mit den wiederherzustellenden Werten
+ */
 void CalibrationController::finish_device(IoBackend& io, const Config& cfg) {
     using namespace el3356;
     std::string err;
@@ -167,6 +252,12 @@ void CalibrationController::finish_device(IoBackend& io, const Config& cfg) {
 
 // --- Gemeinsam ---------------------------------------------------------------
 
+/**
+ * @brief Übernimmt das Ergebnis in eine neue Config; die Session endet bei Erfolg.
+ * @param current aktuelle Config
+ * @param[out] out neue Config mit Kennlinie bzw. Klemmenparametern
+ * @return Fehler bei weniger als 2 gültigen Punkten bzw. unvollständiger Klemmenkalibrierung
+ */
 CalResult CalibrationController::commit(const Config& current, Config& out) {
     if (!active()) return fail("Keine Kalibrierung aktiv");
     out = current;
@@ -191,6 +282,14 @@ CalResult CalibrationController::commit(const Config& current, Config& out) {
     return ok();
 }
 
+/**
+ * @brief Bricht die Kalibrierung ab.
+ *
+ * Bei der Klemme werden Kommando 0x0000 und die Parameter der Config zurückgeschrieben.
+ *
+ * @param cfg Config, deren Klemmenparameter wiederhergestellt werden
+ * @param io Backend
+ */
 void CalibrationController::cancel(const Config& cfg, IoBackend& io) {
     if (kind_ == Kind::Device) {
         std::string err;
@@ -200,15 +299,21 @@ void CalibrationController::cancel(const Config& cfg, IoBackend& io) {
     reset();
 }
 
+/**
+ * @brief Arbeitsschritt je Zyklus: Punkterfassung, Stillstandserkennung, Kommando-Polling.
+ * @param s Sample des aktuellen Zyklus
+ * @param io Backend (SDO-Zugriffe)
+ * @param cfg aktive Config
+ */
 void CalibrationController::step(const Sample& s, IoBackend& io, const Config& cfg) {
     last_raw_ = s.raw;
     last_t_ = s.t;
 
     if (kind_ == Kind::Application && capturing_) {
-        if (!hw_valid(s)) {
+        if (const char* why = hw_fault(s)) {
             capturing_ = false;
             phase_ = "idle";
-            error_ = "Erfassung abgebrochen: Messdaten ungültig";
+            error_ = std::string("Erfassung abgebrochen: ") + why;
             return;
         }
         ++cap_n_;
@@ -278,6 +383,10 @@ void CalibrationController::step(const Sample& s, IoBackend& io, const Config& c
     }
 }
 
+/**
+ * @brief Zustand für Frontend und WebSocket.
+ * @return active, kind, phase, error, message, Punkte bzw. Stillstand und Fortschritt
+ */
 nlohmann::json CalibrationController::to_json() const {
     nlohmann::json j = {{"active", active()},
                         {"kind", kind_ == Kind::Application ? "application"

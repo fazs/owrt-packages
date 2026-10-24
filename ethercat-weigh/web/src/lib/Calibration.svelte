@@ -2,6 +2,7 @@
   import { live, calibrate, simLoad, displayUnit, notify } from './live.svelte.js';
   import { UNITS, fmt, fromG, toG } from './format.js';
 
+  /** @type {{open?: boolean}} Dialog geöffnet (bindbar) */
   let { open = $bindable(false) } = $props();
 
   let dialog;
@@ -13,17 +14,18 @@
 
   // Eingaben
   let devNominal = $state(null);
-  let devUnit = $state('kg');
+  let devUnit = $state('g');
   let pointMass = $state(0);
   let pointUnit = $state(displayUnit());
   let refMass = $state(null);
   let refUnit = $state(displayUnit());
-  let simGrams = $state(1000);
+  let simGrams = $state(null); // Vorbelegung: halbe Nennlast der Klemme
   let busy = $state(false);
 
   $effect(() => {
     if (open && dialog && !dialog.open) {
       if (cfgDev && devNominal === null) devNominal = cfgDev.nominal_load;
+      if (cfgDev && cfgCal && simGrams === null) simGrams = toG(0.5 * cfgDev.nominal_load, cfgCal.device_unit);
       if (cfgCal) devUnit = cfgCal.device_unit;
       dialog.showModal();
     } else if (!open && dialog?.open) {
@@ -31,6 +33,12 @@
     }
   });
 
+  /**
+   * Sendet ein Kalibrierkommando und sperrt dabei die Bedienung.
+   * @param {{action: string}} body Kommando
+   * @param {string} [okText] Hinweis bei Erfolg
+   * @returns {Promise<boolean>} true bei Erfolg
+   */
   async function act(body, okText) {
     busy = true;
     const ok = await calibrate(body);
@@ -39,8 +47,17 @@
     return ok;
   }
 
-  // Standardabweichung des Rohwerts mit 3 signifikanten Stellen
+  /**
+   * Formatiert mit 3 signifikanten Stellen (Standardabweichung des Rohwerts).
+   * @param {number|null} v Wert
+   * @returns {string}
+   */
   const sig = (v) => (v == null ? '–' : Number(v.toPrecision(3)).toLocaleString('de-DE'));
+  /**
+   * Anzeigename einer Einheit.
+   * @param {string} id Einheit
+   * @returns {string}
+   */
   const unitName = (id) => UNITS.find((u) => u.id === id)?.label ?? id;
 
   // --- Anwendung
@@ -61,6 +78,7 @@
     cal?.kind === 'device' ? toG(0.2 * cal.nominal_load, cal.device_unit) : 0,
   );
 
+  /** Übernimmt das Kalibrierergebnis und schließt den Dialog bei Erfolg. */
   async function commit() {
     if (await act({ action: 'commit' }, 'Kalibrierung übernommen')) open = false;
   }
@@ -242,13 +260,20 @@
       {/if}
 
       {#if isSim}
-        <div class="sim">
+        <!-- Formular, damit Enter im Eingabefeld „Auflegen“ auslöst -->
+        <form
+          class="sim"
+          onsubmit={(e) => {
+            e.preventDefault();
+            simLoad(Number(simGrams));
+          }}
+        >
           <span class="muted">Simulation: aufgelegte Masse [g]</span>
           <input type="number" step="any" min="0" bind:value={simGrams} />
-          <button onclick={() => simLoad(Number(simGrams))}>Auflegen</button>
-          <button onclick={() => simLoad(0)}>Entlasten</button>
-          <button onclick={() => simLoad(null)}>Automatik</button>
-        </div>
+          <button type="submit">Auflegen</button>
+          <button type="button" onclick={() => simLoad(0)}>Entlasten</button>
+          <button type="button" onclick={() => simLoad(null)}>Automatik</button>
+        </form>
       {/if}
     {/if}
   </div>

@@ -1,5 +1,5 @@
 <script>
-  import { live, displayUnit } from './live.svelte.js';
+  import { live, displayUnit, deleteMeasurement } from './live.svelte.js';
   import { decimalsFor, fmt, fromG } from './format.js';
 
   const unit = $derived(displayUnit());
@@ -7,6 +7,28 @@
   const rows = $derived(live.measurements.slice(0, 50));
   const nowT = $derived(live.sample?.t ?? 0);
 
+  let confirmId = $state(null); // Messung, deren Löschen auf Bestätigung wartet
+  let confirmTimer;
+  /**
+   * Löschen mit Bestätigung: erster Klick markiert die Zeile (3 s), zweiter löscht.
+   * @param {number} id Nummer der Messung
+   */
+  function del(id) {
+    clearTimeout(confirmTimer);
+    if (confirmId !== id) {
+      confirmId = id;
+      confirmTimer = setTimeout(() => (confirmId = null), 3000);
+      return;
+    }
+    confirmId = null;
+    deleteMeasurement(id);
+  }
+
+  /**
+   * Alter einer Messung relativ zum letzten Sample.
+   * @param {number} t Zeitpunkt der Messung [s]
+   * @returns {string} z. B. "vor 12 s"
+   */
   function ago(t) {
     const s = Math.max(0, Math.round(nowT - t));
     if (s < 60) return `vor ${s} s`;
@@ -35,16 +57,25 @@
             <th scope="col">s</th>
             <th scope="col">Einschwingen</th>
             <th scope="col">Zeit</th>
+            <th scope="col"><span class="sr">Löschen</span></th>
           </tr>
         </thead>
         <tbody>
           {#each rows as r (r.id)}
-            <tr>
+            <tr class:confirm={confirmId === r.id}>
               <td class="id">{r.id}</td>
               <td class="val">{fmt(fromG(r.value, unit), dec)}</td>
               <td>{fmt(fromG(r.stddev, unit), dec + 1)}</td>
               <td>{Math.round(r.settle_ms)} ms</td>
               <td class="muted">{ago(r.t)}</td>
+              <td class="del">
+                <button
+                  class:warn={confirmId === r.id}
+                  title={confirmId === r.id ? 'Zum Löschen erneut klicken' : 'Messung löschen'}
+                  aria-label={confirmId === r.id ? `Messung ${r.id} wirklich löschen` : `Messung ${r.id} löschen`}
+                  onclick={() => del(r.id)}>×</button
+                >
+              </td>
             </tr>
           {/each}
         </tbody>
@@ -56,7 +87,8 @@
 <style>
   .scroll {
     max-height: 360px;
-    overflow: auto;
+    overflow-y: auto;
+    overflow-x: hidden; /* Tabelle ist 100 % breit; Rundungsreste sonst als Scrollleiste */
   }
   table {
     width: 100%;
@@ -70,12 +102,12 @@
     font-size: 0.85rem;
     color: var(--muted);
     text-align: right;
-    padding: 0.3rem 0 0.4rem 0.75rem;
+    padding: 0.3rem 0 0.4rem 0.6rem;
     border-bottom: 1px solid var(--line);
   }
   td {
     text-align: right;
-    padding: 0.32rem 0 0.32rem 0.75rem;
+    padding: 0.32rem 0 0.32rem 0.6rem;
     border-bottom: 1px solid var(--line);
   }
   th:first-child,
@@ -88,6 +120,38 @@
   }
   td.val {
     font-weight: 620;
+  }
+  td.del {
+    width: 1%;
+    padding: 0.15rem 0 0.15rem 0.35rem;
+  }
+  td.del button {
+    width: 1.6rem;
+    padding: 0.1rem 0;
+    font-size: 0.85rem;
+    line-height: 1.3;
+    color: var(--muted);
+    border-color: transparent;
+    background: transparent;
+  }
+  td.del button:hover {
+    border-color: var(--line);
+    color: var(--ink);
+  }
+  td.del button.warn {
+    border-color: var(--st-fault);
+    background: var(--st-fault);
+    color: #fff;
+  }
+  tr.confirm td {
+    background: color-mix(in srgb, var(--st-fault) 8%, transparent);
+  }
+  .sr {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
   }
   .empty {
     margin: 0;

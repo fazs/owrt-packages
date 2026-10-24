@@ -5,6 +5,11 @@
 
 namespace ew {
 
+/**
+ * @brief Name eines Zustands für JSON und Anzeige.
+ * @param s Zustand
+ * @return "fault", "idle", "settling" oder "wait_unload"
+ */
 const char* to_string(MeasState s) {
     switch (s) {
     case MeasState::Fault: return "fault";
@@ -15,14 +20,20 @@ const char* to_string(MeasState s) {
     return "unknown";
 }
 
+/// @param p Parameter (Massen in Gramm)
 MeasurementEngine::MeasurementEngine(const MeasurementConfig& p) : p_(p) {}
 
+/**
+ * @brief Übernimmt neue Parameter und leert das Fenster.
+ * @param p Parameter (Massen in Gramm)
+ */
 void MeasurementEngine::set_params(const MeasurementConfig& p) {
     p_ = p;
     buf_.clear();
     win_ = {};
 }
 
+/// @brief Zurück in Idle: Fenster leeren, Freigabe setzen (z. B. nach Tara).
 void MeasurementEngine::reset() {
     state_ = MeasState::Idle;
     fault_reason_.clear();
@@ -32,6 +43,7 @@ void MeasurementEngine::reset() {
     win_ = {};
 }
 
+/// @brief Berechnet win_ aus buf_ (Welford über das Fenster).
 void MeasurementEngine::compute_window() {
     win_ = {};
     if (buf_.empty()) return;
@@ -54,6 +66,11 @@ void MeasurementEngine::compute_window() {
     win_.stddev = k > 1 ? std::sqrt(m2 / (k - 1)) : 0.0;
 }
 
+/**
+ * @brief Verarbeitet ein Sample (einmal je Zyklus).
+ * @param s Sample mit Nettowert value [g]
+ * @return Messung genau im Übernahmezyklus, sonst std::nullopt
+ */
 std::optional<Measurement> MeasurementEngine::process(const Sample& s) {
     std::string reason;
     if (!sample_valid(s, &reason)) {

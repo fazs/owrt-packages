@@ -12,6 +12,7 @@
 
 namespace {
 
+/// @brief Gibt die Aufrufsyntax auf stdout aus.
 void usage() {
     std::cout << "ethercat-weigh " EW_VERSION "\n"
                  "Usage: ethercat-weigh [-c <config.json>] [--sim] [--syslog] [--write-default-config <pfad>]\n"
@@ -23,6 +24,10 @@ void usage() {
 
 } // namespace
 
+/**
+ * @brief Einstieg: Optionen auswerten, Konfiguration laden, Acquisition und Webserver starten.
+ * @return 0 bei regulärem Ende, 1 bei Konfigurationsfehler, 2 bei ungültigen Optionen
+ */
 int main(int argc, char** argv) {
     std::string config_path = "/etc/ethercat-weigh/config.json";
     bool sim = false;

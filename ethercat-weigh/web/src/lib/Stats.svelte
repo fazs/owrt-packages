@@ -4,6 +4,7 @@
 
   const unit = $derived(displayUnit());
   const dec = $derived(decimalsFor(live.config?.measurement?.tolerance, unit));
+  /** @param {number} v Wert [g] @param {number} d Nachkommastellen @returns {string} in der Anzeigeeinheit */
   const f = (v, d) => fmt(fromG(v, unit), d);
   const ses = $derived(live.statistics?.session);
   const rol = $derived(live.statistics?.rolling);
@@ -17,6 +18,7 @@
   ]);
 
   let confirming = $state(false);
+  /** Setzt die Statistik zurück; erster Klick fragt nach (3 s), zweiter führt aus. */
   async function reset() {
     if (!confirming) {
       confirming = true;
