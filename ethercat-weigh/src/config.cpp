@@ -89,7 +89,7 @@ std::vector<std::string> Config::validate() const {
 
     if (device.nominal_load <= 0.0) e.push_back("device.nominal_load: > 0");
     if (device.reference_load <= 0.0) e.push_back("device.reference_load: > 0");
-    if (device.rated_output_mv_v <= 0.0) e.push_back("device.rated_output_mv_v: > 0");
+    if (device.rated_output_mv_v == 0.0) e.push_back("device.rated_output_mv_v: != 0");
     if (device.gravity_of_earth <= 0.0) e.push_back("device.gravity_of_earth: > 0");
     if (device.scale_factor == 0.0) e.push_back("device.scale_factor: != 0");
     if (device.mode0_filter_settings > 11) e.push_back("device.mode0_filter_settings: zulässig 0..11");

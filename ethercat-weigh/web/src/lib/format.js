@@ -10,8 +10,13 @@ const G = Object.fromEntries(UNITS.map((u) => [u.id, u.g]));
 export const fromG = (grams, unit) => (grams == null ? grams : grams / (G[unit] ?? 1));
 export const toG = (value, unit) => (value == null ? value : value * (G[unit] ?? 1));
 
-// Nachkommastellen aus der Toleranz [g] in der Anzeigeeinheit (eine Stelle feiner)
+// Feste Nachkommastellen je Einheit
+const FIXED_DECIMALS = { g: 3, gr: 2 };
+
+// Nachkommastellen: fest je Einheit, sonst aus der Toleranz [g] in der Anzeigeeinheit
+// (eine Stelle feiner)
 export function decimalsFor(toleranceG, unit = 'g') {
+  if (unit in FIXED_DECIMALS) return FIXED_DECIMALS[unit];
   const tol = fromG(toleranceG, unit);
   if (!(tol > 0)) return 3;
   return Math.min(6, Math.max(0, Math.ceil(-Math.log10(tol)) + 1));

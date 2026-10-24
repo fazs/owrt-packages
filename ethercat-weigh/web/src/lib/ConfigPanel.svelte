@@ -6,6 +6,8 @@
 
   let dialog;
   let draft = $state(null);
+  // Eingabetext der Zahlenfelder (Komma oder Punkt, Zwischenstände wie "-" oder "0,")
+  let texts = $state({});
   let errors = $state([]);
   let saving = $state(false);
 
@@ -107,6 +109,7 @@
   $effect(() => {
     if (open && dialog && !dialog.open) {
       draft = structuredClone($state.snapshot(live.config));
+      texts = {};
       errors = [];
       dialog.showModal();
     } else if (!open && dialog?.open) {
@@ -117,8 +120,17 @@
   function setField(g, f, raw) {
     if (f.t === 'bool' || f.t === 'text') draft[g][f.k] = raw;
     else if (f.t === 'select') draft[g][f.k] = typeof f.o[0][0] === 'number' ? Number(raw) : raw;
-    else draft[g][f.k] = raw === '' ? null : Number(raw);
+    else {
+      texts[`${g}.${f.k}`] = raw;
+      const t = raw.trim().replace(',', '.');
+      const v = t === '' ? NaN : Number(t);
+      draft[g][f.k] = Number.isFinite(v) && (f.t !== 'int' || Number.isInteger(v)) ? v : null;
+    }
   }
+
+  const NUM_PATTERN = '\\s*-?(\\d+([.,]\\d*)?|[.,]\\d+)([eE][\\-+]?\\d+)?\\s*';
+  const INT_PATTERN = '\\s*-?\\d+\\s*';
+  const numText = (g, k) => texts[`${g}.${k}`] ?? String(draft[g][k] ?? '').replace('.', ',');
 
   async function save(e) {
     e.preventDefault();
@@ -181,10 +193,10 @@
                 <label class="field">
                   <span>{f.l}</span>
                   <input
-                    type={f.t === 'text' ? 'text' : 'number'}
-                    step={f.t === 'int' ? '1' : 'any'}
-                    inputmode={f.t === 'text' ? 'text' : 'decimal'}
-                    value={draft[g.key][f.k]}
+                    type="text"
+                    inputmode={f.t === 'int' ? 'numeric' : 'text'}
+                    pattern={f.t === 'text' ? undefined : f.t === 'int' ? INT_PATTERN : NUM_PATTERN}
+                    value={f.t === 'text' ? draft[g.key][f.k] : numText(g.key, f.k)}
                     oninput={(e) => setField(g.key, f, e.currentTarget.value)}
                     required
                   />

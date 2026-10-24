@@ -185,6 +185,12 @@ TEST(config_validation_and_json) {
     c.measurement.min_load = 100.0;
     CHECK(!c.validate().empty());
 
+    ew::Config cr;
+    cr.device.rated_output_mv_v = -1.5;  // negatives Vorzeichen zulässig
+    CHECK(cr.validate().empty());
+    cr.device.rated_output_mv_v = 0.0;
+    CHECK(!cr.validate().empty());
+
     nlohmann::json j = nlohmann::json::parse(R"({"measurement":{"min_load":300}, "unknown":1})");
     const auto c2 = ew::config_from_json(j);
     CHECK_NEAR(c2.measurement.min_load, 300.0, 1e-12);
