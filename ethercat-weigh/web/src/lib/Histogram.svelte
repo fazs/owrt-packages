@@ -1,17 +1,69 @@
 <script>
   import { live, displayUnit } from './live.svelte.js';
-  import { decimalsFor, fmt, fromG } from './format.js';
+  import { decimalsFor, fmt, fromG, MAX_DECIMALS } from './format.js';
+  import { DEFAULT_ROLLING_WINDOW, MIN_CAL_POINTS } from './constants.js';
 
+  // --- Layout [px]
+  /** Höhe des Diagramms */
   const H = 200;
+  /** Ränder: links (y-Beschriftung), rechts, oben, unten (x-Beschriftung) */
   const M = { l: 36, r: 8, t: 10, b: 26 };
+  /** Breite vor der ersten Messung des Containers */
+  const DEFAULT_WIDTH = 600;
+  /** kleinste Zeichenbreite */
+  const MIN_PLOT_WIDTH = 10;
+  /** Mindestabstand der x-Beschriftungen */
+  const X_TICK_SPACING = 90;
+  /** Abstand der y-Beschriftung von der Achse */
+  const Y_LABEL_GAP = 6;
+  /** Abstand der x-Beschriftung vom unteren Rand */
+  const X_LABEL_BASELINE = 8;
+  /** Randbereich, in dem x-Beschriftungen bündig statt zentriert stehen */
+  const X_LABEL_EDGE = 24;
+  /** halbe Balkenlücke bzw. Mindestbreite eines Balkens */
+  const BAR_GAP = 0.5;
+  const BAR_MIN_WIDTH = 1;
+  /** Tooltip: Breite, Höhe, Eckenradius, Abstand oben */
+  const TIP_W = 140;
+  const TIP_H = 22;
+  const TIP_R = 3;
+  const TIP_TOP = 4;
 
-  let width = $state(600);
+  // --- Klassenbildung und Achsen
+  /** Mindestanzahl Werte für ein Histogramm (Streuung braucht zwei Werte) */
+  const MIN_VALUES = MIN_CAL_POINTS;
+  /** Quartile für den Interquartilsabstand */
+  const Q1 = 0.25;
+  const Q3 = 0.75;
+  /** Ausreißergrenze nach Tukey ("far out"): Q1 − 3·IQR … Q3 + 3·IQR */
+  const OUTLIER_IQR = 3;
+  /** Freedman–Diaconis: Klassenbreite 2·IQR / ∛n */
+  const FD_FACTOR = 2;
+  /** zulässige Anzahl Klassen */
+  const MIN_BINS = 5;
+  const MAX_BINS = 40;
+  /** Mantissen für „glatte“ Schrittweiten 1, 2, 5 × 10^k */
+  const NICE_STEPS = [1, 2, 5, 10];
+  /** Basis der Schrittweiten */
+  const DECIMAL_BASE = 10;
+  /** Rundungstoleranz bei Klassenzuordnung und Teilstrichen */
+  const EPS = 1e-9;
+  /** Luft über dem höchsten Balken bzw. der Kurve */
+  const Y_HEADROOM = 1.08;
+  /** Anzahl Teilstriche der y-Achse (ungefähr) */
+  const Y_TICKS = 4;
+  /** Stützstellen der Normalverteilungskurve */
+  const CURVE_POINTS = 80;
+  /** Nachkommastellen der Kurvenkoordinaten im SVG */
+  const SVG_DECIMALS = 1;
+
+  let width = $state(DEFAULT_WIDTH);
   let scope = $state('all'); // all | rolling
   let hover = $state(null); // Index des Balkens unter dem Zeiger
 
   const unit = $derived(displayUnit());
   const dec = $derived(decimalsFor(live.config?.measurement?.tolerance, unit));
-  const rolling = $derived(live.config?.statistics?.rolling_window ?? 50);
+  const rolling = $derived(live.config?.statistics?.rolling_window ?? DEFAULT_ROLLING_WINDOW);
 
   // live.measurements: neueste zuerst, Werte in g
   const values = $derived(
@@ -20,14 +72,14 @@
   const latest = $derived(values[0]);
 
   /**
-   * Rundet auf 1, 2 oder 5 × 10^k (nach oben).
+   * Rundet auf NICE_STEPS × 10^k (nach oben).
    * @param {number} x Wert > 0
    * @returns {number}
    */
   function niceStep(x) {
-    const p = 10 ** Math.floor(Math.log10(x));
+    const p = DECIMAL_BASE ** Math.floor(Math.log10(x));
     const f = x / p;
-    return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p;
+    return NICE_STEPS.find((m) => f <= m) * p;
   }
 
   /**
@@ -43,40 +95,41 @@
   }
 
   const hist = $derived.by(() => {
-    if (values.length < 2) return null;
+    if (values.length < MIN_VALUES) return null;
     const sorted = [...values].sort((a, b) => a - b);
-    // Ausreißer (außerhalb Q1 − 3·IQR … Q3 + 3·IQR) nicht in die Klassen aufnehmen
-    const q1 = quantile(sorted, 0.25);
-    const q3 = quantile(sorted, 0.75);
+    // Ausreißer (außerhalb Q1 − OUTLIER_IQR·IQR … Q3 + OUTLIER_IQR·IQR) nicht in die Klassen aufnehmen
+    const q1 = quantile(sorted, Q1);
+    const q3 = quantile(sorted, Q3);
     const iqr = q3 - q1;
-    const inner = iqr > 0 ? sorted.filter((v) => v >= q1 - 3 * iqr && v <= q3 + 3 * iqr) : sorted;
+    const inner =
+      iqr > 0 ? sorted.filter((v) => v >= q1 - OUTLIER_IQR * iqr && v <= q3 + OUTLIER_IQR * iqr) : sorted;
     const outliers = sorted.length - inner.length;
     const n = inner.length;
     const min = inner[0];
     const max = inner[n - 1];
     const mean = inner.reduce((a, v) => a + v, 0) / n;
     const sd = n > 1 ? Math.sqrt(inner.reduce((a, v) => a + (v - mean) ** 2, 0) / (n - 1)) : 0;
-    // Klassenbreite nach Freedman–Diaconis (Rückfall √n-Regel), 5..40 Klassen,
-    // gerundet auf 1/2/5 · 10^k und nicht feiner als die Anzeigeauflösung
+    // Klassenbreite nach Freedman–Diaconis (Rückfall √n-Regel), MIN_BINS..MAX_BINS Klassen,
+    // gerundet auf NICE_STEPS · 10^k und nicht feiner als die Anzeigeauflösung
     const span = max - min;
-    let w = iqr > 0 ? (2 * iqr) / Math.cbrt(n) : span / Math.ceil(Math.sqrt(n));
-    if (span > 0) w = Math.min(Math.max(w, span / 40), span / 5);
-    const res = 10 ** -dec;
+    let w = iqr > 0 ? (FD_FACTOR * iqr) / Math.cbrt(n) : span / Math.ceil(Math.sqrt(n));
+    if (span > 0) w = Math.min(Math.max(w, span / MAX_BINS), span / MIN_BINS);
+    const res = DECIMAL_BASE ** -dec;
     w = Math.max(res, niceStep(w || res));
-    const start = Math.floor(min / w + 1e-9) * w || 0;
-    const nb = Math.max(1, Math.floor((max - start) / w + 1e-9) + 1);
+    const start = Math.floor(min / w + EPS) * w || 0;
+    const nb = Math.max(1, Math.floor((max - start) / w + EPS) + 1);
     const counts = new Array(nb).fill(0);
-    for (const v of inner) counts[Math.min(nb - 1, Math.floor((v - start) / w + 1e-9))]++;
+    for (const v of inner) counts[Math.min(nb - 1, Math.floor((v - start) / w + EPS))]++;
     return { n, outliers, mean, sd, w, start, end: start + nb * w, counts, top: Math.max(...counts) };
   });
 
-  const pw = $derived(Math.max(10, width - M.l - M.r));
+  const pw = $derived(Math.max(MIN_PLOT_WIDTH, width - M.l - M.r));
   const ph = H - M.t - M.b;
   /** @param {number} v Messwert @returns {number} x-Koordinate im SVG */
   const sx = (v) => M.l + ((v - hist.start) / (hist.end - hist.start)) * pw;
   /** @param {number} c Häufigkeit @returns {number} y-Koordinate im SVG */
   const sy = (c) => M.t + ph - (c / yMax) * ph;
-  const yMax = $derived(hist ? Math.max(hist.top, normalPeak()) * 1.08 : 1);
+  const yMax = $derived(hist ? Math.max(hist.top, normalPeak()) * Y_HEADROOM : 1);
 
   /**
    * Erwartete Häufigkeit je Klasse bei Normalverteilung N(mean, sd).
@@ -85,7 +138,8 @@
    */
   function expected(v) {
     const { n, w, mean, sd } = hist;
-    return ((n * w) / (sd * Math.sqrt(2 * Math.PI))) * Math.exp(-0.5 * ((v - mean) / sd) ** 2);
+    const z = (v - mean) / sd;
+    return ((n * w) / (sd * Math.sqrt(2 * Math.PI))) * Math.exp(-(z * z) / 2);  // Dichte von N(mean, sd)
   }
   /** @returns {number} Maximum der Normalverteilungskurve (0 bei sd = 0) */
   function normalPeak() {
@@ -95,35 +149,35 @@
   const curve = $derived.by(() => {
     if (!hist || !(hist.sd > 0)) return '';
     const pts = [];
-    for (let i = 0; i <= 80; i++) {
-      const v = hist.start + ((hist.end - hist.start) * i) / 80;
-      pts.push(`${sx(v).toFixed(1)},${sy(expected(v)).toFixed(1)}`);
+    for (let i = 0; i <= CURVE_POINTS; i++) {
+      const v = hist.start + ((hist.end - hist.start) * i) / CURVE_POINTS;
+      pts.push(`${sx(v).toFixed(SVG_DECIMALS)},${sy(expected(v)).toFixed(SVG_DECIMALS)}`);
     }
     return 'M' + pts.join('L');
   });
 
   const xTicks = $derived.by(() => {
     if (!hist) return [];
-    const step = Math.max(hist.w, niceStep((hist.end - hist.start) / Math.max(2, Math.floor(pw / 90))));
+    const step = Math.max(hist.w, niceStep((hist.end - hist.start) / Math.max(MIN_VALUES, Math.floor(pw / X_TICK_SPACING))));
     const out = [];
     // über Ganzzahlen zählen, damit keine Rundungsreste (z. B. „-0“) entstehen
-    for (let i = Math.ceil(hist.start / step - 1e-9); i * step <= hist.end + 1e-9; i++) out.push(i * step || 0);
+    for (let i = Math.ceil(hist.start / step - EPS); i * step <= hist.end + EPS; i++) out.push(i * step || 0);
     return out;
   });
 
   const yTicks = $derived.by(() => {
     if (!hist) return [];
-    const step = Math.max(1, niceStep(yMax / 4));
+    const step = Math.max(1, niceStep(yMax / Y_TICKS));
     const out = [];
     for (let c = 0; c <= yMax; c += step) out.push(c);
     return out;
   });
 
-  const tickDec = $derived(hist ? Math.max(0, Math.min(6, Math.ceil(-Math.log10(hist.w) - 1e-9))) : dec);
+  const tickDec = $derived(hist ? Math.max(0, Math.min(MAX_DECIMALS, Math.ceil(-Math.log10(hist.w) - EPS))) : dec);
   // Klasse der letzten Messung (-1, wenn sie als Ausreißer außerhalb liegt)
   const latestBin = $derived.by(() => {
     if (!hist || latest == null || latest < hist.start || latest > hist.end) return -1;
-    return Math.min(hist.counts.length - 1, Math.floor((latest - hist.start) / hist.w + 1e-9));
+    return Math.min(hist.counts.length - 1, Math.floor((latest - hist.start) / hist.w + EPS));
   });
 </script>
 
@@ -150,7 +204,7 @@
       <svg {width} height={H} role="img" aria-label="Histogramm der Messwerte, {hist.n} Messungen">
         {#each yTicks as c (c)}
           <line class="grid" x1={M.l} x2={M.l + pw} y1={sy(c)} y2={sy(c)} />
-          <text class="tick" x={M.l - 6} y={sy(c)} text-anchor="end" dominant-baseline="middle">{c}</text>
+          <text class="tick" x={M.l - Y_LABEL_GAP} y={sy(c)} text-anchor="end" dominant-baseline="middle">{c}</text>
         {/each}
         {#each xTicks as v (v)}
           {@const x = sx(v)}
@@ -158,8 +212,8 @@
           <text
             class="tick"
             {x}
-            y={H - 8}
-            text-anchor={x > M.l + pw - 24 ? 'end' : x < M.l + 24 ? 'start' : 'middle'}>{fmt(v, tickDec)}</text
+            y={H - X_LABEL_BASELINE}
+            text-anchor={x > M.l + pw - X_LABEL_EDGE ? 'end' : x < M.l + X_LABEL_EDGE ? 'start' : 'middle'}>{fmt(v, tickDec)}</text
           >
         {/each}
 
@@ -170,9 +224,9 @@
             class="bar"
             class:latest={i === latestBin}
             class:hover={i === hover}
-            x={x0 + 0.5}
+            x={x0 + BAR_GAP}
             y={sy(c)}
-            width={Math.max(1, x1 - x0 - 1)}
+            width={Math.max(BAR_MIN_WIDTH, x1 - x0 - 2 * BAR_GAP)}
             height={M.t + ph - sy(c)}
           />
           <!-- Trefferfläche über die volle Höhe, auch für leere Klassen -->
@@ -194,10 +248,10 @@
 
         {#if hover !== null}
           {@const a = hist.start + hover * hist.w}
-          {@const tx = Math.min(Math.max(sx(a + hist.w / 2), M.l + 70), M.l + pw - 70)}
-          <g class="tip" transform="translate({tx},{M.t + 4})">
-            <rect x="-70" y="0" width="140" height="22" rx="3" />
-            <text x="0" y="11" text-anchor="middle" dominant-baseline="middle"
+          {@const tx = Math.min(Math.max(sx(a + hist.w / 2), M.l + TIP_W / 2), M.l + pw - TIP_W / 2)}
+          <g class="tip" transform="translate({tx},{M.t + TIP_TOP})">
+            <rect x={-TIP_W / 2} y="0" width={TIP_W} height={TIP_H} rx={TIP_R} />
+            <text x="0" y={TIP_H / 2} text-anchor="middle" dominant-baseline="middle"
               >{fmt(a, tickDec)} … {fmt(a + hist.w, tickDec)}: {hist.counts[hover]}</text
             >
           </g>

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstdint>
 #include <deque>
 #include <vector>
 
@@ -29,7 +28,7 @@ namespace ew {
 
         void reset();
 
-        StatSummary summary() const;
+        [[nodiscard]] StatSummary summary () const;
 
     private:
         uint64_t n_ = 0;
@@ -40,7 +39,7 @@ namespace ew {
     class RollingStats {
     public:
         /// @param size Fenstergröße N
-        explicit RollingStats(uint32_t size = 50) : size_(size) {
+        explicit RollingStats(uint32_t size) : size_(size) {
         }
 
         void add(double x);
@@ -52,7 +51,7 @@ namespace ew {
 
         void rebuild(const std::vector<double> &held);
 
-        StatSummary summary() const;
+        [[nodiscard]] StatSummary summary () const;
 
     private:
         uint32_t size_;
@@ -63,7 +62,7 @@ namespace ew {
     class TemporaryStatistics {
     public:
         /// @param rolling Größe des gleitenden Fensters
-        explicit TemporaryStatistics(uint32_t rolling = 50) : rolling_(rolling) {
+        explicit TemporaryStatistics(uint32_t rolling) : rolling_(rolling) {
         }
 
         /// Fügt eine Messung zu Session und Fenster hinzu.
@@ -83,7 +82,7 @@ namespace ew {
         /// Ändert die Größe des gleitenden Fensters.
         void set_rolling_window(uint32_t n) { rolling_.resize(n); }
 
-        nlohmann::json to_json() const;
+        [[nodiscard]] nlohmann::json to_json() const;
 
     private:
         RunningStats session_;  ///< seit Reset

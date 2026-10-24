@@ -2,9 +2,21 @@
 
 #include <cmath>
 #include <cstdio>
-#include <cstring>
+#include <limits>
 
 namespace ew::el3356 {
+
+namespace {
+
+constexpr uint32_t kBitsPerByte = 8U;                                    ///< Bits je Byte
+constexpr uint8_t kMaxFieldBits = std::numeric_limits<uint64_t>::digits;  ///< längstes Bitfeld
+constexpr uint32_t kMapIndexShift = 16U;   ///< Mapping-Eintrag: Index in Bit 16..31
+constexpr uint32_t kMapSubShift = 8U;      ///< Mapping-Eintrag: Subindex in Bit 8..15
+constexpr uint32_t kMapByteMask = 0xFFU;   ///< Maske für Subindex bzw. Bitlänge
+constexpr size_t kObjNameLen = sizeof("0xIIII:SS");  ///< Puffer für "0xIIII:SS" inkl. Nullbyte
+constexpr size_t kPdoNameLen = sizeof("0xIIII");     ///< Puffer für "0xIIII" inkl. Nullbyte
+
+} // namespace
 
 /**
  * @brief Zerlegt einen Mapping-Eintrag aus 0x16xx/0x1Axx.
@@ -12,8 +24,38 @@ namespace ew::el3356 {
  * @return Index, Subindex, Bitlänge
  */
 MapEntry decode_map_entry(uint32_t raw) {
-    return {static_cast<uint16_t>(raw >> 16), static_cast<uint8_t>((raw >> 8) & 0xFF),
-            static_cast<uint8_t>(raw & 0xFF)};
+    return {static_cast<uint16_t>(raw >> kMapIndexShift),
+            static_cast<uint8_t>((raw >> kMapSubShift) & kMapByteMask),
+            static_cast<uint8_t>(raw & kMapByteMask)};
+}
+
+/**
+ * @brief Setzt einen Mapping-Eintrag für 0x16xx/0x1Axx zusammen (Umkehrung von decode_map_entry()).
+ * @param e Index, Subindex, Bitlänge
+ * @return UINT32: index<<16 | sub<<8 | bitlen
+ */
+uint32_t encode_map_entry(const MapEntry& e) {
+    return static_cast<uint32_t>(e.index) << kMapIndexShift | static_cast<uint32_t>(e.sub) << kMapSubShift |
+           static_cast<uint32_t>(e.bits);
+}
+
+/**
+ * @brief Prüft, ob ein Index ein PDO-Mapping-Objekt ist (0x16xx oder 0x1Axx).
+ * @param index Objektindex
+ * @return true für RxPDO- und TxPDO-Mapping-Objekte
+ */
+bool is_pdo_mapping(uint16_t index) {
+    const uint16_t group = index & kPdoGroupMask;
+    return group == kPdoRxFirst || group == kPdoTxFirst;
+}
+
+/**
+ * @brief Anzahl Bytes für ein Abbild von @p bits Bit.
+ * @param bits Länge in Bit
+ * @return aufgerundete Bytezahl
+ */
+size_t bytes_for_bits(uint32_t bits) {
+    return (bits + kBitsPerByte - 1U) / kBitsPerByte;
 }
 
 namespace {
@@ -25,7 +67,7 @@ namespace {
  */
 template <typename F>
 void walk(const std::vector<std::vector<MapEntry>>& pdos, F&& on_entry) {
-    uint32_t off = 0;
+    uint32_t off = 0U;
     for (const auto& pdo : pdos)
         for (const auto& e : pdo) {
             on_entry(e, off);
@@ -41,9 +83,9 @@ void walk(const std::vector<std::vector<MapEntry>>& pdos, F&& on_entry) {
  * @return Rohwert
  */
 uint64_t get_bits(const uint8_t* img, uint32_t off, uint8_t len) {
-    uint64_t v = 0;
-    for (uint8_t i = 0; i < len && i < 64; ++i, ++off)
-        v |= static_cast<uint64_t>((img[off / 8] >> (off % 8)) & 1u) << i;
+    uint64_t v = 0U;
+    for (uint8_t i = 0U; i < len && i < kMaxFieldBits; ++i, ++off)
+        v |= static_cast<uint64_t>((img[off / kBitsPerByte] >> (off % kBitsPerByte)) & 1U) << i;
     return v;
 }
 
@@ -55,29 +97,25 @@ uint64_t get_bits(const uint8_t* img, uint32_t off, uint8_t len) {
  * @param v Rohwert
  */
 void set_bits(uint8_t* img, uint32_t off, uint8_t len, uint64_t v) {
-    for (uint8_t i = 0; i < len && i < 64; ++i, ++off) {
-        const uint8_t mask = static_cast<uint8_t>(1u << (off % 8));
-        if ((v >> i) & 1u)
-            img[off / 8] |= mask;
+    for (uint8_t i = 0U; i < len && i < kMaxFieldBits; ++i, ++off) {
+        const uint8_t mask = static_cast<uint8_t>(1U << (off % kBitsPerByte));
+        if ((v >> i) & 1U)
+            img[off / kBitsPerByte] |= mask;
         else
-            img[off / 8] &= static_cast<uint8_t>(~mask);
+            img[off / kBitsPerByte] &= static_cast<uint8_t>(~mask);
     }
 }
 
 /// @brief Liest ein Bit; false, wenn der Eintrag nicht gemappt ist.
 bool get_bit(const uint8_t* img, const EntryLoc& l) {
     if (!l.present) return false;
-    return (img[l.bit_offset / 8] >> (l.bit_offset % 8)) & 1u;
+    return (img[l.bit_offset / kBitsPerByte] >> (l.bit_offset % kBitsPerByte)) & 1U;
 }
 
 /// @brief Setzt oder löscht ein Bit; ohne Wirkung, wenn der Eintrag nicht gemappt ist.
 void set_bit(uint8_t* img, const EntryLoc& l, bool v) {
     if (!l.present) return;
-    const uint8_t mask = static_cast<uint8_t>(1u << (l.bit_offset % 8));
-    if (v)
-        img[l.bit_offset / 8] |= mask;
-    else
-        img[l.bit_offset / 8] &= static_cast<uint8_t>(~mask);
+    set_bits(img, l.bit_offset, kBitsBool, v ? 1U : 0U);
 }
 
 /// @brief Bytes eines Werts in Speicherreihenfolge (Zielplattformen sind little endian).
@@ -96,7 +134,7 @@ std::vector<uint8_t> le(T v) {
  */
 double from_raw(DType t, uint64_t raw) {
     switch (t) {
-    case DType::Bool: return raw & 1u;
+    case DType::Bool: return static_cast<double>(raw & 1U);
     case DType::I8: return static_cast<int8_t>(raw);
     case DType::I16: return static_cast<int16_t>(raw);
     case DType::I32: return static_cast<int32_t>(raw);
@@ -118,7 +156,7 @@ double from_raw(DType t, uint64_t raw) {
  */
 uint64_t to_raw(DType t, double v) {
     switch (t) {
-    case DType::Bool: return v != 0.0 ? 1u : 0u;
+    case DType::Bool: return v != 0.0 ? 1U : 0U;
     case DType::I8:
     case DType::I16:
     case DType::I32: return static_cast<uint32_t>(static_cast<int32_t>(std::lround(v)));
@@ -143,39 +181,39 @@ struct KnownEntry {
 
 /// Objektverzeichnis laut ESI (Revision 0x0019): RMB 0x6000/0x7000, AI-Kanäle 0x6010/0x6020
 const KnownEntry kKnownEntries[] = {
-    {kObjInputs, 0x02, "Overrange", DType::Bool},
-    {kObjInputs, 0x04, "Data invalid", DType::Bool},
-    {kObjInputs, 0x07, "Error", DType::Bool},
-    {kObjInputs, 0x08, "Calibration in progress", DType::Bool},
-    {kObjInputs, 0x09, "Steady state", DType::Bool},
-    {kObjInputs, 0x0E, "Sync error", DType::Bool},
-    {kObjInputs, 0x10, "TxPDO Toggle", DType::Bool},
-    {kObjInputs, 0x11, "Value", DType::I32},
-    {kObjInputs, 0x12, "Value (Real)", DType::F32},
-    {kObjInputs, 0x13, "Timestamp", DType::U64},
-    {0x6010, 0x01, "Underrange", DType::Bool},
-    {0x6010, 0x02, "Overrange", DType::Bool},
-    {0x6010, 0x07, "Error", DType::Bool},
-    {0x6010, 0x10, "TxPDO Toggle", DType::Bool},
-    {0x6010, 0x11, "Value", DType::I32},
-    {0x6020, 0x01, "Underrange", DType::Bool},
-    {0x6020, 0x02, "Overrange", DType::Bool},
-    {0x6020, 0x07, "Error", DType::Bool},
-    {0x6020, 0x10, "TxPDO Toggle", DType::Bool},
-    {0x6020, 0x11, "Value", DType::I32},
-    {kObjSmOutParam, 0x20, "Sync error", DType::Bool},
-    {kObjTxPdoPar, 0x09, "TxPDO Toggle", DType::Bool},
-    {kObjControl, 0x01, "Start calibration", DType::Bool},
-    {kObjControl, 0x02, "Disable calibration", DType::Bool},
-    {kObjControl, 0x03, "Input freeze", DType::Bool},
-    {kObjControl, 0x04, "Sample mode", DType::Bool},
-    {kObjControl, 0x05, "Tara", DType::Bool},
-    {kObjControl, 0x11, "Filter frequency", DType::U16},
+    {kObjInputs, kSubInOverrange, "Overrange", DType::Bool},
+    {kObjInputs, kSubInDataInvalid, "Data invalid", DType::Bool},
+    {kObjInputs, kSubInError, "Error", DType::Bool},
+    {kObjInputs, kSubInCalibration, "Calibration in progress", DType::Bool},
+    {kObjInputs, kSubInSteadyState, "Steady state", DType::Bool},
+    {kObjInputs, kSubInSyncError, "Sync error", DType::Bool},
+    {kObjInputs, kSubInToggle, "TxPDO Toggle", DType::Bool},
+    {kObjInputs, kSubInValue, "Value", DType::I32},
+    {kObjInputs, kSubInValueReal, "Value (Real)", DType::F32},
+    {kObjInputs, kSubInTimestamp, "Timestamp", DType::U64},
+    {kObjAiInputsCh1, kSubAiUnderrange, "Underrange", DType::Bool},
+    {kObjAiInputsCh1, kSubAiOverrange, "Overrange", DType::Bool},
+    {kObjAiInputsCh1, kSubAiError, "Error", DType::Bool},
+    {kObjAiInputsCh1, kSubAiToggle, "TxPDO Toggle", DType::Bool},
+    {kObjAiInputsCh1, kSubAiValue, "Value", DType::I32},
+    {kObjAiInputsCh2, kSubAiUnderrange, "Underrange", DType::Bool},
+    {kObjAiInputsCh2, kSubAiOverrange, "Overrange", DType::Bool},
+    {kObjAiInputsCh2, kSubAiError, "Error", DType::Bool},
+    {kObjAiInputsCh2, kSubAiToggle, "TxPDO Toggle", DType::Bool},
+    {kObjAiInputsCh2, kSubAiValue, "Value", DType::I32},
+    {kObjSmOutParam, kSubSmOutSyncError, "Sync error", DType::Bool},
+    {kObjTxPdoPar, kSubTxPdoParToggle, "TxPDO Toggle", DType::Bool},
+    {kObjControl, kSubCtrlStartCalibration, "Start calibration", DType::Bool},
+    {kObjControl, kSubCtrlDisableCalibration, "Disable calibration", DType::Bool},
+    {kObjControl, kSubCtrlInputFreeze, "Input freeze", DType::Bool},
+    {kObjControl, kSubCtrlSampleMode, "Sample mode", DType::Bool},
+    {kObjControl, kSubCtrlTare, "Tara", DType::Bool},
+    {kObjControl, kSubCtrlFilterFrequency, "Filter frequency", DType::U16},
 };
 
 /**
  * @brief PDO-Eintrag mit Name und Typ aus der ESI-Tabelle.
- * @param index Objektindex (0 = Lücke)
+ * @param index Objektindex (kObjGap = Lücke)
  * @param sub Subindex
  * @param bits Länge in Bit
  * @return Eintrag; unbekannte Objekte heißen "0xIIII:SS", Typ nach Bitlänge
@@ -183,13 +221,22 @@ const KnownEntry kKnownEntries[] = {
 PdoEntry known(uint16_t index, uint8_t sub, uint8_t bits) {
     PdoEntry e;
     e.map = {index, sub, bits};
-    if (!known_entry(index, sub, e.name, e.type) && index != 0) {
-        e.type = dtype_from_coe(0, bits);
-        char b[16];
+    if (!known_entry(index, sub, e.name, e.type) && index != kObjGap) {
+        e.type = dtype_from_coe(kCoeUnknown, bits);
+        char b[kObjNameLen];
         std::snprintf(b, sizeof b, "0x%04X:%02X", index, sub);
         e.name = b;
     }
     return e;
+}
+
+/**
+ * @brief Lücke im Mapping.
+ * @param bits Breite in Bit (laut ESI)
+ * @return Eintrag ohne Objekt
+ */
+PdoEntry gap(uint8_t bits) {
+    return known(kObjGap, kSubCount, bits);
 }
 
 } // namespace
@@ -232,27 +279,27 @@ bool dtype_from_name(const std::string& s, DType& t) {
 
 /**
  * @brief Datentyp aus dem CoE-Datentypcode (ETG.1000.6).
- * @param coe ECT_*-Code aus der SDO-Information, 0 = unbekannt
+ * @param coe ECT_*-Code aus der SDO-Information, kCoeUnknown = unbekannt
  * @param bits Bitlänge, Rückfall bei unbekanntem Code
  * @return Datentyp
  */
 DType dtype_from_coe(uint16_t coe, uint8_t bits) {
-    switch (coe) {  // ECT_BOOLEAN .. ECT_REAL32 (ETG.1000.6)
-    case 0x0001: return DType::Bool;
-    case 0x0002: return DType::I8;
-    case 0x0003: return DType::I16;
-    case 0x0004: return DType::I32;
-    case 0x0005: return DType::U8;
-    case 0x0006: return DType::U16;
-    case 0x0007: return DType::U32;
-    case 0x0008: return DType::F32;
-    case 0x001B: return DType::U64;
+    switch (coe) {
+    case kCoeBoolean: return DType::Bool;
+    case kCoeInteger8: return DType::I8;
+    case kCoeInteger16: return DType::I16;
+    case kCoeInteger32: return DType::I32;
+    case kCoeUnsigned8: return DType::U8;
+    case kCoeUnsigned16: return DType::U16;
+    case kCoeUnsigned32: return DType::U32;
+    case kCoeReal32: return DType::F32;
+    case kCoeUnsigned64: return DType::U64;
     default: break;
     }
-    if (bits == 1) return DType::Bool;
-    if (bits <= 8) return DType::U8;
-    if (bits <= 16) return DType::U16;
-    if (bits <= 32) return DType::U32;
+    if (bits == kBitsBool) return DType::Bool;
+    if (bits <= std::numeric_limits<uint8_t>::digits) return DType::U8;
+    if (bits <= std::numeric_limits<uint16_t>::digits) return DType::U16;
+    if (bits <= std::numeric_limits<uint32_t>::digits) return DType::U32;
     return DType::U64;
 }
 
@@ -264,15 +311,15 @@ DType dtype_from_coe(uint16_t coe, uint8_t bits) {
 size_t dtype_size(DType t) {
     switch (t) {
     case DType::Bool:
-    case DType::U8:
-    case DType::I8: return 1;
-    case DType::U16:
-    case DType::I16: return 2;
-    case DType::U32:
-    case DType::I32:
-    case DType::F32: return 4;
-    case DType::U64: return 8;
-    default: return 0;
+    case DType::U8: return sizeof(uint8_t);
+    case DType::I8: return sizeof(int8_t);
+    case DType::U16: return sizeof(uint16_t);
+    case DType::I16: return sizeof(int16_t);
+    case DType::U32: return sizeof(uint32_t);
+    case DType::I32: return sizeof(int32_t);
+    case DType::F32: return sizeof(float);
+    case DType::U64: return sizeof(uint64_t);
+    default: return 0U;
     }
 }
 
@@ -285,7 +332,7 @@ size_t dtype_size(DType t) {
 std::vector<uint8_t> encode_value(DType t, double v) {
     const uint64_t raw = to_raw(t, v);
     std::vector<uint8_t> out(dtype_size(t));
-    for (size_t i = 0; i < out.size(); ++i) out[i] = static_cast<uint8_t>(raw >> (8 * i));
+    for (size_t i = 0U; i < out.size(); ++i) out[i] = static_cast<uint8_t>(raw >> (kBitsPerByte * i));
     return out;
 }
 
@@ -296,9 +343,10 @@ std::vector<uint8_t> encode_value(DType t, double v) {
  * @return Wert
  */
 double decode_value(DType t, const std::vector<uint8_t>& d) {
-    uint64_t raw = 0;
-    const size_t n = dtype_size(t) ? dtype_size(t) : 8;
-    for (size_t i = 0; i < d.size() && i < n; ++i) raw |= static_cast<uint64_t>(d[i]) << (8 * i);
+    uint64_t raw = 0U;
+    const size_t n = dtype_size(t) != 0U ? dtype_size(t) : sizeof(uint64_t);
+    for (size_t i = 0U; i < d.size() && i < n; ++i)
+        raw |= static_cast<uint64_t>(d[i]) << (kBitsPerByte * i);
     return from_raw(t, raw);
 }
 
@@ -315,19 +363,18 @@ InputLayout layout_inputs(const std::vector<std::vector<MapEntry>>& pdos) {
     InputLayout l;
     walk(pdos, [&](const MapEntry& e, uint32_t off) {
         EntryLoc loc{true, off, e.bits};
-        // Bis Revision 0x0014 liegen Sync error und TxPDO Toggle in 0x1C32:20 bzw. 0x1800:09
-        if (e.index == kObjSmOutParam && e.sub == 0x20) l.sync_error = loc;
-        if (e.index == kObjTxPdoPar && e.sub == 0x09) l.toggle = loc;
+        if (e.index == kObjSmOutParam && e.sub == kSubSmOutSyncError) l.sync_error = loc;
+        if (e.index == kObjTxPdoPar && e.sub == kSubTxPdoParToggle) l.toggle = loc;
         if (e.index != kObjInputs) return;
         switch (e.sub) {
-        case 0x02: l.overrange = loc; break;
-        case 0x04: l.data_invalid = loc; break;
-        case 0x07: l.error = loc; break;
-        case 0x08: l.calibration = loc; break;
-        case 0x09: l.steady_state = loc; break;
-        case 0x0E: l.sync_error = loc; break;
-        case 0x10: l.toggle = loc; break;
-        case 0x12: l.value_real = loc; break;
+        case kSubInOverrange: l.overrange = loc; break;
+        case kSubInDataInvalid: l.data_invalid = loc; break;
+        case kSubInError: l.error = loc; break;
+        case kSubInCalibration: l.calibration = loc; break;
+        case kSubInSteadyState: l.steady_state = loc; break;
+        case kSubInSyncError: l.sync_error = loc; break;
+        case kSubInToggle: l.toggle = loc; break;
+        case kSubInValueReal: l.value_real = loc; break;
         default: break;
         }
     });
@@ -345,11 +392,11 @@ OutputLayout layout_outputs(const std::vector<std::vector<MapEntry>>& pdos) {
         if (e.index != kObjControl) return;
         EntryLoc loc{true, off, e.bits};
         switch (e.sub) {
-        case 0x01: l.start_calibration = loc; break;
-        case 0x02: l.disable_calibration = loc; break;
-        case 0x03: l.input_freeze = loc; break;
-        case 0x04: l.sample_mode = loc; break;
-        case 0x05: l.tare = loc; break;
+        case kSubCtrlStartCalibration: l.start_calibration = loc; break;
+        case kSubCtrlDisableCalibration: l.disable_calibration = loc; break;
+        case kSubCtrlInputFreeze: l.input_freeze = loc; break;
+        case kSubCtrlSampleMode: l.sample_mode = loc; break;
+        case kSubCtrlTare: l.tare = loc; break;
         default: break;
         }
     });
@@ -381,10 +428,11 @@ El3356Status decode_status(const uint8_t* img, const InputLayout& l) {
  * @return Wert, 0 wenn nicht byteweise mit 32 Bit gemappt
  */
 float decode_value_real(const uint8_t* img, const InputLayout& l) {
-    float f = 0.0f;
-    if (!l.value_real.present || l.value_real.bit_len != 32 || (l.value_real.bit_offset % 8) != 0)
+    float f = 0.0F;
+    if (!l.value_real.present || l.value_real.bit_len != kBitsDint ||
+        (l.value_real.bit_offset % kBitsPerByte) != 0U)
         return f;
-    std::memcpy(&f, img + l.value_real.bit_offset / 8, sizeof(f));
+    std::memcpy(&f, img + l.value_real.bit_offset / kBitsPerByte, sizeof(f));
     return f;
 }
 
@@ -417,23 +465,23 @@ void encode_inputs(uint8_t* img, const InputLayout& l, const El3356Status& s, fl
     set_bit(img, l.steady_state, s.steady_state);
     set_bit(img, l.sync_error, s.sync_error);
     set_bit(img, l.toggle, s.txpdo_toggle);
-    if (l.value_real.present && l.value_real.bit_len == 32)
-        set_bits(img, l.value_real.bit_offset, 32, to_raw(DType::F32, value_real));
+    if (l.value_real.present && l.value_real.bit_len == kBitsDint)
+        set_bits(img, l.value_real.bit_offset, kBitsDint, to_raw(DType::F32, value_real));
 }
 
 /**
  * @brief Zugriff auf das Steuerbit 0x7000:@p sub.
  * @param c Steuerbits
- * @param sub Subindex 1..5
+ * @param sub Subindex kSubCtrlStartCalibration..kSubCtrlTare
  * @return Zeiger auf das Feld in @p c, nullptr bei unbekanntem Subindex
  */
 bool* control_bit(El3356Control& c, uint8_t sub) {
     switch (sub) {
-    case 0x01: return &c.start_calibration;
-    case 0x02: return &c.disable_calibration;
-    case 0x03: return &c.input_freeze;
-    case 0x04: return &c.sample_mode;
-    case 0x05: return &c.tare;
+    case kSubCtrlStartCalibration: return &c.start_calibration;
+    case kSubCtrlDisableCalibration: return &c.disable_calibration;
+    case kSubCtrlInputFreeze: return &c.input_freeze;
+    case kSubCtrlSampleMode: return &c.sample_mode;
+    case kSubCtrlTare: return &c.tare;
     default: return nullptr;
     }
 }
@@ -464,17 +512,17 @@ bool known_entry(uint16_t index, uint8_t sub, std::string& name, DType& type) {
 std::string known_pdo_name(uint16_t pdo) {
     switch (pdo) {
     case kPdoControl: return "RMB Control";
-    case 0x1601: return "RMB Filter frequency";
+    case kPdoFilterFrequency: return "RMB Filter frequency";
     case kPdoStatus: return "RMB Status";
-    case 0x1A01: return "RMB Value (INT32)";
+    case kPdoValueInt: return "RMB Value (INT32)";
     case kPdoValueReal: return "RMB Value (Real)";
-    case 0x1A03: return "RMB Timestamp";
-    case 0x1A04: return "AI Standard Channel 1";
-    case 0x1A05: return "AI Compact Channel 1";
-    case 0x1A06: return "AI Standard Channel 2";
-    case 0x1A07: return "AI Compact Channel 2";
+    case kPdoTimestamp: return "RMB Timestamp";
+    case kPdoAiStandardCh1: return "AI Standard Channel 1";
+    case kPdoAiCompactCh1: return "AI Compact Channel 1";
+    case kPdoAiStandardCh2: return "AI Standard Channel 2";
+    case kPdoAiCompactCh2: return "AI Compact Channel 2";
     default: {
-        char b[8];
+        char b[kPdoNameLen];
         std::snprintf(b, sizeof b, "0x%04X", pdo);
         return b;
     }
@@ -485,6 +533,7 @@ std::string known_pdo_name(uint16_t pdo) {
  * @brief PDOs der EL3356-0010 laut ESI (Revision 0x0019) mit Mapping und Exclude-Listen.
  *
  * Grundlage für die Simulation und Rückfall für Namen ohne SDO-Information.
+ * Die Breiten der Lücken stammen aus dem Mapping der ESI.
  *
  * @return alle PDOs, nicht zugeordnet
  */
@@ -493,32 +542,38 @@ std::vector<PdoInfo> known_pdos() {
         return PdoInfo{idx, known_pdo_name(idx), rx, false, std::move(e), std::move(ex)};
     };
     auto ai_standard = [](uint16_t obj) {
-        return std::vector<PdoEntry>{known(obj, 0x01, 1), known(obj, 0x02, 1), known(0, 0, 4),
-                                     known(obj, 0x07, 1), known(0, 0, 1), known(0, 0, 7),
-                                     known(obj, 0x10, 1), known(obj, 0x11, 32)};
+        return std::vector<PdoEntry>{known(obj, kSubAiUnderrange, kBitsBool), known(obj, kSubAiOverrange, kBitsBool),
+                                     gap(4U), known(obj, kSubAiError, kBitsBool), gap(1U), gap(7U),
+                                     known(obj, kSubAiToggle, kBitsBool), known(obj, kSubAiValue, kBitsDint)};
     };
-    const std::vector<uint16_t> ai = {0x1A04, 0x1A05, 0x1A06, 0x1A07};
+    const std::vector<uint16_t> ai = {kPdoAiStandardCh1, kPdoAiCompactCh1, kPdoAiStandardCh2, kPdoAiCompactCh2};
+    const std::vector<uint16_t> rmb = {kPdoStatus, kPdoValueInt, kPdoValueReal, kPdoTimestamp};
+    auto with = [](std::vector<uint16_t> a, uint16_t b) {
+        a.insert(a.begin(), b);
+        return a;
+    };
     return {
         pdo(kPdoControl, true,
-            {known(kObjControl, 0x01, 1), known(kObjControl, 0x02, 1), known(kObjControl, 0x03, 1),
-             known(kObjControl, 0x04, 1), known(kObjControl, 0x05, 1), known(0, 0, 3),
-             known(0, 0, 8)},
+            {known(kObjControl, kSubCtrlStartCalibration, kBitsBool),
+             known(kObjControl, kSubCtrlDisableCalibration, kBitsBool),
+             known(kObjControl, kSubCtrlInputFreeze, kBitsBool), known(kObjControl, kSubCtrlSampleMode, kBitsBool),
+             known(kObjControl, kSubCtrlTare, kBitsBool), gap(3U), gap(8U)},
             {}),
-        pdo(0x1601, true, {known(kObjControl, 0x11, 16)}, {}),
+        pdo(kPdoFilterFrequency, true, {known(kObjControl, kSubCtrlFilterFrequency, kBitsUint)}, {}),
         pdo(kPdoStatus, false,
-            {known(0, 0, 1), known(kObjInputs, 0x02, 1), known(0, 0, 1), known(kObjInputs, 0x04, 1),
-             known(0, 0, 2), known(kObjInputs, 0x07, 1), known(kObjInputs, 0x08, 1),
-             known(kObjInputs, 0x09, 1), known(0, 0, 4), known(kObjInputs, 0x0E, 1), known(0, 0, 1),
-             known(kObjInputs, 0x10, 1)},
+            {gap(1U), known(kObjInputs, kSubInOverrange, kBitsBool), gap(1U),
+             known(kObjInputs, kSubInDataInvalid, kBitsBool), gap(2U), known(kObjInputs, kSubInError, kBitsBool),
+             known(kObjInputs, kSubInCalibration, kBitsBool), known(kObjInputs, kSubInSteadyState, kBitsBool),
+             gap(4U), known(kObjInputs, kSubInSyncError, kBitsBool), gap(1U),
+             known(kObjInputs, kSubInToggle, kBitsBool)},
             ai),
-        pdo(0x1A01, false, {known(kObjInputs, 0x11, 32)},
-            {kPdoValueReal, 0x1A04, 0x1A05, 0x1A06, 0x1A07}),
-        pdo(kPdoValueReal, false, {known(kObjInputs, 0x12, 32)}, {0x1A01, 0x1A04, 0x1A05, 0x1A06, 0x1A07}),
-        pdo(0x1A03, false, {known(kObjInputs, 0x13, 64)}, ai),
-        pdo(0x1A04, false, ai_standard(0x6010), {0x1A05, 0x1A00, 0x1A01, 0x1A02, 0x1A03}),
-        pdo(0x1A05, false, {known(0x6010, 0x11, 32)}, {0x1A04, 0x1A00, 0x1A01, 0x1A02, 0x1A03}),
-        pdo(0x1A06, false, ai_standard(0x6020), {0x1A07, 0x1A00, 0x1A01, 0x1A02, 0x1A03}),
-        pdo(0x1A07, false, {known(0x6020, 0x11, 32)}, {0x1A06, 0x1A00, 0x1A01, 0x1A02, 0x1A03}),
+        pdo(kPdoValueInt, false, {known(kObjInputs, kSubInValue, kBitsDint)}, with(ai, kPdoValueReal)),
+        pdo(kPdoValueReal, false, {known(kObjInputs, kSubInValueReal, kBitsDint)}, with(ai, kPdoValueInt)),
+        pdo(kPdoTimestamp, false, {known(kObjInputs, kSubInTimestamp, kBitsUlint)}, ai),
+        pdo(kPdoAiStandardCh1, false, ai_standard(kObjAiInputsCh1), with(rmb, kPdoAiCompactCh1)),
+        pdo(kPdoAiCompactCh1, false, {known(kObjAiInputsCh1, kSubAiValue, kBitsDint)}, with(rmb, kPdoAiStandardCh1)),
+        pdo(kPdoAiStandardCh2, false, ai_standard(kObjAiInputsCh2), with(rmb, kPdoAiCompactCh2)),
+        pdo(kPdoAiCompactCh2, false, {known(kObjAiInputsCh2, kSubAiValue, kBitsDint)}, with(rmb, kPdoAiStandardCh2)),
     };
 }
 
@@ -535,7 +590,7 @@ void locate_pdos(std::vector<PdoInfo>& pdos, const std::vector<uint16_t>& rx_ass
         for (auto& e : p.entries) e.loc = {};
     }
     for (bool rx : {true, false}) {
-        uint32_t off = 0;
+        uint32_t off = 0U;
         for (uint16_t idx : rx ? rx_assign : tx_assign)
             for (auto& p : pdos) {
                 if (p.index != idx || p.rx != rx) continue;
@@ -569,18 +624,18 @@ std::vector<SdoWrite> settings_writes(const DeviceConfig& dc) {
         return SdoWrite{kObjSettings, sub, encode_value(t, v), name, t, false};
     };
     return {
-        w(0x01, DType::Bool, dc.mode0_enable_filter, "Mode0 enable filter"),
-        w(0x03, DType::Bool, dc.mode0_enable_averager, "Mode0 enable averager"),
-        w(0x11, DType::U16, dc.mode0_filter_settings, "Mode0 filter settings"),
-        w(0x23, DType::F32, dc.rated_output_mv_v, "Rated output"),
-        w(0x24, DType::F32, dc.nominal_load, "Nominal load"),
-        w(0x25, DType::F32, dc.zero_balance, "Zero balance"),
-        w(0x26, DType::F32, dc.gravity_of_earth, "Gravity of earth"),
-        w(0x27, DType::F32, dc.scale_factor, "Scale factor"),
-        w(0x28, DType::F32, dc.reference_load, "Reference load"),
-        w(0x29, DType::U16, dc.steady_state_window, "Steady state window"),
-        w(0x2A, DType::U32, dc.steady_state_tolerance, "Steady state tolerance"),
-        w(0x31, DType::U16, dc.calibration_interval, "Calibration interval"),
+        w(kSubMode0EnableFilter, DType::Bool, dc.mode0_enable_filter, "Mode0 enable filter"),
+        w(kSubMode0EnableAverager, DType::Bool, dc.mode0_enable_averager, "Mode0 enable averager"),
+        w(kSubFilterMode0, DType::U16, dc.mode0_filter_settings, "Mode0 filter settings"),
+        w(kSubRatedOutput, DType::F32, dc.rated_output_mv_v, "Rated output"),
+        w(kSubNominalLoad, DType::F32, dc.nominal_load, "Nominal load"),
+        w(kSubZeroBalance, DType::F32, dc.zero_balance, "Zero balance"),
+        w(kSubGravity, DType::F32, dc.gravity_of_earth, "Gravity of earth"),
+        w(kSubScaleFactor, DType::F32, dc.scale_factor, "Scale factor"),
+        w(kSubReferenceLoad, DType::F32, dc.reference_load, "Reference load"),
+        w(kSubSteadyStateWindow, DType::U16, dc.steady_state_window, "Steady state window"),
+        w(kSubSteadyStateTolerance, DType::U32, dc.steady_state_tolerance, "Steady state tolerance"),
+        w(kSubCalibrationInterval, DType::U16, dc.calibration_interval, "Calibration interval"),
     };
 }
 
@@ -600,17 +655,17 @@ const std::vector<uint16_t>& tx_assignment() {
  * @brief Schreibliste für eine PDO-Zuordnung: Anzahl 0, Einträge, Anzahl.
  * @param sm_obj 0x1C12 oder 0x1C13
  * @param pdos zuzuordnende PDOs in Reihenfolge
- * @return SDO-Schreibzugriffe (nur in PRE-OP zulässig)
+ * @return pdos.size() + 2 SDO-Schreibzugriffe (nur in PRE-OP zulässig)
  */
 std::vector<SdoWrite> assign_writes(uint16_t sm_obj, const std::vector<uint16_t>& pdos) {
     const char* what = sm_obj == kSm2Assign ? "RxPDO assign" : "TxPDO assign";
     std::vector<SdoWrite> out;
-    out.push_back({sm_obj, 0, encode_value(DType::U8, 0), std::string(what) + ": Anzahl löschen",
+    out.push_back({sm_obj, kSubCount, encode_value(DType::U8, 0.0), std::string(what) + ": Anzahl löschen",
                    DType::U8, true});
-    for (size_t i = 0; i < pdos.size(); ++i)
-        out.push_back({sm_obj, static_cast<uint8_t>(i + 1), encode_value(DType::U16, pdos[i]),
+    for (size_t i = 0U; i < pdos.size(); ++i)
+        out.push_back({sm_obj, static_cast<uint8_t>(kSubFirstEntry + i), encode_value(DType::U16, pdos[i]),
                        std::string(what) + ": " + known_pdo_name(pdos[i]), DType::U16, true});
-    out.push_back({sm_obj, 0, encode_value(DType::U8, static_cast<double>(pdos.size())),
+    out.push_back({sm_obj, kSubCount, encode_value(DType::U8, static_cast<double>(pdos.size())),
                    std::string(what) + ": Anzahl", DType::U8, true});
     return out;
 }
@@ -634,7 +689,7 @@ std::vector<uint8_t> le_u16(uint16_t v) { return le<uint16_t>(v); }
 std::vector<uint8_t> le_f32(float v) { return le<float>(v); }
 /// @brief REAL32 aus Bytes, little endian; 0 bei weniger als 4 Byte.
 float f32_from_le(const std::vector<uint8_t>& d) {
-    float f = 0.0f;
+    float f = 0.0F;
     if (d.size() >= sizeof(f)) std::memcpy(&f, d.data(), sizeof(f));
     return f;
 }

@@ -11,8 +11,15 @@ namespace ew {
 
 namespace {
 
-constexpr double kPollInterval = 0.1;   // s zwischen Statusabfragen 0xFB00:02
-constexpr double kCmdTimeout = 30.0;    // s bis Abbruch eines Kommandos
+constexpr double kPollInterval = 0.1;   ///< Zeit zwischen Statusabfragen 0xFB00:02 [s]
+constexpr double kCmdTimeout = 30.0;    ///< Zeit bis zum Abbruch eines Kommandos [s]
+constexpr double kNotStable = -1.0;     ///< stable_since_: kein Stillstand
+constexpr uint32_t kMinCaptureSamples = 2U;  ///< Mindestanzahl für Mittelwert und Standardabweichung
+constexpr double kSameMassG = 1e-9;     ///< gleiche Masse: Stützpunkt ersetzen [g]
+constexpr double kNeutralScale = 1.0;   ///< Scale factor während der Kalibrierung (Last direkt)
+constexpr double kNeutralGain = 1.0;    ///< Gain während der Kalibrierung
+constexpr double kNeutralTara = 0.0;    ///< Tara während der Kalibrierung
+constexpr size_t kErrLen = 64U;         ///< Puffer für Fehlermeldungen
 
 /**
  * @brief Hardwareseitiger Fehlergrund eines Samples.
@@ -76,7 +83,7 @@ void CalibrationController::reset() {
     capturing_ = false;
     rated_result_.reset();
     zero_result_.reset();
-    stable_since_ = -1.0;
+    stable_since_ = kNotStable;
 }
 
 // --- Anwendung ---------------------------------------------------------------
@@ -91,7 +98,7 @@ CalResult CalibrationController::start_application(const Config& cfg) {
     reset();
     kind_ = Kind::Application;
     phase_ = "idle";
-    cap_duration_ = cfg.calibration.capture_time_ms / 1000.0;
+    cap_duration_ = cfg.calibration.capture_time_ms / kMsPerS;
     message_ = "Nullpunkt und Referenzgewichte erfassen";
     return ok();
 }
@@ -156,10 +163,10 @@ CalResult CalibrationController::start_device(const Config& cfg, double nominal_
     reset();
 
     std::string err;
-    const bool w = write_u16(io, kObjCommand, 1, kCmdNone, err) &&
-                   write_f32(io, kSubScaleFactor, 1.0, err) &&
-                   write_f32(io, kSubGain, 1.0, err) &&
-                   write_f32(io, kSubTara, 0.0, err) &&
+    const bool w = write_u16(io, kObjCommand, kSubCmdRequest, kCmdNone, err) &&
+                   write_f32(io, kSubScaleFactor, kNeutralScale, err) &&
+                   write_f32(io, kSubGain, kNeutralGain, err) &&
+                   write_f32(io, kSubTara, kNeutralTara, err) &&
                    write_u16(io, kObjSettings, kSubFilterMode0, kFilterIir8, err) &&
                    write_f32(io, kSubGravity, cfg.device.gravity_of_earth, err) &&
                    write_f32(io, kSubNominalLoad, nominal_load, err);
@@ -191,7 +198,8 @@ CalResult CalibrationController::device_zero(IoBackend& io, double t) {
     if (stable_since_ < 0.0 || t - stable_since_ < stable_time_s_)
         return fail("Messwert noch nicht ausreichend lange stabil");
     std::string err;
-    if (!write_u16(io, el3356::kObjCommand, 1, el3356::kCmdZeroBalance, err)) return fail(err);
+    if (!write_u16(io, el3356::kObjCommand, el3356::kSubCmdRequest, el3356::kCmdZeroBalance, err))
+        return fail(err);
     phase_ = "zero_busy";
     cmd_start_ = t;
     next_poll_ = t + kPollInterval;
@@ -211,13 +219,13 @@ CalResult CalibrationController::device_reference(double mass_g, IoBackend& io, 
     if (kind_ != Kind::Device) return fail("Keine Kalibrierung in der Klemme aktiv");
     if (phase_ != "zero_done") return fail("Zuerst Nullabgleich durchführen");
     const double ref = from_grams(mass_g, device_unit_);
-    if (!(ref >= 0.2 * nominal_))
+    if (!(ref >= kMinReferenceRatio * nominal_))
         return fail("Referenzlast muss mindestens 20 % der Nennlast betragen");
     if (stable_since_ < 0.0 || t - stable_since_ < stable_time_s_)
         return fail("Messwert noch nicht ausreichend lange stabil");
     std::string err;
     if (!write_f32(io, kSubReferenceLoad, ref, err) ||
-        !write_u16(io, kObjCommand, 1, kCmdCalibration, err))
+        !write_u16(io, kObjCommand, kSubCmdRequest, kCmdCalibration, err))
         return fail(err);
     reference_ = ref;
     phase_ = "ref_busy";
@@ -236,9 +244,9 @@ void CalibrationController::finish_device(IoBackend& io, const Config& cfg) {
     using namespace el3356;
     std::string err;
     std::vector<uint8_t> d;
-    if (io.sdo_read(kObjSettings, kSubRatedOutput, 4, d, err)) rated_result_ = f32_from_le(d);
-    if (io.sdo_read(kObjSettings, kSubZeroBalance, 4, d, err)) zero_result_ = f32_from_le(d);
-    write_u16(io, kObjCommand, 1, kCmdNone, err);
+    if (io.sdo_read(kObjSettings, kSubRatedOutput, sizeof(float), d, err)) rated_result_ = f32_from_le(d);
+    if (io.sdo_read(kObjSettings, kSubZeroBalance, sizeof(float), d, err)) zero_result_ = f32_from_le(d);
+    write_u16(io, kObjCommand, kSubCmdRequest, kCmdNone, err);
     write_u16(io, kObjSettings, kSubFilterMode0, cfg.device.mode0_filter_settings, err);
     write_f32(io, kSubScaleFactor, cfg.device.scale_factor, err);
     if (!rated_result_ || !zero_result_) {
@@ -293,7 +301,7 @@ CalResult CalibrationController::commit(const Config& current, Config& out) {
 void CalibrationController::cancel(const Config& cfg, IoBackend& io) {
     if (kind_ == Kind::Device) {
         std::string err;
-        write_u16(io, el3356::kObjCommand, 1, el3356::kCmdNone, err);
+        write_u16(io, el3356::kObjCommand, el3356::kSubCmdRequest, el3356::kCmdNone, err);
         io.write_device_config(cfg.device, err);  // Parameter der Config zurückschreiben
     }
     reset();
@@ -320,10 +328,10 @@ void CalibrationController::step(const Sample& s, IoBackend& io, const Config& c
         const double d = s.raw - cap_mean_;
         cap_mean_ += d / cap_n_;
         cap_m2_ += d * (s.raw - cap_mean_);
-        if (s.t - cap_start_ >= cap_duration_ && cap_n_ >= 2) {
+        if (s.t - cap_start_ >= cap_duration_ && cap_n_ >= kMinCaptureSamples) {
             AppPoint p{cap_mean_, cap_mass_g_, std::sqrt(cap_m2_ / (cap_n_ - 1)), cap_n_};
             auto it = std::find_if(points_.begin(), points_.end(), [&](const AppPoint& q) {
-                return std::fabs(q.mass_g - p.mass_g) < 1e-9;
+                return std::fabs(q.mass_g - p.mass_g) < kSameMassG;
             });
             if (it != points_.end())
                 *it = p;  // gleiche Masse: Punkt ersetzen
@@ -342,7 +350,7 @@ void CalibrationController::step(const Sample& s, IoBackend& io, const Config& c
     // Stillstandserkennung auf dem Rohwert (Last in device_unit, Scale factor 1)
     if (!hw_valid(s) || std::fabs(s.raw - stable_ref_) > band_) {
         stable_ref_ = s.raw;
-        stable_since_ = hw_valid(s) ? s.t : -1.0;
+        stable_since_ = hw_valid(s) ? s.t : kNotStable;
     }
 
     if (phase_ != "zero_busy" && phase_ != "ref_busy") return;
@@ -352,7 +360,7 @@ void CalibrationController::step(const Sample& s, IoBackend& io, const Config& c
     std::string err;
     std::vector<uint8_t> d;
     const bool zero = phase_ == "zero_busy";
-    if (!io.sdo_read(el3356::kObjCommand, 2, 1, d, err) || d.empty()) {
+    if (!io.sdo_read(el3356::kObjCommand, el3356::kSubCmdStatus, sizeof(uint8_t), d, err) || d.empty()) {
         if (s.t - cmd_start_ > kCmdTimeout) {
             error_ = "Kommandostatus nicht lesbar: " + err;
             phase_ = zero ? "prepared" : "zero_done";
@@ -368,7 +376,7 @@ void CalibrationController::step(const Sample& s, IoBackend& io, const Config& c
         return;
     }
     if (st != el3356::kCmdStatusDone) {
-        char b[64];
+        char b[kErrLen];
         std::snprintf(b, sizeof b, "Klemme meldet Kommandostatus %u", st);
         error_ = b;
         phase_ = zero ? "prepared" : "zero_done";
@@ -377,7 +385,7 @@ void CalibrationController::step(const Sample& s, IoBackend& io, const Config& c
     if (zero) {
         phase_ = "zero_done";
         message_ = "Referenzlast auflegen (>= 20 % Nennlast), Stillstand abwarten";
-        stable_since_ = -1.0;
+        stable_since_ = kNotStable;
     } else {
         finish_device(io, cfg);
     }

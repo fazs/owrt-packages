@@ -1,6 +1,7 @@
 <script>
   import { live, debugApi, notify } from './live.svelte.js';
-  import { hex, objKey, enumFor, asNum, formatValue, parseValue } from './coe.js';
+  import { hex, objKey, enumFor, asNum, formatValue, parseValue, INDEX_HEX_DIGITS, F32_DIGITS, OBJ_CONTROL, OBJ_RX_ASSIGN, OBJ_TX_ASSIGN } from './coe.js';
+  import { DEBUG_POLL_MS } from './constants.js';
 
   /** @type {{open?: boolean}} Dialog geöffnet (bindbar) */
   let { open = $bindable(false) } = $props();
@@ -38,7 +39,7 @@
   // Live-Werte aus dem Prozessabbild, solange die PDO-Ansicht offen ist
   $effect(() => {
     if (!open || tab !== 'pdo') return;
-    const id = setInterval(loadPdos, 300);
+    const id = setInterval(loadPdos, DEBUG_POLL_MS);
     return () => clearInterval(id);
   });
 
@@ -69,7 +70,7 @@
    */
   function initialTarget(s) {
     if (enumFor(s.index, s.sub, s.type, pdo?.pdos)) return asNum(s.value);
-    return s.type === 'f32' ? String(Number(s.value.toPrecision(7))) : String(asNum(s.value));
+    return s.type === 'f32' ? String(Number(s.value.toPrecision(F32_DIGITS))) : String(asNum(s.value));
   }
 
   /**
@@ -112,7 +113,7 @@
    * @param {{index: number}} e Eintrag
    * @returns {boolean}
    */
-  const viaImage = (p, e) => p.rx && p.assigned && e.index === 0x7000;
+  const viaImage = (p, e) => p.rx && p.assigned && e.index === OBJ_CONTROL;
 
   /**
    * Aktueller Wert des Sollwert-Editors: Eingabe, sonst Übersteuerung, Live- oder SDO-Wert.
@@ -307,7 +308,8 @@
     <div class="body">
       {#if tab === 'pdo'}
         <p class="hint muted">
-          Zugeordnete PDOs zeigen den Wert aus dem Prozessabbild (alle 300 ms). Steuerbits (0x7000) werden im
+          Zugeordnete PDOs zeigen den Wert aus dem Prozessabbild (alle {DEBUG_POLL_MS} ms). Steuerbits
+          ({hex(OBJ_CONTROL, INDEX_HEX_DIGITS)}) werden im
           Prozessabbild übersteuert, bis sie freigegeben werden oder der Dialog geschlossen wird. Nicht zugeordnete
           Einträge werden per SDO gelesen bzw. geschrieben.
           {#if isSim}Simulation: Steuerbits wirken nicht auf den Messwert.{/if}
@@ -317,12 +319,12 @@
           {#each pdo.pdos as p (p.index)}
             <section class="pdo">
               <h3>
-                <code>{hex(p.index, 4)}</code>
+                <code>{hex(p.index, INDEX_HEX_DIGITS)}</code>
                 {p.name}
                 <span class="tag">{p.rx ? 'RxPDO · Ausgang' : 'TxPDO · Eingang'}</span>
                 <span class="tag" class:ok={p.assigned}>{p.assigned ? 'zugeordnet' : 'nicht zugeordnet'}</span>
                 {#if p.excludes?.length}
-                  <small class="muted">schließt aus: {p.excludes.map((x) => hex(x, 4)).join(', ')}</small>
+                  <small class="muted">schließt aus: {p.excludes.map((x) => hex(x, INDEX_HEX_DIGITS)).join(', ')}</small>
                 {/if}
               </h3>
               <div class="scroll">
@@ -404,7 +406,7 @@
       {:else}
         <p class="hint muted">
           Sequenz des Übergangs PRE-OP → SAFE-OP mit den Werten der gespeicherten Konfiguration. Sollwerte können vor
-          dem Senden geändert werden; sie werden nicht gespeichert. Die PDO-Zuordnung (0x1C12/0x1C13) ist nur in
+          dem Senden geändert werden; sie werden nicht gespeichert. Die PDO-Zuordnung ({hex(OBJ_RX_ASSIGN, INDEX_HEX_DIGITS)}/{hex(OBJ_TX_ASSIGN, INDEX_HEX_DIGITS)}) ist nur in
           PRE-OP beschreibbar; im Betrieb antwortet die Klemme mit SDO-Abbruch. „Neu initialisieren“ durchläuft
           INIT → OP und sendet dabei die gespeicherte Sequenz.
         </p>

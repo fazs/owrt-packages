@@ -1,23 +1,27 @@
 <script>
   import { live, displayUnit, deleteMeasurement } from './live.svelte.js';
   import { decimalsFor, fmt, fromG } from './format.js';
+  import { CONFIRM_MS, S_PER_H, S_PER_MIN, SNAPSHOT_MEASUREMENTS } from './constants.js';
+
+  /** angezeigte Zeilen (wie der Snapshot des Backends) */
+  const VISIBLE_ROWS = SNAPSHOT_MEASUREMENTS;
 
   const unit = $derived(displayUnit());
   const dec = $derived(decimalsFor(live.config?.measurement?.tolerance, unit));
-  const rows = $derived(live.measurements.slice(0, 50));
+  const rows = $derived(live.measurements.slice(0, VISIBLE_ROWS));
   const nowT = $derived(live.sample?.t ?? 0);
 
   let confirmId = $state(null); // Messung, deren Löschen auf Bestätigung wartet
   let confirmTimer;
   /**
-   * Löschen mit Bestätigung: erster Klick markiert die Zeile (3 s), zweiter löscht.
+   * Löschen mit Bestätigung: erster Klick markiert die Zeile (CONFIRM_MS), zweiter löscht.
    * @param {number} id Nummer der Messung
    */
   function del(id) {
     clearTimeout(confirmTimer);
     if (confirmId !== id) {
       confirmId = id;
-      confirmTimer = setTimeout(() => (confirmId = null), 3000);
+      confirmTimer = setTimeout(() => (confirmId = null), CONFIRM_MS);
       return;
     }
     confirmId = null;
@@ -31,9 +35,9 @@
    */
   function ago(t) {
     const s = Math.max(0, Math.round(nowT - t));
-    if (s < 60) return `vor ${s} s`;
-    if (s < 3600) return `vor ${Math.floor(s / 60)} min`;
-    return `vor ${Math.floor(s / 3600)} h`;
+    if (s < S_PER_MIN) return `vor ${s} s`;
+    if (s < S_PER_H) return `vor ${Math.floor(s / S_PER_MIN)} min`;
+    return `vor ${Math.floor(s / S_PER_H)} h`;
   }
 </script>
 

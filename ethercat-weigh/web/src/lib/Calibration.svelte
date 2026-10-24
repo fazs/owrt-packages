@@ -1,6 +1,16 @@
 <script>
-  import { live, calibrate, simLoad, displayUnit, notify } from './live.svelte.js';
+  import { live, calibrate, simLoad, simDefaultGrams, displayUnit, notify } from './live.svelte.js';
   import { UNITS, fmt, fromG, toG } from './format.js';
+  import { DEFAULT_STABLE_TIME_S, MIN_CAL_POINTS, MIN_REFERENCE_RATIO, PERCENT } from './constants.js';
+
+  /** Signifikante Stellen der Standardabweichung des Rohwerts */
+  const SIG_DIGITS = 3;
+  /** Nachkommastellen von Rohwerten und Stützpunktmassen */
+  const RAW_DECIMALS = 4;
+  /** Nachkommastellen von Rated output und Zero balance [mV/V] */
+  const MVV_DECIMALS = 6;
+  /** Nachkommastellen der Mindestreferenz im Hinweis */
+  const REF_DECIMALS = 3;
 
   /** @type {{open?: boolean}} Dialog geöffnet (bindbar) */
   let { open = $bindable(false) } = $props();
@@ -19,13 +29,13 @@
   let pointUnit = $state(displayUnit());
   let refMass = $state(null);
   let refUnit = $state(displayUnit());
-  let simGrams = $state(null); // Vorbelegung: halbe Nennlast der Klemme
+  let simGrams = $state(null); // Vorbelegung: simDefaultGrams()
   let busy = $state(false);
 
   $effect(() => {
     if (open && dialog && !dialog.open) {
       if (cfgDev && devNominal === null) devNominal = cfgDev.nominal_load;
-      if (cfgDev && cfgCal && simGrams === null) simGrams = toG(0.5 * cfgDev.nominal_load, cfgCal.device_unit);
+      if (simGrams === null) simGrams = simDefaultGrams();
       if (cfgCal) devUnit = cfgCal.device_unit;
       dialog.showModal();
     } else if (!open && dialog?.open) {
@@ -48,11 +58,11 @@
   }
 
   /**
-   * Formatiert mit 3 signifikanten Stellen (Standardabweichung des Rohwerts).
+   * Formatiert mit SIG_DIGITS signifikanten Stellen (Standardabweichung des Rohwerts).
    * @param {number|null} v Wert
    * @returns {string}
    */
-  const sig = (v) => (v == null ? '–' : Number(v.toPrecision(3)).toLocaleString('de-DE'));
+  const sig = (v) => (v == null ? '–' : Number(v.toPrecision(SIG_DIGITS)).toLocaleString('de-DE'));
   /**
    * Anzeigename einer Einheit.
    * @param {string} id Einheit
@@ -62,12 +72,13 @@
 
   // --- Anwendung
   const points = $derived(cal?.kind === 'application' ? cal.points ?? [] : []);
-  const canCommitApp = $derived(points.length >= 2 && !cal?.capturing);
+  const canCommitApp = $derived(points.length >= MIN_CAL_POINTS && !cal?.capturing);
 
   // --- Klemme
   const devPhase = $derived(cal?.kind === 'device' ? cal.phase : null);
-  const stableOk = $derived((cal?.stable_s ?? 0) >= (cal?.stable_time_s ?? 10));
-  const stableFrac = $derived(Math.min(1, (cal?.stable_s ?? 0) / (cal?.stable_time_s || 10)));
+  const stableTime = $derived(cal?.stable_time_s || DEFAULT_STABLE_TIME_S);
+  const stableOk = $derived((cal?.stable_s ?? 0) >= stableTime);
+  const stableFrac = $derived(Math.min(1, (cal?.stable_s ?? 0) / stableTime));
   const cmdBusy = $derived(devPhase === 'zero_busy' || devPhase === 'ref_busy');
   const steps = $derived([
     { id: 'prepared', label: 'Vorbereitet', done: !!devPhase },
@@ -75,7 +86,7 @@
     { id: 'ref', label: 'Referenzlast', done: devPhase === 'done' },
   ]);
   const minRefG = $derived(
-    cal?.kind === 'device' ? toG(0.2 * cal.nominal_load, cal.device_unit) : 0,
+    cal?.kind === 'device' ? toG(MIN_REFERENCE_RATIO * cal.nominal_load, cal.device_unit) : 0,
   );
 
   /** Übernimmt das Kalibrierergebnis und schließt den Dialog bei Erfolg. */
@@ -145,7 +156,7 @@
       <div class="live">
         <span class="muted">Rohwert</span>
         <output>
-          {fmt(cal.raw, 4)}{#if cal.kind === 'device'}&nbsp;{unitName(cal.device_unit)}{/if}
+          {fmt(cal.raw, RAW_DECIMALS)}{#if cal.kind === 'device'}&nbsp;{unitName(cal.device_unit)}{/if}
         </output>
       </div>
       {#if cal.message}<p class="message">{cal.message}</p>{/if}
@@ -166,8 +177,8 @@
           <tbody>
             {#each points as p, i (p.mass_g)}
               <tr>
-                <td>{fmt(fromG(p.mass_g, displayUnit()), 4)}</td>
-                <td>{fmt(p.raw, 4)}</td>
+                <td>{fmt(fromG(p.mass_g, displayUnit()), RAW_DECIMALS)}</td>
+                <td>{fmt(p.raw, RAW_DECIMALS)}</td>
                 <td>{sig(p.stddev)}</td>
                 <td>{p.n}</td>
                 <td>
@@ -230,7 +241,7 @@
           </button>
         {:else if devPhase === 'zero_done'}
           <p class="muted">
-            Referenzlast auflegen, mindestens {fmt(fromG(minRefG, refUnit), 3)} {unitName(refUnit)} (20 % der Nennlast).
+            Referenzlast auflegen, mindestens {fmt(fromG(minRefG, refUnit), REF_DECIMALS)} {unitName(refUnit)} ({Math.round(MIN_REFERENCE_RATIO * PERCENT)} % der Nennlast).
           </p>
           <div class="row end">
             <label class="field grow">
@@ -253,8 +264,8 @@
           </div>
         {:else if devPhase === 'done'}
           <dl class="result">
-            <dt>Rated output</dt><dd>{fmt(cal.rated_output_mv_v, 6)} mV/V</dd>
-            <dt>Zero balance</dt><dd>{fmt(cal.zero_balance, 6)} mV/V</dd>
+            <dt>Rated output</dt><dd>{fmt(cal.rated_output_mv_v, MVV_DECIMALS)} mV/V</dd>
+            <dt>Zero balance</dt><dd>{fmt(cal.zero_balance, MVV_DECIMALS)} mV/V</dd>
           </dl>
         {/if}
       {/if}

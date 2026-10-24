@@ -2,20 +2,47 @@
  * @file CoE-Objekte der EL3356: Adressformat, Wertebereiche (Enums) und Eingabe-Parsing.
  */
 
+/** Basis hexadezimaler Zahlen. */
+const HEX_RADIX = 16;
+/** Hex-Stellen eines Objektindex (UINT16). */
+export const INDEX_HEX_DIGITS = 4;
+/** Hex-Stellen eines Subindex (USINT). */
+export const SUB_HEX_DIGITS = 2;
+/** Hex-Stellen eines UDINT. */
+const U32_HEX_DIGITS = 8;
+/** Signifikante Stellen eines REAL32 (24 Bit Mantisse). */
+export const F32_DIGITS = 7;
+
+// --- Objekte (Beckhoff-ESI EL3356-0010, siehe src/el3356.hpp) ---
+/** RxPDO assign (SM2). */
+export const OBJ_RX_ASSIGN = 0x1c12;
+/** TxPDO assign (SM3). */
+export const OBJ_TX_ASSIGN = 0x1c13;
+/** RMB Outputs (Steuerbits). */
+export const OBJ_CONTROL = 0x7000;
+/** Subindex 0: Anzahl der Einträge. */
+const SUB_COUNT = 0;
+
+// --- Kommandos für 0xFB00:01 ---
+const CMD_NONE = 0x0000;
+const CMD_ZERO_BALANCE = 0x0101;
+const CMD_CALIBRATION = 0x0102;
+
 /**
  * Zahl als Hex-Text mit Präfix 0x.
  * @param {number} v Wert
  * @param {number} digits Mindeststellen
  * @returns {string} z. B. "0x1A00"
  */
-export const hex = (v, digits) => '0x' + Number(v).toString(16).toUpperCase().padStart(digits, '0');
+export const hex = (v, digits) => '0x' + Number(v).toString(HEX_RADIX).toUpperCase().padStart(digits, '0');
 /**
  * Objektadresse "0xIIII:SS".
  * @param {number} index Index
  * @param {number} sub Subindex
  * @returns {string}
  */
-export const objKey = (index, sub) => `${hex(index, 4)}:${Number(sub).toString(16).toUpperCase().padStart(2, '0')}`;
+export const objKey = (index, sub) =>
+  `${hex(index, INDEX_HEX_DIGITS)}:${Number(sub).toString(HEX_RADIX).toUpperCase().padStart(SUB_HEX_DIGITS, '0')}`;
 
 /** 0x8000:11/:12 Mode0/Mode1 filter settings (ESI: DT0800EN16/DT0801EN16). */
 export const FILTER_OPTIONS = [
@@ -48,9 +75,9 @@ const ENUMS = {
   '0x8000:11': FILTER_OPTIONS,
   '0x8000:12': FILTER_OPTIONS,
   '0xFB00:01': [
-    [0x0000, '0x0000 Kein Kommando'],
-    [0x0101, '0x0101 Nullabgleich'],
-    [0x0102, '0x0102 Kalibrierung mit Reference load'],
+    [CMD_NONE, `${hex(CMD_NONE, INDEX_HEX_DIGITS)} Kein Kommando`],
+    [CMD_ZERO_BALANCE, `${hex(CMD_ZERO_BALANCE, INDEX_HEX_DIGITS)} Nullabgleich`],
+    [CMD_CALIBRATION, `${hex(CMD_CALIBRATION, INDEX_HEX_DIGITS)} Kalibrierung mit Reference load`],
   ],
 };
 
@@ -63,9 +90,9 @@ const ENUMS = {
  * @returns {Array<[number, string]>|null} [Wert, Text]-Paare oder null (freie Eingabe)
  */
 export function enumFor(index, sub, type, pdos = []) {
-  if ((index === 0x1c12 || index === 0x1c13) && sub > 0) {
-    const rx = index === 0x1c12;
-    const opts = pdos.filter((p) => p.rx === rx).map((p) => [p.index, `${hex(p.index, 4)} ${p.name}`]);
+  if ((index === OBJ_RX_ASSIGN || index === OBJ_TX_ASSIGN) && sub > SUB_COUNT) {
+    const rx = index === OBJ_RX_ASSIGN;
+    const opts = pdos.filter((p) => p.rx === rx).map((p) => [p.index, `${hex(p.index, INDEX_HEX_DIGITS)} ${p.name}`]);
     if (opts.length) return opts;
   }
   return ENUMS[objKey(index, sub)] ?? (type === 'bool' ? BOOL : null);
@@ -90,8 +117,9 @@ export function formatValue(v, type, opts) {
   const n = asNum(v);
   const hit = opts?.find(([o]) => o === n);
   if (hit) return hit[1];
-  if (type === 'f32') return Number(n.toPrecision(7)).toLocaleString('de-DE', { maximumFractionDigits: 7 });
-  if (type === 'u16' || type === 'u32') return `${n} (${hex(n, type === 'u16' ? 4 : 8)})`;
+  if (type === 'f32')
+    return Number(n.toPrecision(F32_DIGITS)).toLocaleString('de-DE', { maximumFractionDigits: F32_DIGITS });
+  if (type === 'u16' || type === 'u32') return `${n} (${hex(n, type === 'u16' ? INDEX_HEX_DIGITS : U32_HEX_DIGITS)})`;
   if (type === 'u64') return n.toLocaleString('de-DE');
   return String(n);
 }
@@ -105,7 +133,7 @@ export function formatValue(v, type, opts) {
  */
 export function parseValue(text, type) {
   const s = String(text).trim().replace(',', '.');
-  const n = /^-?0x[0-9a-f]+$/i.test(s) ? parseInt(s, 16) : Number(s);
+  const n = /^-?0x[0-9a-f]+$/i.test(s) ? parseInt(s, HEX_RADIX) : Number(s);
   if (s === '' || !Number.isFinite(n)) throw new Error(`Ungültiger Wert: ${text}`);
   if (type !== 'f32' && !Number.isInteger(n)) throw new Error(`Ganzzahl erwartet: ${text}`);
   return type === 'bool' ? n !== 0 : n;

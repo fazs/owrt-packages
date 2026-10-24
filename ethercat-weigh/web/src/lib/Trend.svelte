@@ -4,15 +4,30 @@
   import { live, trend, trendTick, TREND_SECONDS, displayUnit } from './live.svelte.js';
   import { fromG } from './format.js';
 
+  /** Abstand der senkrechten Rasterlinien [s] */
+  const GRID_STEP_S = 5;
+  /** Strichlänge der Schwellenlinien [px, logisch] */
+  const DASH_PX = 5;
+  /** Radius der Markierung erfasster Messungen [px, logisch] */
+  const MARKER_RADIUS_PX = 5;
+  /** Luft über und unter der Kurve (Anteil des Wertebereichs) bzw. mindestens [Anzeigeeinheit] */
+  const Y_PAD_REL = 0.08;
+  const Y_PAD_MIN = 0.1;
+  /** Breite der y-Achse [px] */
+  const Y_AXIS_SIZE = 56;
+  /** Linienbreite der Kurve [px] */
+  const LINE_WIDTH = 1.5;
+
   let el;
   let plot = null;
   let tNow = 0; // Zeitstempel des neuesten Werts; x-Achse relativ dazu (-TREND_SECONDS .. 0)
 
   /**
-   * Festes Raster: Teilstriche alle 5 s, unabhängig vom Zeitfortschritt.
+   * Festes Raster: Teilstriche alle GRID_STEP_S, unabhängig vom Zeitfortschritt.
    * @returns {number[]} -TREND_SECONDS .. 0
    */
-  const xSplits = () => Array.from({ length: TREND_SECONDS / 5 + 1 }, (_, i) => -TREND_SECONDS + i * 5);
+  const xSplits = () =>
+    Array.from({ length: TREND_SECONDS / GRID_STEP_S + 1 }, (_, i) => -TREND_SECONDS + i * GRID_STEP_S);
 
   const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
@@ -29,7 +44,7 @@
     ctx.rect(left, top, width, height);
     ctx.clip();
     if (m) {
-      ctx.setLineDash([5 * devicePixelRatio, 5 * devicePixelRatio]);
+      ctx.setLineDash([DASH_PX * devicePixelRatio, DASH_PX * devicePixelRatio]);
       ctx.lineWidth = devicePixelRatio;
       for (const [val, color] of [
         [m.min_load, css('--st-settling')],
@@ -50,7 +65,7 @@
       const x = u.valToPos(meas.t - tNow, 'x', true);
       const y = u.valToPos(fromG(meas.value, displayUnit()), 'y', true);
       ctx.beginPath();
-      ctx.arc(x, y, 5 * devicePixelRatio, 0, 2 * Math.PI);
+      ctx.arc(x, y, MARKER_RADIUS_PX * devicePixelRatio, 0, 2 * Math.PI);
       ctx.fill();
     }
     ctx.restore();
@@ -72,7 +87,7 @@
           range: (u, min, max) => {
             const lo = Math.min(min ?? 0, 0);
             const hi = Math.max(max ?? 1, fromG(live.config?.measurement?.min_load ?? 0, displayUnit()));
-            const pad = (hi - lo) * 0.08 || 0.1;
+            const pad = (hi - lo) * Y_PAD_REL || Y_PAD_MIN;
             return [lo - pad, hi + pad];
           },
         },
@@ -91,11 +106,11 @@
           font,
           grid: { stroke: grid, width: 1 },
           ticks: { show: false },
-          size: 56,
+          size: Y_AXIS_SIZE,
           values: (u, vals) => vals.map((v) => v.toLocaleString('de-DE')),
         },
       ],
-      series: [{}, { stroke: css('--ink'), width: 1.5, spanGaps: false, points: { show: false } }],
+      series: [{}, { stroke: css('--ink'), width: LINE_WIDTH, spanGaps: false, points: { show: false } }],
       hooks: { draw: [drawOverlay] },
     };
     plot?.destroy();

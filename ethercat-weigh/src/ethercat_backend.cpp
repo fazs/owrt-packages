@@ -14,6 +14,18 @@ namespace {
 /// Kontext für den PRE-OP -> SAFE-OP Hook (SOEM ruft eine freie Funktion auf)
 const Config* g_cfg = nullptr;
 
+constexpr uint16_t kStateMask = 0x0FU;     ///< Zustandsbits ohne EC_STATE_ERROR (ETG.1000.6 AL-Status)
+constexpr int kSafeOpTimeoutFactor = 4;    ///< Wartezeit auf SAFE-OP: Vielfaches von EC_TIMEOUTSTATE
+/// WKC-Beitrag je Ausgangs-Slave: LRW zählt Schreiben und Lesen (SOEM simple_test)
+constexpr int kOutputWkcFactor = 2;
+constexpr int kOpRetries = 200;            ///< Versuche bis OP (je ein Prozessdatenzyklus)
+constexpr int kOpCheckTimeoutUs = 50000;   ///< Wartezeit je Zustandsprüfung auf OP [µs]
+constexpr double kCheckIntervalS = 0.5;    ///< Mindestabstand der Zustandsprüfungen bei WKC-Fehlern [s]
+constexpr int kRecoverTimeoutUs = 500;     ///< ec_reconfig_slave/ec_recover_slave [µs]
+constexpr size_t kMsgLen = 96U;            ///< Puffer für SDO-Fehlermeldungen
+constexpr size_t kStateMsgLen = 256U;      ///< Puffer je Slave in slave_states()
+constexpr size_t kObjNameLen = sizeof("0xIIII:SS");  ///< Puffer für "0xIIII:SS" inkl. Nullbyte
+
 /**
  * @brief Liest ein SDO fester Größe.
  * @param slave Slave-Nummer
@@ -41,7 +53,7 @@ bool write_settings(uint16_t slave, const DeviceConfig& dc, std::string& err) {
         auto data = w.data;
         if (ec_SDOwrite(slave, w.index, w.sub, FALSE, static_cast<int>(data.size()), data.data(),
                         EC_TIMEOUTRXM) <= 0) {
-            char b[96];
+            char b[kMsgLen];
             std::snprintf(b, sizeof b, "SDO-Write 0x%04X:%02X (%s) fehlgeschlagen", w.index, w.sub,
                           w.name.c_str());
             err = b;
@@ -126,7 +138,7 @@ bool read_assigned(uint16_t slave, uint16_t sm_obj, std::vector<std::vector<el33
  * @return "INIT", "PRE-OP", "BOOT", "SAFE-OP", "OP" oder "NONE"
  */
 const char* state_name(uint16_t st) {
-    switch (st & 0x0F) {
+    switch (st & kStateMask) {
     case EC_STATE_INIT: return "INIT";
     case EC_STATE_PRE_OP: return "PRE-OP";
     case EC_STATE_BOOT: return "BOOT";
@@ -149,7 +161,7 @@ std::string slave_states(uint16_t expected) {
     for (int i = 1; i <= ec_slavecount; ++i) {
         const ec_slavet& sl = ec_slave[i];
         if (sl.state == expected) continue;
-        char b[256];
+        char b[kStateMsgLen];
         std::snprintf(b, sizeof b, "%sSlave %d %s: %s%s, AL-Status 0x%04X (%s)",
                       out.empty() ? "" : "; ", i, sl.name, state_name(sl.state),
                       (sl.state & EC_STATE_ERROR) ? "+ERROR" : "", sl.ALstatuscode,
@@ -255,7 +267,7 @@ bool EthercatBackend::open(const Config& cfg, std::string& err) {
     }
     // ec_statecheck(0, ...) aktualisiert nur ec_slave[0].state (Gruppenzustand per BRD);
     // die Einzelzustände liefert erst ec_readstate().
-    ec_statecheck(0, EC_STATE_SAFE_OP, EC_TIMEOUTSTATE * 4);
+    ec_statecheck(0, EC_STATE_SAFE_OP, EC_TIMEOUTSTATE * kSafeOpTimeoutFactor);
     ec_readstate();
     if (ec_slave[slave_].state != EC_STATE_SAFE_OP) {
         err = "SAFE-OP nicht erreicht: " + slave_states(EC_STATE_SAFE_OP);
@@ -263,17 +275,17 @@ bool EthercatBackend::open(const Config& cfg, std::string& err) {
     }
     if (!read_layout(err)) return false;
 
-    expected_wkc_ = ec_group[0].outputsWKC * 2 + ec_group[0].inputsWKC;
+    expected_wkc_ = ec_group[0].outputsWKC * kOutputWkcFactor + ec_group[0].inputsWKC;
     log_info("IOmap %d Byte, erwarteter WKC %d", used, expected_wkc_);
 
     ec_slave[0].state = EC_STATE_OPERATIONAL;
     ec_send_processdata();
     ec_receive_processdata(EC_TIMEOUTRET);
     ec_writestate(0);
-    for (int i = 0; i < 200 && ec_slave[0].state != EC_STATE_OPERATIONAL; ++i) {
+    for (int i = 0; i < kOpRetries && ec_slave[0].state != EC_STATE_OPERATIONAL; ++i) {
         ec_send_processdata();
         ec_receive_processdata(EC_TIMEOUTRET);
-        ec_statecheck(0, EC_STATE_OPERATIONAL, 50000);
+        ec_statecheck(0, EC_STATE_OPERATIONAL, kOpCheckTimeoutUs);
     }
     if (ec_slave[0].state != EC_STATE_OPERATIONAL) {
         ec_readstate();
@@ -328,17 +340,17 @@ void EthercatBackend::discover_pdos(const std::vector<uint16_t>& rx_assign,
     auto info = std::make_unique<SdoInfo>();
     info->slave = slave_;
     info->supported = (ec_slave[slave_].CoEdetails & ECT_COEDET_SDOINFO) != 0;
-    const auto known = el3356::known_pdos();
+    const auto catalog = el3356::known_pdos();
     pdos_.clear();
-    for (uint16_t base : {uint16_t{0x1600}, uint16_t{0x1A00}})
-        for (uint16_t idx = base; idx < base + 8; ++idx) {
+    for (uint16_t base : {el3356::kPdoRxFirst, el3356::kPdoTxFirst})
+        for (uint16_t idx = base; idx < base + el3356::kPdoRangeSize; ++idx) {
             std::vector<el3356::MapEntry> m;
             if (!read_pdo_mapping(slave_, idx, m)) continue;
             el3356::PdoInfo p;
             p.index = idx;
-            p.rx = base == 0x1600;
+            p.rx = base == el3356::kPdoRxFirst;
             if (!info->object_name(idx, p.name)) p.name = el3356::known_pdo_name(idx);
-            for (const auto& k : known)
+            for (const auto& k : catalog)
                 if (k.index == idx) p.excludes = k.excludes;
             for (const auto& me : m) {
                 el3356::PdoEntry e;
@@ -347,12 +359,12 @@ void EthercatBackend::discover_pdos(const std::vector<uint16_t>& rx_assign,
                     uint16_t coe = 0;
                     std::string known_name;
                     el3356::DType known_type = el3356::DType::None;
-                    const bool known = el3356::known_entry(me.index, me.sub, known_name, known_type);
+                    const bool has_known = el3356::known_entry(me.index, me.sub, known_name, known_type);
                     if (!info->entry(me.index, me.sub, e.name, coe)) e.name = known_name;
                     e.type = coe ? el3356::dtype_from_coe(coe, me.bits)
-                                 : known ? known_type : el3356::dtype_from_coe(0, me.bits);
+                                 : has_known ? known_type : el3356::dtype_from_coe(el3356::kCoeUnknown, me.bits);
                     if (e.name.empty()) {
-                        char b[16];
+                        char b[kObjNameLen];
                         std::snprintf(b, sizeof b, "0x%04X:%02X", me.index, me.sub);
                         e.name = b;
                     }
@@ -422,11 +434,12 @@ void EthercatBackend::cycle(double t, const El3356Control& ctrl, Sample& out) {
  * @param t Zeit seit Start [s]
  */
 void EthercatBackend::check_and_recover(double t) {
-    if (last_check_t_ >= 0.0 && t - last_check_t_ < 0.5) return;
+    if (last_check_t_ != kNoCheck && t - last_check_t_ < kCheckIntervalS) return;
     last_check_t_ = t;
     ec_readstate();
     link_ok_ = true;
-    for (uint16_t s = 1; s <= ec_slavecount; ++s) {
+    assert(ec_slavecount < UINT16_MAX);
+    for (uint16_t s = 1; s <= static_cast<uint16_t>(ec_slavecount); ++s) {
         ec_slavet& sl = ec_slave[s];
         if (sl.state == EC_STATE_OPERATIONAL) continue;
         link_ok_ = false;
@@ -439,7 +452,7 @@ void EthercatBackend::check_and_recover(double t) {
             sl.state = EC_STATE_OPERATIONAL;
             ec_writestate(s);
         } else if (sl.state > EC_STATE_NONE) {
-            if (ec_reconfig_slave(s, 500)) {
+            if (ec_reconfig_slave(s, kRecoverTimeoutUs)) {
                 sl.islost = FALSE;
                 log_warn("Slave %u: rekonfiguriert", s);
             }
@@ -451,7 +464,7 @@ void EthercatBackend::check_and_recover(double t) {
             }
         }
         if (sl.islost && sl.state == EC_STATE_NONE) {
-            if (ec_recover_slave(s, 500)) {
+            if (ec_recover_slave(s, kRecoverTimeoutUs)) {
                 sl.islost = FALSE;
                 log_warn("Slave %u: wiederhergestellt", s);
             }
@@ -480,7 +493,7 @@ bool EthercatBackend::sdo_write(uint16_t index, uint8_t sub, const std::vector<u
     auto buf = data;
     if (ec_SDOwrite(slave_, index, sub, FALSE, static_cast<int>(buf.size()), buf.data(),
                     EC_TIMEOUTRXM) <= 0) {
-        char b[64];
+        char b[kMsgLen];
         std::snprintf(b, sizeof b, "SDO-Write 0x%04X:%02X fehlgeschlagen", index, sub);
         err = b;
         return false;
@@ -498,7 +511,7 @@ bool EthercatBackend::sdo_read(uint16_t index, uint8_t sub, size_t size, std::ve
     data.assign(size, 0);
     int n = static_cast<int>(size);
     if (ec_SDOread(slave_, index, sub, FALSE, &n, data.data(), EC_TIMEOUTRXM) <= 0) {
-        char b[64];
+        char b[kMsgLen];
         std::snprintf(b, sizeof b, "SDO-Read 0x%04X:%02X fehlgeschlagen", index, sub);
         err = b;
         return false;

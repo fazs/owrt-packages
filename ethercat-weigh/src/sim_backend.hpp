@@ -20,7 +20,7 @@ namespace ew {
 class SimBackend : public IoBackend {
 public:
     explicit SimBackend(unsigned seed = 1);
-    std::string name() const override { return "simulation"; }
+    [[nodiscard]] std::string name() const override { return "simulation"; }
     bool open(const Config& cfg, std::string& err) override;
     void cycle(double t, const El3356Control& ctrl, Sample& out) override;
     bool write_device_config(const DeviceConfig& dc, std::string& err) override;
@@ -30,11 +30,35 @@ public:
                   std::string& err) override;
     void close() override {}
     bool set_sim_load(std::optional<double> grams) override;
-    std::vector<el3356::PdoInfo> pdos() const override { return pdos_; }
+    [[nodiscard]] std::vector<el3356::PdoInfo> pdos() const override { return pdos_; }
     void process_image(std::vector<uint8_t>& in, std::vector<uint8_t>& out) const override {
         in = img_in_;
         out = img_out_;
     }
+
+    /// @name Modellparameter der Simulation (auch von den Tests verwendet)
+    /// @{
+    static constexpr double kProfileEmptyS = 2.0;    ///< Lastprofil: leer [s]
+    static constexpr double kProfileLoadedS = 5.0;   ///< Lastprofil: belastet inkl. Einschwingen [s]
+    static constexpr double kProfilePeriodS = kProfileEmptyS + kProfileLoadedS;  ///< Periode [s]
+    static constexpr double kLoadFractionMin = 0.1;  ///< Lastprofil: kleinste Last (Anteil der Kapazität)
+    static constexpr double kLoadFractionMax = 0.9;  ///< Lastprofil: größte Last (Anteil der Kapazität)
+    static constexpr double kSettleFrequencyHz = 3.0;  ///< Einschwingen: Frequenz der Schwingung
+    static constexpr double kSettleTauS = 0.25;        ///< Einschwingen: Abklingzeitkonstante [s]
+    static constexpr double kOverrangeFactor = 1.1;  ///< Overrange ab diesem Vielfachen der Nennlast
+    static constexpr double kSteadyBandRel = 0.001;  ///< Steady state: Band relativ zur Nennlast
+    static constexpr double kSteadyTimeS = 1.0;      ///< Steady state: Mindestdauer im Band [s]
+    static constexpr double kRatedDev = 0.005;  ///< Kennwert +0,5 % gegenüber dem Nennwert
+    static constexpr double kZeroDev = 0.01;    ///< Nullpunkt +1 % des Kennwerts
+    static constexpr double kNoiseRel = 6e-5;   ///< Rauschen relativ zum Kennwert (6e-5 · Kapazität)
+    static constexpr double kIir8NoiseFactor = 0.3;  ///< Rauschminderung durch Filter IIR8
+    static constexpr int kRatedSigDigits = 2;        ///< Nennwert Rated output: signifikante Stellen
+    static constexpr double kZeroStepRel = 0.05;     ///< Nennwert Zero balance: Raster relativ zum Kennwert
+    static constexpr double kFallbackCapacityG = 1000.0;  ///< Kapazität bei ungültiger Nennlast [g]
+    static constexpr double kFallbackRatedMvV = 1.0;      ///< Kennwert bei Rated output 0 [mV/V]
+    static constexpr int kCmdBusyReads = 3;  ///< Statusabfragen 0xFB00:02 bis zum Abschluss eines Kommandos
+    static constexpr uint8_t kCmdStatusUnknown = 1U;  ///< 0xFB00:02 bei unbekanntem Kommando
+    /// @}
 
     /// Simulierter Sensor, aus der Config abgeleitet (siehe sensor_for()).
     struct SimSensor {
@@ -45,7 +69,7 @@ public:
     };
     static SimSensor sensor_for(const Config& cfg);
     /// aktuell simulierter Sensor (nach open() aus der Config)
-    const SimSensor& sensor() const { return sensor_; }
+    [[nodiscard]] const SimSensor& sensor() const { return sensor_; }
 
 private:
     double mass_kg(double t);
@@ -53,23 +77,23 @@ private:
 
     std::mt19937 rng_;                                            ///< Zufallsgenerator (Seed fest)
     std::normal_distribution<double> noise_{0.0, 1.0};            ///< Rauschen, normiert
-    std::uniform_real_distribution<double> load_dist_{0.1, 0.9};  ///< Last als Anteil der Kapazität
+    std::uniform_real_distribution<double> load_dist_{kLoadFractionMin, kLoadFractionMax};  ///< Last als Anteil der Kapazität
     SimSensor sensor_;                                            ///< simulierter Sensor
 
-    // Objektverzeichnis (Auszug); Startwerte werden in open() überschrieben
-    float gain_ = 1.0f;       ///< 0x8000:21 Gain
-    float tara_ = 0.0f;       ///< 0x8000:22 Tara
-    float rated_ = 2.0f;      ///< 0x8000:23 Rated output
-    float nominal_ = 5.0f;    ///< 0x8000:24 Nominal load
-    float zero_bal_ = 0.0f;   ///< 0x8000:25 Zero balance
-    float scale_ = 1000.0f;   ///< 0x8000:27 Scale factor
-    float reference_ = 5.0f;  ///< 0x8000:28 Reference load
-    uint16_t filter_ = 0;     ///< 0x8000:11 Mode0 filter settings
-    uint16_t cmd_ = 0;        ///< 0xFB00:01 Request
-    uint8_t cmd_status_ = 0;  ///< 0xFB00:02 Status
-    int cmd_busy_reads_ = 0;  ///< Statusabfragen bis zum Abschluss des Kommandos
+    // Objektverzeichnis (Auszug); Werte aus DeviceConfig (Konstruktor, open(), write_device_config())
+    float gain_ = 0.0F;        ///< 0x8000:21 Gain
+    float tara_ = 0.0F;        ///< 0x8000:22 Tara
+    float rated_ = 0.0F;       ///< 0x8000:23 Rated output
+    float nominal_ = 0.0F;     ///< 0x8000:24 Nominal load
+    float zero_bal_ = 0.0F;    ///< 0x8000:25 Zero balance
+    float scale_ = 0.0F;       ///< 0x8000:27 Scale factor
+    float reference_ = 0.0F;   ///< 0x8000:28 Reference load
+    uint16_t filter_ = 0U;     ///< 0x8000:11 Mode0 filter settings
+    uint16_t cmd_ = el3356::kCmdNone;              ///< 0xFB00:01 Request
+    uint8_t cmd_status_ = el3356::kCmdStatusDone;  ///< 0xFB00:02 Status
+    int cmd_busy_reads_ = 0;   ///< Statusabfragen bis zum Abschluss des Kommandos
 
-    /// Übrige Objekte: gespeicherte SDO-Daten (Schlüssel index << 8 | sub)
+    /// Übrige Objekte: gespeicherte SDO-Daten (Schlüssel siehe od_key())
     std::map<uint32_t, std::vector<uint8_t>> od_;
 
     // Prozessabbild gemäß Standard-Zuordnung (el3356::rx_assignment/tx_assignment)

@@ -1,9 +1,15 @@
 #include "measurement.hpp"
+#include "units.hpp"
 
 #include <algorithm>
 #include <cmath>
 
 namespace ew {
+
+namespace {
+/// Mindestanzahl Samples im Fenster (Spannweite und Standardabweichung brauchen zwei Werte)
+constexpr size_t kMinWindowSamples = 2U;
+} // namespace
 
 /**
  * @brief Name eines Zustands für JSON und Anzeige.
@@ -48,7 +54,7 @@ void MeasurementEngine::compute_window() {
     win_ = {};
     if (buf_.empty()) return;
     win_.n = static_cast<uint32_t>(buf_.size());
-    win_.span_ms = (buf_.back().t - buf_.front().t) * 1000.0;
+    win_.span_ms = (buf_.back().t - buf_.front().t) * kMsPerS;
     double mn = buf_.front().v, mx = mn, mean = 0.0, m2 = 0.0;
     uint32_t k = 0;
     for (const auto& p : buf_) {  // Welford über das Fenster
@@ -104,11 +110,11 @@ std::optional<Measurement> MeasurementEngine::process(const Sample& s) {
     state_ = MeasState::Settling;
     buf_.push_back({s.t, v});
     // Kleinstes Fenster behalten, dessen Spannweite >= stable_time ist
-    const double tw = p_.stable_time_ms / 1000.0;
-    while (buf_.size() > 2 && (buf_.back().t - buf_[1].t) >= tw) buf_.pop_front();
+    const double tw = p_.stable_time_ms / kMsPerS;
+    while (buf_.size() > kMinWindowSamples && (buf_.back().t - buf_[1].t) >= tw) buf_.pop_front();
     compute_window();
 
-    const bool long_enough = (win_.span_ms / 1000.0) >= tw;
+    const bool long_enough = (win_.span_ms / kMsPerS) >= tw;
     const bool stable = win_.range <= p_.tolerance && win_.stddev <= p_.sigma_max;
     const bool dev_ok = !p_.use_device_steady_state || s.status.steady_state;
     if (!(long_enough && stable && dev_ok)) return std::nullopt;
@@ -120,7 +126,7 @@ std::optional<Measurement> MeasurementEngine::process(const Sample& s) {
     m.stddev = win_.stddev;
     m.range = win_.range;
     m.n = win_.n;
-    m.settle_ms = (s.t - load_since_) * 1000.0;
+    m.settle_ms = (s.t - load_since_) * kMsPerS;
 
     armed_ = false;
     state_ = MeasState::WaitUnload;

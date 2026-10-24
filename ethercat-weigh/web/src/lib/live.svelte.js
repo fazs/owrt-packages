@@ -2,6 +2,16 @@
  * @file Verbindung zum Backend: WebSocket /ws (Live-Daten) + REST /api (Kommandos, Config).
  */
 
+import {
+  DEFAULT_HISTORY_SIZE,
+  NOTICE_MS,
+  SIM_DEFAULT_LOAD_RATIO,
+  WS_RETRY_FACTOR,
+  WS_RETRY_MAX_MS,
+  WS_RETRY_MIN_MS,
+} from './constants.js';
+import { toG } from './format.js';
+
 /** Länge des Verlaufs [s]. */
 export const TREND_SECONDS = 30;
 
@@ -62,18 +72,18 @@ export const trend = { t: [], v: [] };
 export const trendTick = $state({ version: 0 });
 
 let ws = null;
-let retryMs = 1000;
+let retryMs = WS_RETRY_MIN_MS;
 let noticeTimer = null;
 
 /**
- * Zeigt einen Hinweis für 4 s an.
+ * Zeigt einen Hinweis für NOTICE_MS an.
  * @param {'ok'|'error'} kind Art
  * @param {string} text Text
  */
 export function notify(kind, text) {
   live.notice = { kind, text };
   clearTimeout(noticeTimer);
-  noticeTimer = setTimeout(() => (live.notice = null), 4000);
+  noticeTimer = setTimeout(() => (live.notice = null), NOTICE_MS);
 }
 
 /**
@@ -113,10 +123,10 @@ function applySnapshot(s) {
 }
 
 /**
- * Anzahl der im Backend gehaltenen Messungen; der Snapshot enthält nur die letzten 50.
+ * Anzahl der im Backend gehaltenen Messungen; der Snapshot enthält nur die letzten SNAPSHOT_MEASUREMENTS.
  * @returns {number}
  */
-const historySize = () => live.config?.statistics?.history_size ?? 500;
+const historySize = () => live.config?.statistics?.history_size ?? DEFAULT_HISTORY_SIZE;
 
 /** Lädt alle gehaltenen Messungen über /api/measurements (neueste zuerst). */
 async function loadMeasurements() {
@@ -177,13 +187,13 @@ function handle(msg) {
   }
 }
 
-/** Verbindet den WebSocket; bei Abbruch Wiederverbindung mit wachsendem Abstand (max. 8 s). */
+/** Verbindet den WebSocket; bei Abbruch Wiederverbindung mit wachsendem Abstand (bis WS_RETRY_MAX_MS). */
 export function connect() {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(`${proto}//${location.host}/ws`);
   ws.onopen = () => {
     live.connected = true;
-    retryMs = 1000;
+    retryMs = WS_RETRY_MIN_MS;
   };
   ws.onmessage = (ev) => {
     try {
@@ -195,7 +205,7 @@ export function connect() {
   ws.onclose = () => {
     live.connected = false;
     setTimeout(connect, retryMs);
-    retryMs = Math.min(retryMs * 2, 8000);
+    retryMs = Math.min(retryMs * WS_RETRY_FACTOR, WS_RETRY_MAX_MS);
   };
   ws.onerror = () => ws.close();
 }
@@ -278,6 +288,16 @@ export async function simLoad(grams) {
   } catch (e) {
     notify('error', e.message);
   }
+}
+
+/**
+ * Vorbelegung der simulierten Masse: SIM_DEFAULT_LOAD_RATIO der Nennlast der Klemme.
+ * @returns {number|null} Masse [g] oder null, solange die Konfiguration fehlt
+ */
+export function simDefaultGrams() {
+  const dev = live.config?.device;
+  const cal = live.config?.calibration;
+  return dev && cal ? toG(SIM_DEFAULT_LOAD_RATIO * dev.nominal_load, cal.device_unit) : null;
 }
 
 /**

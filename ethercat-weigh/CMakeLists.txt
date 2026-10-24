@@ -51,7 +51,7 @@ add_library(ew_core STATIC
   src/sim_backend.cpp)
 target_include_directories(ew_core PUBLIC src)
 target_link_libraries(ew_core PUBLIC ew_deps)
-target_compile_options(ew_core PRIVATE -Wall -Wextra)
+target_compile_options(ew_core PRIVATE -Wall -Wextra -Wshadow)
 
 # --- Anwendung ---------------------------------------------------------------
 add_executable(ethercat-weigh
@@ -60,7 +60,7 @@ add_executable(ethercat-weigh
   src/acquisition.cpp
   src/web_server.cpp)
 target_link_libraries(ethercat-weigh PRIVATE ew_core soem Threads::Threads)
-target_compile_options(ethercat-weigh PRIVATE -Wall -Wextra)
+target_compile_options(ethercat-weigh PRIVATE -Wall -Wextra -Wshadow)
 target_compile_definitions(ethercat-weigh PRIVATE EW_VERSION="${PROJECT_VERSION}")
 
 install(TARGETS ethercat-weigh RUNTIME DESTINATION bin)
@@ -69,6 +69,7 @@ if(EW_BUILD_TESTS)
   enable_testing()
   add_executable(ew_tests tests/test_main.cpp)
   target_link_libraries(ew_tests PRIVATE ew_core)
+  target_compile_options(ew_tests PRIVATE -Wall -Wextra -Wshadow)
   # Simulation und Tests verwenden die ausgelieferte Konfiguration
   target_compile_definitions(ew_tests PRIVATE
     EW_PACKAGE_CONFIG="${CMAKE_CURRENT_SOURCE_DIR}/openwrt/ethercat-weigh/files/config.json")

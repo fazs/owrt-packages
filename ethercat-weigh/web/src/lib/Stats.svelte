@@ -1,6 +1,7 @@
 <script>
   import { live, resetStatistics, displayUnit } from './live.svelte.js';
   import { decimalsFor, fmt, fmtInt, fromG } from './format.js';
+  import { CONFIRM_MS } from './constants.js';
 
   const unit = $derived(displayUnit());
   const dec = $derived(decimalsFor(live.config?.measurement?.tolerance, unit));
@@ -18,11 +19,11 @@
   ]);
 
   let confirming = $state(false);
-  /** Setzt die Statistik zurück; erster Klick fragt nach (3 s), zweiter führt aus. */
+  /** Setzt die Statistik zurück; erster Klick fragt nach (CONFIRM_MS), zweiter führt aus. */
   async function reset() {
     if (!confirming) {
       confirming = true;
-      setTimeout(() => (confirming = false), 3000);
+      setTimeout(() => (confirming = false), CONFIRM_MS);
       return;
     }
     confirming = false;

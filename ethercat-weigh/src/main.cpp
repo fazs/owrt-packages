@@ -1,4 +1,4 @@
-#include <cstring>
+#include <cstdlib>
 #include <iostream>
 #include <memory>
 #include <string>
@@ -11,6 +11,10 @@
 #include "web_server.hpp"
 
 namespace {
+
+constexpr int kExitOk = EXIT_SUCCESS;     ///< reguläres Ende
+constexpr int kExitError = EXIT_FAILURE;  ///< Konfigurations- oder Schreibfehler
+constexpr int kExitUsage = 2;             ///< ungültige Optionen (Konvention der Shell-Werkzeuge)
 
 /// @brief Gibt die Aufrufsyntax auf stdout aus.
 void usage() {
@@ -26,7 +30,7 @@ void usage() {
 
 /**
  * @brief Einstieg: Optionen auswerten, Konfiguration laden, Acquisition und Webserver starten.
- * @return 0 bei regulärem Ende, 1 bei Konfigurationsfehler, 2 bei ungültigen Optionen
+ * @return kExitOk, kExitError bei Konfigurationsfehler, kExitUsage bei ungültigen Optionen
  */
 int main(int argc, char** argv) {
     std::string config_path = "/etc/ethercat-weigh/config.json";
@@ -45,15 +49,15 @@ int main(int argc, char** argv) {
                 ew::save_config(argv[++i], ew::Config{});
             } catch (const std::exception& ex) {
                 std::cerr << ex.what() << '\n';
-                return 1;
+                return kExitError;
             }
-            return 0;
+            return kExitOk;
         } else if (a == "-h" || a == "--help") {
             usage();
-            return 0;
+            return kExitOk;
         } else {
             usage();
-            return 2;
+            return kExitUsage;
         }
     }
 
@@ -62,7 +66,7 @@ int main(int argc, char** argv) {
         cfg = ew::load_config(config_path);
     } catch (const std::exception& ex) {
         ew::log_error(ex.what());
-        return 1;
+        return kExitError;
     }
 
     std::unique_ptr<ew::IoBackend> backend;
@@ -79,5 +83,5 @@ int main(int argc, char** argv) {
     ew::run_web_server(acq, cfg.http);  // blockiert bis SIGINT/SIGTERM
     acq.stop();
     ew::log_info("beendet");
-    return 0;
+    return kExitOk;
 }

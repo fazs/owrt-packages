@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -96,7 +95,7 @@ struct Config {
     UiConfig ui;                    ///< Anzeige
     HttpConfig http;                ///< Webserver
 
-    std::vector<std::string> validate() const;
+    [[nodiscard]] std::vector<std::string> validate() const;
 };
 
 void to_json(nlohmann::json& j, const CalPoint& p);

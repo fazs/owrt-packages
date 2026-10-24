@@ -1,4 +1,5 @@
 #include "config.hpp"
+#include "el3356.hpp"
 #include "units.hpp"
 
 #include <algorithm>
@@ -8,6 +9,61 @@
 #include <stdexcept>
 
 namespace ew {
+
+namespace {
+
+/// @name Zulässige Wertebereiche der Konfiguration
+/// @{
+constexpr uint32_t kCycleMsMin = 1U;               ///< ethercat.cycle_ms
+constexpr uint32_t kCycleMsMax = 1000U;
+constexpr uint32_t kWkcFaultCyclesMin = 1U;        ///< ethercat.wkc_fault_cycles
+constexpr int kRtPriorityMin = 0;                  ///< ethercat.rt_priority (0 = SCHED_OTHER)
+constexpr int kRtPriorityMax = 99;                 ///< höchste SCHED_FIFO-Priorität unter Linux
+constexpr uint32_t kCaptureMsMin = 100U;           ///< calibration.capture_time_ms
+constexpr uint32_t kCaptureMsMax = 60000U;
+constexpr double kStableTimeSMin = 0.0;            ///< calibration.stable_time_s
+constexpr double kStableTimeSMax = 600.0;
+constexpr double kStableBandRelMax = 0.1;          ///< calibration.stable_band_rel (> 0)
+constexpr uint32_t kMinWindowCycles = 2U;          ///< measurement.stable_time_ms in Zyklen
+constexpr uint32_t kRollingWindowMin = 2U;         ///< statistics.rolling_window
+constexpr uint32_t kRollingWindowMax = 100000U;
+constexpr uint32_t kHistorySizeMin = 1U;           ///< statistics.history_size
+constexpr uint32_t kHistorySizeMax = 100000U;
+constexpr uint32_t kRateHzMin = 1U;                ///< ui.rate_hz
+constexpr uint32_t kRateHzMax = 100U;
+constexpr uint16_t kThreadsMin = 1U;               ///< http.threads
+constexpr uint16_t kThreadsMax = 8U;
+/// @}
+
+constexpr size_t kMinCalPoints = 2U;  ///< Stützpunkte für eine Kennlinie
+constexpr int kJsonIndent = 2;        ///< Einrückung beim Speichern
+constexpr size_t kNumLen = 32U;       ///< Puffer für eine formatierte Zahl
+
+/**
+ * @brief Zahl für Meldungen (Dezimalkomma, ohne überflüssige Stellen).
+ * @param v Wert
+ * @return Text
+ */
+std::string num_text(double v) {
+    char b[kNumLen];
+    std::snprintf(b, sizeof b, "%g", v);
+    std::string s = b;
+    std::replace(s.begin(), s.end(), '.', ',');
+    return s;
+}
+
+/**
+ * @brief Meldung für einen Wertebereich.
+ * @param field Feldname
+ * @param lo untere Grenze
+ * @param hi obere Grenze
+ * @return "field: zulässig lo..hi"
+ */
+std::string range_msg(const char* field, double lo, double hi) {
+    return std::string(field) + ": zulässig " + num_text(lo) + ".." + num_text(hi);
+}
+
+} // namespace
 
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(EthercatConfig,
     interface, slave_name, cycle_ms, wkc_fault_cycles, rt_priority)
@@ -76,8 +132,8 @@ Config config_from_json(const nlohmann::json& j) {
  */
 std::vector<std::string> validate_points(const std::vector<CalPoint>& pts) {
     std::vector<std::string> e;
-    if (pts.size() < 2) {
-        e.push_back("Kennlinie: mindestens 2 Punkte erforderlich");
+    if (pts.size() < kMinCalPoints) {
+        e.push_back("Kennlinie: mindestens " + std::to_string(kMinCalPoints) + " Punkte erforderlich");
         return e;
     }
     std::vector<CalPoint> s = pts;
@@ -85,13 +141,13 @@ std::vector<std::string> validate_points(const std::vector<CalPoint>& pts) {
     int dir = 0;
     for (size_t i = 1; i < s.size(); ++i) {
         if (!(s[i].raw > s[i - 1].raw)) {
-            e.push_back("Kennlinie: zwei Punkte mit gleichem Rohwert");
+            e.emplace_back("Kennlinie: zwei Punkte mit gleichem Rohwert");
             break;
         }
         const double dm = s[i].mass_g - s[i - 1].mass_g;
         const int d = dm > 0 ? 1 : (dm < 0 ? -1 : 0);
         if (d == 0 || (dir != 0 && d != dir)) {
-            e.push_back("Kennlinie: Masse nicht streng monoton über dem Rohwert");
+            e.emplace_back("Kennlinie: Masse nicht streng monoton über dem Rohwert");
             break;
         }
         dir = d;
@@ -105,49 +161,53 @@ std::vector<std::string> validate_points(const std::vector<CalPoint>& pts) {
  */
 std::vector<std::string> Config::validate() const {
     std::vector<std::string> e;
-    if (ethercat.interface.empty()) e.push_back("ethercat.interface: leer");
-    if (ethercat.cycle_ms < 1 || ethercat.cycle_ms > 1000)
-        e.push_back("ethercat.cycle_ms: zulässig 1..1000");
-    if (ethercat.wkc_fault_cycles < 1) e.push_back("ethercat.wkc_fault_cycles: >= 1");
-    if (ethercat.rt_priority < 0 || ethercat.rt_priority > 99)
-        e.push_back("ethercat.rt_priority: zulässig 0..99");
+    if (ethercat.interface.empty()) e.emplace_back("ethercat.interface: leer");
+    if (ethercat.cycle_ms < kCycleMsMin || ethercat.cycle_ms > kCycleMsMax)
+        e.push_back(range_msg("ethercat.cycle_ms", kCycleMsMin, kCycleMsMax));
+    if (ethercat.wkc_fault_cycles < kWkcFaultCyclesMin)
+        e.push_back("ethercat.wkc_fault_cycles: >= " + std::to_string(kWkcFaultCyclesMin));
+    if (ethercat.rt_priority < kRtPriorityMin || ethercat.rt_priority > kRtPriorityMax)
+        e.push_back(range_msg("ethercat.rt_priority", kRtPriorityMin, kRtPriorityMax));
 
-    if (device.nominal_load <= 0.0) e.push_back("device.nominal_load: > 0");
-    if (device.reference_load <= 0.0) e.push_back("device.reference_load: > 0");
-    if (device.rated_output_mv_v == 0.0) e.push_back("device.rated_output_mv_v: != 0");
-    if (device.gravity_of_earth <= 0.0) e.push_back("device.gravity_of_earth: > 0");
-    if (device.scale_factor == 0.0) e.push_back("device.scale_factor: != 0");
-    if (device.mode0_filter_settings > 11) e.push_back("device.mode0_filter_settings: zulässig 0..11");
+    if (device.nominal_load <= 0.0) e.emplace_back("device.nominal_load: > 0");
+    if (device.reference_load <= 0.0) e.emplace_back("device.reference_load: > 0");
+    if (device.rated_output_mv_v == 0.0) e.emplace_back("device.rated_output_mv_v: != 0");
+    if (device.gravity_of_earth <= 0.0) e.emplace_back("device.gravity_of_earth: > 0");
+    if (device.scale_factor == 0.0) e.emplace_back("device.scale_factor: != 0");
+    if (device.mode0_filter_settings > el3356::kFilterPdoFrequency)
+        e.push_back(range_msg("device.mode0_filter_settings", 0.0, el3356::kFilterPdoFrequency));
 
     const auto& cal = calibration;
     if (cal.mode != "device" && cal.mode != "application")
-        e.push_back("calibration.mode: 'device' oder 'application'");
-    if (!valid_unit(cal.device_unit)) e.push_back("calibration.device_unit: mg, g, kg oder gr");
-    if (cal.capture_time_ms < 100 || cal.capture_time_ms > 60000)
-        e.push_back("calibration.capture_time_ms: zulässig 100..60000");
-    if (cal.stable_time_s < 0.0 || cal.stable_time_s > 600.0)
-        e.push_back("calibration.stable_time_s: zulässig 0..600");
-    if (cal.stable_band_rel <= 0.0 || cal.stable_band_rel > 0.1)
-        e.push_back("calibration.stable_band_rel: zulässig >0..0,1");
+        e.emplace_back("calibration.mode: 'device' oder 'application'");
+    if (!valid_unit(cal.device_unit)) e.emplace_back("calibration.device_unit: mg, g, kg oder gr");
+    if (cal.capture_time_ms < kCaptureMsMin || cal.capture_time_ms > kCaptureMsMax)
+        e.push_back(range_msg("calibration.capture_time_ms", kCaptureMsMin, kCaptureMsMax));
+    if (cal.stable_time_s < kStableTimeSMin || cal.stable_time_s > kStableTimeSMax)
+        e.push_back(range_msg("calibration.stable_time_s", kStableTimeSMin, kStableTimeSMax));
+    if (cal.stable_band_rel <= 0.0 || cal.stable_band_rel > kStableBandRelMax)
+        e.push_back("calibration.stable_band_rel: zulässig >0.." + num_text(kStableBandRelMax));
     if (cal.mode == "application" && !cal.points.empty())
         for (auto& s : validate_points(cal.points)) e.push_back("calibration.points: " + s);
 
     const auto& m = measurement;
     if (!(m.min_load > m.zero_threshold))
-        e.push_back("measurement.min_load muss > measurement.zero_threshold sein");
-    if (m.tolerance <= 0.0) e.push_back("measurement.tolerance: > 0");
-    if (m.sigma_max <= 0.0) e.push_back("measurement.sigma_max: > 0");
-    if (m.stable_time_ms < 2 * ethercat.cycle_ms)
-        e.push_back("measurement.stable_time_ms: >= 2 * ethercat.cycle_ms");
+        e.emplace_back("measurement.min_load muss > measurement.zero_threshold sein");
+    if (m.tolerance <= 0.0) e.emplace_back("measurement.tolerance: > 0");
+    if (m.sigma_max <= 0.0) e.emplace_back("measurement.sigma_max: > 0");
+    if (m.stable_time_ms < kMinWindowCycles * ethercat.cycle_ms)
+        e.push_back("measurement.stable_time_ms: >= " + std::to_string(kMinWindowCycles) + " * ethercat.cycle_ms");
 
-    if (statistics.rolling_window < 2 || statistics.rolling_window > 100000)
-        e.push_back("statistics.rolling_window: zulässig 2..100000");
-    if (statistics.history_size < 1 || statistics.history_size > 100000)
-        e.push_back("statistics.history_size: zulässig 1..100000");
-    if (ui.rate_hz < 1 || ui.rate_hz > 100) e.push_back("ui.rate_hz: zulässig 1..100");
-    if (!valid_unit(ui.display_unit)) e.push_back("ui.display_unit: mg, g, kg oder gr");
-    if (http.port == 0) e.push_back("http.port: != 0");
-    if (http.threads < 1 || http.threads > 8) e.push_back("http.threads: zulässig 1..8");
+    if (statistics.rolling_window < kRollingWindowMin || statistics.rolling_window > kRollingWindowMax)
+        e.push_back(range_msg("statistics.rolling_window", kRollingWindowMin, kRollingWindowMax));
+    if (statistics.history_size < kHistorySizeMin || statistics.history_size > kHistorySizeMax)
+        e.push_back(range_msg("statistics.history_size", kHistorySizeMin, kHistorySizeMax));
+    if (ui.rate_hz < kRateHzMin || ui.rate_hz > kRateHzMax)
+        e.push_back(range_msg("ui.rate_hz", kRateHzMin, kRateHzMax));
+    if (!valid_unit(ui.display_unit)) e.emplace_back("ui.display_unit: mg, g, kg oder gr");
+    if (http.port == 0) e.emplace_back("http.port: != 0");
+    if (http.threads < kThreadsMin || http.threads > kThreadsMax)
+        e.push_back(range_msg("http.threads", kThreadsMin, kThreadsMax));
     return e;
 }
 
@@ -188,7 +248,7 @@ void save_config(const std::string& path, const Config& c) {
     {
         std::ofstream f(tmp, std::ios::trunc);
         if (!f) throw std::runtime_error("Config nicht schreibbar: " + tmp);
-        f << nlohmann::json(c).dump(2) << '\n';
+        f << nlohmann::json(c).dump(kJsonIndent) << '\n';
         f.flush();
         if (!f) throw std::runtime_error("Schreibfehler: " + tmp);
     }

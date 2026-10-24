@@ -7,8 +7,11 @@
     tare,
     clearTare,
     setUnit,
-    displayUnit, simLoad,
+    displayUnit,
+    simLoad,
+    simDefaultGrams,
   } from './lib/live.svelte.js';
+  import { INFO_REFRESH_MS } from './lib/constants.js';
   import { UNITS } from './lib/format.js';
   import Calibration from './lib/Calibration.svelte';
   import Readout from './lib/Readout.svelte';
@@ -25,11 +28,17 @@
   const isSim = $derived(live.info?.backend === 'simulation');
   const hasTare = $derived(live.sample?.tare != null);
 
-  let simGrams = $state(1000);
+  /** Nachkommastellen der Zykluszeit in der Fußzeile */
+  const CYCLE_MS_DECIMALS = 2;
+
+  let simGrams = $state(null); // Vorbelegung aus der Nennlast, sobald die Konfiguration da ist
+  $effect(() => {
+    if (simGrams === null && live.config) simGrams = simDefaultGrams();
+  });
 
   onMount(() => {
     connect();
-    const id = setInterval(refreshInfo, 5000);
+    const id = setInterval(refreshInfo, INFO_REFRESH_MS);
     return () => clearInterval(id);
   });
 
@@ -113,7 +122,7 @@
     <span>ethercat-weigh {info.version}</span>
     <span>Zyklen {info.cycles?.toLocaleString('de-DE')}</span>
     <span>Überläufe {info.overruns}</span>
-    <span>max. Zykluszeit {info.max_cycle_ms?.toFixed(2)} ms</span>
+    <span>max. Zykluszeit {info.max_cycle_ms?.toFixed(CYCLE_MS_DECIMALS)} ms</span>
   {/if}
 </footer>
 

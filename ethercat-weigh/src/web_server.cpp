@@ -1,6 +1,7 @@
 #include "web_server.hpp"
 
 #include <fstream>
+#include <limits>
 #include <mutex>
 #include <sstream>
 #include <unordered_set>
@@ -11,6 +12,17 @@
 namespace ew {
 
 namespace {
+
+/// @name HTTP-Statuscodes (RFC 9110)
+/// @{
+constexpr int kHttpOk = 200;          ///< OK
+constexpr int kHttpBadRequest = 400;  ///< ungültige Anfrage
+constexpr int kHttpNotFound = 404;    ///< nicht gefunden
+constexpr int kHttpConflict = 409;    ///< Kommando im aktuellen Zustand nicht ausführbar
+/// @}
+
+/// Cache-Dauer statischer Dateien des Frontends [s] (1 Tag)
+constexpr int kStaticMaxAgeS = 24 * 60 * 60;
 
 /**
  * @brief JSON-Antwort ohne Caching.
@@ -54,23 +66,24 @@ std::string mime_type(const std::string& path) {
  *
  * @param root Frontend-Verzeichnis (http.web_root)
  * @param rel Pfad relativ zu @p root; leer = index.html
- * @return Datei, 400 oder 404
+ * @return Datei, kHttpBadRequest oder kHttpNotFound
  */
 crow::response serve_file(const std::string& root, std::string rel) {
     if (rel.empty()) rel = "index.html";
     if (rel.find("..") != std::string::npos || rel.front() == '/')
-        return crow::response(400);
+        return crow::response(kHttpBadRequest);
     std::ifstream f(root + "/" + rel, std::ios::binary);
     if (!f) {
         // SPA-Fallback: unbekannte Pfade ohne Dateiendung -> index.html
         if (rel.find('.') == std::string::npos) return serve_file(root, "index.html");
-        return crow::response(404);
+        return crow::response(kHttpNotFound);
     }
     std::ostringstream os;
     os << f.rdbuf();
-    crow::response r(200, os.str());
+    crow::response r(kHttpOk, os.str());
     r.set_header("Content-Type", mime_type(rel));
-    r.set_header("Cache-Control", rel == "index.html" ? "no-cache" : "public, max-age=86400");
+    r.set_header("Cache-Control",
+                 rel == "index.html" ? "no-cache" : "public, max-age=" + std::to_string(kStaticMaxAgeS));
     return r;
 }
 
@@ -120,12 +133,12 @@ void run_web_server(Acquisition& acq, const HttpConfig& http) {
     acq.set_publisher([&hub](const std::string& msg) { hub.broadcast(msg); });
 
     // --- REST ------------------------------------------------------------------
-    CROW_ROUTE(app, "/api/info")([&] { return json_response(200, acq.info()); });
+    CROW_ROUTE(app, "/api/info")([&] { return json_response(kHttpOk, acq.info()); });
 
-    CROW_ROUTE(app, "/api/state")([&] { return json_response(200, acq.snapshot()); });
+    CROW_ROUTE(app, "/api/state")([&] { return json_response(kHttpOk, acq.snapshot()); });
 
     CROW_ROUTE(app, "/api/config").methods(crow::HTTPMethod::Get)([&] {
-        return json_response(200, nlohmann::json(acq.config()));
+        return json_response(kHttpOk, nlohmann::json(acq.config()));
     });
 
     CROW_ROUTE(app, "/api/config").methods(crow::HTTPMethod::Put)([&](const crow::request& req) {
@@ -133,19 +146,19 @@ void run_web_server(Acquisition& acq, const HttpConfig& http) {
         try {
             next = config_from_json(nlohmann::json::parse(req.body));
         } catch (const std::exception& ex) {
-            return json_response(400, {{"ok", false}, {"errors", {std::string(ex.what())}}});
+            return json_response(kHttpBadRequest, {{"ok", false}, {"errors", {std::string(ex.what())}}});
         }
         const auto r = acq.update_config(next);
-        return json_response(r.ok ? 200 : 400, {{"ok", r.ok},
+        return json_response(r.ok ? kHttpOk : kHttpBadRequest, {{"ok", r.ok},
                                                 {"restart_required", r.restart_required},
                                                 {"errors", r.errors}});
     });
 
-    CROW_ROUTE(app, "/api/measurements")([&] { return json_response(200, acq.measurements_json()); });
+    CROW_ROUTE(app, "/api/measurements")([&] { return json_response(kHttpOk, acq.measurements_json()); });
 
     CROW_ROUTE(app, "/api/measurements.csv")([&](const crow::request& req) {
         const char* u = req.url_params.get("unit");
-        crow::response r(200, acq.measurements_csv(u ? u : "g"));
+        crow::response r(kHttpOk, acq.measurements_csv(u ? u : "g"));
         r.set_header("Content-Type", "text/csv; charset=utf-8");
         r.set_header("Content-Disposition", "attachment; filename=\"measurements.csv\"");
         return r;
@@ -153,17 +166,17 @@ void run_web_server(Acquisition& acq, const HttpConfig& http) {
 
     CROW_ROUTE(app, "/api/measurements/<uint>").methods(crow::HTTPMethod::Delete)([&](uint64_t id) {
         if (!acq.delete_measurement(id))
-            return json_response(404, {{"ok", false}, {"error", "Messung nicht gefunden"}});
-        return json_response(200, {{"ok", true}});
+            return json_response(kHttpNotFound, {{"ok", false}, {"error", "Messung nicht gefunden"}});
+        return json_response(kHttpOk, {{"ok", true}});
     });
 
     CROW_ROUTE(app, "/api/statistics/reset").methods(crow::HTTPMethod::Post)([&] {
         acq.reset_statistics();
-        return json_response(200, {{"ok", true}});
+        return json_response(kHttpOk, {{"ok", true}});
     });
 
     auto result = [](const CalResult& r) {
-        return json_response(r.ok ? 200 : 409, {{"ok", r.ok}, {"error", r.error}});
+        return json_response(r.ok ? kHttpOk : kHttpConflict, {{"ok", r.ok}, {"error", r.error}});
     };
 
     CROW_ROUTE(app, "/api/tare").methods(crow::HTTPMethod::Post)([&] { return result(acq.tare()); });
@@ -178,7 +191,7 @@ void run_web_server(Acquisition& acq, const HttpConfig& http) {
         try {
             j = nlohmann::json::parse(req.body);
         } catch (const std::exception& ex) {
-            return json_response(400, {{"ok", false}, {"error", ex.what()}});
+            return json_response(kHttpBadRequest, {{"ok", false}, {"error", ex.what()}});
         }
         return result(acq.calibration(j));
     });
@@ -190,7 +203,7 @@ void run_web_server(Acquisition& acq, const HttpConfig& http) {
             const auto j = nlohmann::json::parse(req.body);
             if (j.contains("grams") && j["grams"].is_number()) g = j["grams"].get<double>();
         } catch (const std::exception& ex) {
-            return json_response(400, {{"ok", false}, {"error", ex.what()}});
+            return json_response(kHttpBadRequest, {{"ok", false}, {"error", ex.what()}});
         }
         return result(acq.set_sim_load(g));
     });
@@ -198,7 +211,7 @@ void run_web_server(Acquisition& acq, const HttpConfig& http) {
     // --- Debug (PDOs, Initialisierungssequenz) -----------------------------------
     CROW_ROUTE(app, "/api/debug/pdos")([&] {
         const auto j = acq.debug_pdos();
-        return json_response(j.value("ok", false) ? 200 : 409, j);
+        return json_response(j.value("ok", false) ? kHttpOk : kHttpConflict, j);
     });
 
     // {"sub": <0x7000-Subindex>, "value": true|false|null} oder {"clear": true}
@@ -209,12 +222,13 @@ void run_web_server(Acquisition& acq, const HttpConfig& http) {
             const auto j = nlohmann::json::parse(req.body);
             if (!j.value("clear", false)) {
                 const int s = j.at("sub").get<int>();
-                if (s < 0 || s > 0xFF) throw std::runtime_error("sub außerhalb des Wertebereichs");
+                if (s < 0 || s > std::numeric_limits<uint8_t>::max())
+                    throw std::runtime_error("sub außerhalb des Wertebereichs");
                 sub = static_cast<uint8_t>(s);
                 if (j.contains("value") && j["value"].is_boolean()) value = j["value"].get<bool>();
             }
         } catch (const std::exception& ex) {
-            return json_response(400, {{"ok", false}, {"error", ex.what()}});
+            return json_response(kHttpBadRequest, {{"ok", false}, {"error", ex.what()}});
         }
         return result(acq.debug_override(sub, value));
     });
@@ -225,16 +239,16 @@ void run_web_server(Acquisition& acq, const HttpConfig& http) {
         try {
             j = acq.debug_sdo(nlohmann::json::parse(req.body));
         } catch (const std::exception& ex) {
-            return json_response(400, {{"ok", false}, {"error", ex.what()}});
+            return json_response(kHttpBadRequest, {{"ok", false}, {"error", ex.what()}});
         }
-        return json_response(j.value("ok", false) ? 200 : 409, j);
+        return json_response(j.value("ok", false) ? kHttpOk : kHttpConflict, j);
     });
 
-    CROW_ROUTE(app, "/api/debug/init")([&] { return json_response(200, acq.debug_init_sequence()); });
+    CROW_ROUTE(app, "/api/debug/init")([&] { return json_response(kHttpOk, acq.debug_init_sequence()); });
 
     CROW_ROUTE(app, "/api/debug/reinit").methods(crow::HTTPMethod::Post)([&] {
         acq.reinit();
-        return json_response(200, {{"ok", true}});
+        return json_response(kHttpOk, {{"ok", true}});
     });
 
     // --- WebSocket -------------------------------------------------------------

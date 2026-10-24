@@ -58,7 +58,8 @@ inline void vlog(int prio, const char* level, const char* fmt, va_list ap) {
     }
     std::lock_guard<std::mutex> lk(log_mutex());
     std::time_t now = std::time(nullptr);
-    char ts[32];
+    constexpr size_t kTimestampLen = sizeof("YYYY-MM-DD HH:MM:SS");  // inkl. Nullbyte
+    char ts[kTimestampLen];
     std::strftime(ts, sizeof ts, "%Y-%m-%d %H:%M:%S", std::localtime(&now));
     std::fprintf(stderr, "%s [%s] ", ts, level);
     std::vfprintf(stderr, fmt, ap);

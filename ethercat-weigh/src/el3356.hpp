@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstdint>
 #include <string>
 #include <vector>
 
@@ -14,47 +13,149 @@
  */
 namespace ew::el3356 {
 
-/// @name PDOs und PDO-Zuordnung
+/// @name RxPDOs (Ausgänge)
 /// @{
-constexpr uint16_t kPdoStatus = 0x1A00;     ///< TxPDO RMB Status, 2 Byte
-constexpr uint16_t kPdoValueReal = 0x1A02;  ///< TxPDO RMB Value (Real), 4 Byte
-constexpr uint16_t kPdoControl = 0x1600;    ///< RxPDO RMB Control, 2 Byte
-constexpr uint16_t kSm2Assign = 0x1C12;     ///< RxPDO assign (SM2)
-constexpr uint16_t kSm3Assign = 0x1C13;     ///< TxPDO assign (SM3)
+constexpr uint16_t kPdoControl = 0x1600U;          ///< RMB Control, 2 Byte
+constexpr uint16_t kPdoFilterFrequency = 0x1601U;  ///< RMB Filter frequency
+/// @}
+
+/// @name TxPDOs (Eingänge)
+/// @{
+constexpr uint16_t kPdoStatus = 0x1A00U;         ///< RMB Status, 2 Byte
+constexpr uint16_t kPdoValueInt = 0x1A01U;       ///< RMB Value (INT32)
+constexpr uint16_t kPdoValueReal = 0x1A02U;      ///< RMB Value (Real), 4 Byte
+constexpr uint16_t kPdoTimestamp = 0x1A03U;      ///< RMB Timestamp
+constexpr uint16_t kPdoAiStandardCh1 = 0x1A04U;  ///< AI Standard Channel 1
+constexpr uint16_t kPdoAiCompactCh1 = 0x1A05U;   ///< AI Compact Channel 1
+constexpr uint16_t kPdoAiStandardCh2 = 0x1A06U;  ///< AI Standard Channel 2
+constexpr uint16_t kPdoAiCompactCh2 = 0x1A07U;   ///< AI Compact Channel 2
+/// @}
+
+/// @name Bereiche der PDO-Mapping-Objekte (CoE: 0x1600+n RxPDO, 0x1A00+n TxPDO)
+/// @{
+constexpr uint16_t kPdoRxFirst = kPdoControl;  ///< erstes RxPDO-Mapping-Objekt
+constexpr uint16_t kPdoTxFirst = kPdoStatus;   ///< erstes TxPDO-Mapping-Objekt
+constexpr uint16_t kPdoRangeSize = 8U;         ///< geprüfte Objekte je Richtung (0x1600..0x1607, 0x1A00..0x1A07)
+constexpr uint16_t kPdoGroupMask = 0xFF00U;    ///< Maske für den Bereich 0x16xx bzw. 0x1Axx
+/// @}
+
+/// @name PDO-Zuordnung
+/// @{
+constexpr uint16_t kSm2Assign = 0x1C12U;  ///< RxPDO assign (SM2)
+constexpr uint16_t kSm3Assign = 0x1C13U;  ///< TxPDO assign (SM3)
+constexpr uint8_t kSubCount = 0x00U;      ///< Subindex 0: Anzahl der Einträge (Zuordnung, Mapping)
+constexpr uint8_t kSubFirstEntry = 0x01U; ///< erster Eintrag hinter Subindex 0
 /// @}
 
 /// @name Objekte
 /// @{
-constexpr uint16_t kObjInputs = 0x6000;      ///< RMB Inputs
-constexpr uint16_t kObjControl = 0x7000;     ///< RMB Outputs
-constexpr uint16_t kObjSettings = 0x8000;    ///< RMB Settings
-constexpr uint16_t kObjSmOutParam = 0x1C32;  ///< :20 Sync error (0x1A00 bis Revision 0x0014)
-constexpr uint16_t kObjTxPdoPar = 0x1800;    ///< :09 TxPDO Toggle (0x1A00 bis Revision 0x0014)
-constexpr uint16_t kObjCommand = 0xFB00;     ///< RMB Command: :01 Request, :02 Status, :03 Response
+constexpr uint16_t kObjGap = 0x0000U;         ///< Index einer Lücke im Mapping
+constexpr uint16_t kObjInputs = 0x6000U;      ///< RMB Inputs
+constexpr uint16_t kObjAiInputsCh1 = 0x6010U; ///< AI Inputs Kanal 1
+constexpr uint16_t kObjAiInputsCh2 = 0x6020U; ///< AI Inputs Kanal 2
+constexpr uint16_t kObjControl = 0x7000U;     ///< RMB Outputs
+constexpr uint16_t kObjSettings = 0x8000U;    ///< RMB Settings
+constexpr uint16_t kObjSmOutParam = 0x1C32U;  ///< SM output parameter (Sync error bis Revision 0x0014)
+constexpr uint16_t kObjTxPdoPar = 0x1800U;    ///< RMB TxPDO-Par Status (Toggle bis Revision 0x0014)
+constexpr uint16_t kObjCommand = 0xFB00U;     ///< RMB Command
 /// @}
 
-/// @name Subindizes von 0x8000
+/// @name Subindizes von 0x6000 (RMB Inputs)
 /// @{
-constexpr uint8_t kSubFilterMode0 = 0x11;    ///< Mode0 filter settings
-constexpr uint8_t kSubGain = 0x21;           ///< Gain
-constexpr uint8_t kSubTara = 0x22;           ///< Tara
-constexpr uint8_t kSubRatedOutput = 0x23;    ///< Rated output [mV/V]
-constexpr uint8_t kSubNominalLoad = 0x24;    ///< Nominal load
-constexpr uint8_t kSubZeroBalance = 0x25;    ///< Zero balance [mV/V]
-constexpr uint8_t kSubGravity = 0x26;        ///< Gravity of earth
-constexpr uint8_t kSubScaleFactor = 0x27;    ///< Scale factor
-constexpr uint8_t kSubReferenceLoad = 0x28;  ///< Reference load
+constexpr uint8_t kSubInOverrange = 0x02U;      ///< Overrange
+constexpr uint8_t kSubInDataInvalid = 0x04U;    ///< Data invalid
+constexpr uint8_t kSubInError = 0x07U;          ///< Error
+constexpr uint8_t kSubInCalibration = 0x08U;    ///< Calibration in progress
+constexpr uint8_t kSubInSteadyState = 0x09U;    ///< Steady state
+constexpr uint8_t kSubInSyncError = 0x0EU;      ///< Sync error (ab Revision 0x0015)
+constexpr uint8_t kSubInToggle = 0x10U;         ///< TxPDO Toggle (ab Revision 0x0015)
+constexpr uint8_t kSubInValue = 0x11U;          ///< Value (DINT)
+constexpr uint8_t kSubInValueReal = 0x12U;      ///< Value (Real)
+constexpr uint8_t kSubInTimestamp = 0x13U;      ///< Timestamp (ULINT)
 /// @}
 
-constexpr uint16_t kFilterIir8 = 9;  ///< 0x8000:11 Wert 9 = IIR8
-
-/// @name Kommandos für 0xFB00:01 (als UINT16 geschrieben) und Status 0xFB00:02
+/// @name Subindizes von 0x6010/0x6020 (AI Inputs)
 /// @{
-constexpr uint16_t kCmdNone = 0x0000;         ///< kein Kommando
-constexpr uint16_t kCmdZeroBalance = 0x0101;  ///< 257: Nullabgleich
-constexpr uint16_t kCmdCalibration = 0x0102;  ///< 258: Kalibrierung mit Reference load
-constexpr uint8_t kCmdStatusDone = 0;         ///< 0xFB00:02 = 0: fertig ohne Fehler
-constexpr uint8_t kCmdStatusBusy = 255;       ///< 0xFB00:02 = 255: läuft
+constexpr uint8_t kSubAiUnderrange = 0x01U;  ///< Underrange
+constexpr uint8_t kSubAiOverrange = 0x02U;   ///< Overrange
+constexpr uint8_t kSubAiError = 0x07U;       ///< Error
+constexpr uint8_t kSubAiToggle = 0x10U;      ///< TxPDO Toggle
+constexpr uint8_t kSubAiValue = 0x11U;       ///< Value (DINT)
+/// @}
+
+/// @name Subindizes der Objekte vor Revision 0x0015
+/// @{
+constexpr uint8_t kSubSmOutSyncError = 0x20U;  ///< 0x1C32:20 Sync error
+constexpr uint8_t kSubTxPdoParToggle = 0x09U;  ///< 0x1800:09 TxPDO Toggle
+/// @}
+
+/// @name Subindizes von 0x7000 (RMB Outputs)
+/// @{
+constexpr uint8_t kSubCtrlStartCalibration = 0x01U;    ///< Start calibration
+constexpr uint8_t kSubCtrlDisableCalibration = 0x02U;  ///< Disable calibration
+constexpr uint8_t kSubCtrlInputFreeze = 0x03U;         ///< Input freeze
+constexpr uint8_t kSubCtrlSampleMode = 0x04U;          ///< Sample mode
+constexpr uint8_t kSubCtrlTare = 0x05U;                ///< Tara
+constexpr uint8_t kSubCtrlFilterFrequency = 0x11U;     ///< Filter frequency (UINT)
+/// @}
+
+/// @name Subindizes von 0x8000 (RMB Settings)
+/// @{
+constexpr uint8_t kSubMode0EnableFilter = 0x01U;     ///< Mode0 enable filter
+constexpr uint8_t kSubMode0EnableAverager = 0x03U;   ///< Mode0 enable averager
+constexpr uint8_t kSubFilterMode0 = 0x11U;           ///< Mode0 filter settings
+constexpr uint8_t kSubGain = 0x21U;                  ///< Gain
+constexpr uint8_t kSubTara = 0x22U;                  ///< Tara
+constexpr uint8_t kSubRatedOutput = 0x23U;           ///< Rated output [mV/V]
+constexpr uint8_t kSubNominalLoad = 0x24U;           ///< Nominal load
+constexpr uint8_t kSubZeroBalance = 0x25U;           ///< Zero balance [mV/V]
+constexpr uint8_t kSubGravity = 0x26U;               ///< Gravity of earth
+constexpr uint8_t kSubScaleFactor = 0x27U;           ///< Scale factor
+constexpr uint8_t kSubReferenceLoad = 0x28U;         ///< Reference load
+constexpr uint8_t kSubSteadyStateWindow = 0x29U;     ///< Steady state window [ms]
+constexpr uint8_t kSubSteadyStateTolerance = 0x2AU;  ///< Steady state tolerance
+constexpr uint8_t kSubCalibrationInterval = 0x31U;   ///< Calibration interval
+/// @}
+
+constexpr uint16_t kFilterIir8 = 9U;           ///< 0x8000:11 Wert 9 = IIR8
+constexpr uint16_t kFilterPdoFrequency = 11U;  ///< 0x8000:11 letzter Wert: PDO Filter frequency (0x7000:11)
+
+/// @name Subindizes von 0xFB00 (RMB Command)
+/// @{
+constexpr uint8_t kSubCmdRequest = 0x01U;   ///< Request (Kommando, als UINT16 geschrieben)
+constexpr uint8_t kSubCmdStatus = 0x02U;    ///< Status (USINT)
+constexpr uint8_t kSubCmdResponse = 0x03U;  ///< Response
+/// @}
+
+/// @name Kommandos für 0xFB00:01 und Status 0xFB00:02
+/// @{
+constexpr uint16_t kCmdNone = 0x0000U;         ///< kein Kommando
+constexpr uint16_t kCmdZeroBalance = 0x0101U;  ///< 257: Nullabgleich
+constexpr uint16_t kCmdCalibration = 0x0102U;  ///< 258: Kalibrierung mit Reference load
+constexpr uint8_t kCmdStatusDone = 0U;         ///< 0xFB00:02 = 0: fertig ohne Fehler
+constexpr uint8_t kCmdStatusBusy = 255U;       ///< 0xFB00:02 = 255: läuft
+/// @}
+
+/// @name Bitlängen von PDO-Einträgen
+/// @{
+constexpr uint8_t kBitsBool = 1U;    ///< BOOL
+constexpr uint8_t kBitsUint = 16U;   ///< UINT
+constexpr uint8_t kBitsDint = 32U;   ///< DINT, REAL
+constexpr uint8_t kBitsUlint = 64U;  ///< ULINT
+/// @}
+
+/// @name Datentypcodes der SDO-Information (ETG.1000.6, ECT_*)
+/// @{
+constexpr uint16_t kCoeUnknown = 0x0000U;     ///< kein Code bekannt
+constexpr uint16_t kCoeBoolean = 0x0001U;     ///< BOOLEAN
+constexpr uint16_t kCoeInteger8 = 0x0002U;    ///< INTEGER8
+constexpr uint16_t kCoeInteger16 = 0x0003U;   ///< INTEGER16
+constexpr uint16_t kCoeInteger32 = 0x0004U;   ///< INTEGER32
+constexpr uint16_t kCoeUnsigned8 = 0x0005U;   ///< UNSIGNED8
+constexpr uint16_t kCoeUnsigned16 = 0x0006U;  ///< UNSIGNED16
+constexpr uint16_t kCoeUnsigned32 = 0x0007U;  ///< UNSIGNED32
+constexpr uint16_t kCoeReal32 = 0x0008U;      ///< REAL32
+constexpr uint16_t kCoeUnsigned64 = 0x001BU;  ///< UNSIGNED64
 /// @}
 
 /// Datentyp eines CoE-Objekts bzw. PDO-Eintrags.
@@ -72,7 +173,7 @@ enum class DType : uint8_t {
 };
 const char* dtype_name(DType t);
 bool dtype_from_name(const std::string& s, DType& t);
-DType dtype_from_coe(uint16_t coe_type, uint8_t bits);
+DType dtype_from_coe(uint16_t coe, uint8_t bits);
 size_t dtype_size(DType t);
 std::vector<uint8_t> encode_value(DType t, double v);
 double decode_value(DType t, const std::vector<uint8_t>& d);
@@ -112,6 +213,9 @@ struct MapEntry {
     uint8_t bits;    ///< Länge in Bit
 };
 MapEntry decode_map_entry(uint32_t raw);
+uint32_t encode_map_entry(const MapEntry& e);
+bool is_pdo_mapping(uint16_t index);
+size_t bytes_for_bits(uint32_t bits);
 
 InputLayout layout_inputs(const std::vector<std::vector<MapEntry>>& pdos_in_order);
 OutputLayout layout_outputs(const std::vector<std::vector<MapEntry>>& pdos_in_order);

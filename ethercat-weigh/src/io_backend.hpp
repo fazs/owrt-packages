@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
@@ -22,7 +21,7 @@ public:
     virtual ~IoBackend() = default;
 
     /// @return Name der Quelle ("ethercat", "simulation")
-    virtual std::string name() const = 0;
+    [[nodiscard]] virtual std::string name() const = 0;
 
     /**
      * @brief Initialisierung bis OP.
@@ -78,7 +77,7 @@ public:
      * @brief Debug: alle PDOs der Klemme.
      * @return PDO-Katalog; zugeordnete Einträge mit Lage im Prozessabbild des Slaves
      */
-    virtual std::vector<el3356::PdoInfo> pdos() const = 0;
+    [[nodiscard]] virtual std::vector <el3356::PdoInfo> pdos() const = 0;
 
     /**
      * @brief Debug: Prozessabbild des Slaves nach dem letzten Zyklus.

@@ -16,6 +16,8 @@ Browser ── REST / WebSocket ──┐
                          EK1100 ── EL3356-0010 ── Wägezelle
 ```
 
+Regeln für den Code und die zugrunde liegenden Standards: [CODING_GUIDELINES.md](CODING_GUIDELINES.md).
+
 ## Verzeichnisstruktur
 
 | Pfad | Inhalt |

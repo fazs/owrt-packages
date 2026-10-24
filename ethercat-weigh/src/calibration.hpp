@@ -20,12 +20,12 @@ class Characteristic {
 public:
     static Characteristic from_config(const CalibrationConfig& cal, const DeviceConfig& dev);
 
-    std::optional<double> to_grams(double raw) const;
+    [[nodiscard]] std::optional<double> to_grams(double raw) const;
     /// true, wenn die Kennlinie verwendbar ist
-    bool valid() const { return valid_; }
+    [[nodiscard]] bool valid() const { return valid_; }
     /// "device" oder "application"
-    const std::string& mode() const { return mode_; }
-    double sensitivity() const;
+    [[nodiscard]] const std::string& mode() const { return mode_; }
+    [[nodiscard]] double sensitivity() const;
 
 private:
     std::string mode_;                    ///< "device" oder "application"
