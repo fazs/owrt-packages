@@ -4,8 +4,8 @@
   import { MIN_CAL_POINTS, VISIBLE_MEASUREMENTS } from './constants.js';
 
   // --- Layout [px]
-  /** Höhe des Diagramms */
-  const H = 200;
+  /** Mindesthöhe des Diagramms; mehr, wenn die Seite Platz hat */
+  const MIN_HEIGHT = 200;
   /** Ränder: links (y-Beschriftung), rechts, oben, unten (x-Beschriftung) */
   const M = { l: 36, r: 8, t: 10, b: 26 };
   /** Breite vor der ersten Messung des Containers */
@@ -68,6 +68,7 @@
   const SVG_DECIMALS = 1;
 
   let width = $state(DEFAULT_WIDTH);
+  let height = $state(MIN_HEIGHT);
   let scope = $state('all'); // all | shown (in der Messwerttabelle angezeigte Werte)
   let hover = $state(null); // Index des Balkens unter dem Zeiger
   let binFactor = $state(1); // Faktor für die Klassenanzahl, nur bis zum Neuladen
@@ -164,7 +165,7 @@
   });
 
   const pw = $derived(Math.max(MIN_PLOT_WIDTH, width - M.l - M.r));
-  const ph = H - M.t - M.b;
+  const ph = $derived(height - M.t - M.b);
   /** @param {number} v Messwert @returns {number} x-Koordinate im SVG */
   const sx = (v) => M.l + ((v - hist.start) / (hist.end - hist.start)) * pw;
   /** @param {number} c Häufigkeit @returns {number} y-Koordinate im SVG */
@@ -295,8 +296,8 @@
   {#if !hist}
     <p class="muted empty">Das Histogramm erscheint ab zwei erfassten Messungen.</p>
   {:else}
-    <div class="plot" bind:clientWidth={width}>
-      <svg bind:this={svgEl} {width} height={H} aria-label="Histogramm der Messwerte, {hist.n} Messungen">
+    <div class="plot" style:min-height="{MIN_HEIGHT}px" bind:clientWidth={width} bind:clientHeight={height}>
+      <svg bind:this={svgEl} {width} {height} aria-label="Histogramm der Messwerte, {hist.n} Messungen">
         {#each yTicks as c (c)}
           <line class="grid" x1={M.l} x2={M.l + pw} y1={sy(c)} y2={sy(c)} />
           <text class="tick" x={M.l - Y_LABEL_GAP} y={sy(c)} text-anchor="end" dominant-baseline="middle">{c}</text>
@@ -307,7 +308,7 @@
           <text
             class="tick"
             {x}
-            y={H - X_LABEL_BASELINE}
+            y={height - X_LABEL_BASELINE}
             text-anchor={x > M.l + pw - X_LABEL_EDGE ? 'end' : x < M.l + X_LABEL_EDGE ? 'start' : 'middle'}>{fmt(v, tickDec)}</text
           >
         {/each}
@@ -472,10 +473,20 @@
     background: var(--ink);
     color: var(--panel);
   }
+  /* wächst mit der verfügbaren Höhe (App.svelte); das SVG folgt der gemessenen Größe */
+  section {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+  }
   .plot {
+    flex: 1 1 0;
+    position: relative;
     width: 100%;
   }
   svg {
+    position: absolute; /* bestimmt die Höhe von .plot nicht mit */
+    inset: 0;
     display: block;
     font-family: var(--font);
     user-select: none; /* Ziehen der Grenzbalken markiert sonst die Beschriftung */

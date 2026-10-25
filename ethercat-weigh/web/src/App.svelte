@@ -245,8 +245,16 @@
     grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
     gap: 1rem;
     padding: 1rem clamp(0.75rem, 3vw, 1.75rem);
+    width: 100%; /* als Flex-Element von #app sonst nur so breit wie der Inhalt */
     max-width: 1480px;
     margin: 0 auto;
+  }
+  /* zweispaltig: restliche Bildschirmhöhe füllen; Verlauf und Verteilung wachsen mit,
+     reicht die Höhe nicht, ragt die Fußzeile über den Rand */
+  @media (min-width: 961px) {
+    main {
+      flex: 1 0 auto;
+    }
   }
   .col-main,
   .col-side {

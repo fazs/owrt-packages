@@ -164,8 +164,16 @@
   h2 .unit {
     font-weight: 450;
   }
+  /* wächst mit der verfügbaren Höhe (App.svelte), mindestens min-height */
+  section {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+  }
   .plot {
-    height: 240px;
+    flex: 1 1 0;
+    min-height: 240px;
+    overflow: hidden; /* uPlot folgt der Größe über den ResizeObserver, darf sie aber nicht bestimmen */
     width: 100%;
   }
   .legend {
