@@ -10,12 +10,15 @@
 #include <cstdio>
 #include <cstring>
 #include <functional>
+#include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
 #include "config.hpp"
 #include "el3356.hpp"
 #include "measurement.hpp"
+#include "measurement_csv.hpp"
 #include "calibration.hpp"
 #include "calibration_controller.hpp"
 #include "sim_backend.hpp"
@@ -309,6 +312,13 @@ TEST(config_validation_and_json) {
     cr.device.rated_output_mv_v = 0.0;
     CHECK(!cr.validate().empty());
 
+    ew::Config cu;
+    cu.ui.hidden_columns = {std::string(ew::kMeasurementColumns.front()),
+                            std::string(ew::kMeasurementColumns.back())};
+    CHECK(cu.validate().empty());
+    cu.ui.hidden_columns.emplace_back("unknown");
+    CHECK(!cu.validate().empty());
+
     const nlohmann::json j = {{"measurement", {{"min_load", kJsonMinLoad}}}, {"unknown", 1}};
     const auto c2 = ew::config_from_json(j);
     CHECK_NEAR(c2.measurement.min_load, kJsonMinLoad, kEps);
@@ -553,6 +563,64 @@ TEST(units_conversion) {
     CHECK_NEAR(ew::to_grams(kKg, "kg"), kKg * kThousand, kEps);
     CHECK_NEAR(ew::from_grams(1.0, "mg"), kThousand, kEpsCoarse);
     CHECK(!ew::valid_unit("lb"));
+}
+
+TEST(measurement_csv_roundtrip_and_formats) {
+    constexpr double kValueG = 25.125;
+    constexpr double kStddevG = 0.0125;
+    constexpr double kRangeG = 0.05;
+    constexpr uint32_t kSamples = 50U;
+    constexpr double kSettleMs = 1210.0;
+    constexpr double kTimeS = 12.5;
+    constexpr double kPlainG = 12.5;   // einzelne Spalte mit Dezimalkomma
+    constexpr double kCommaG = 7.25;   // Komma als Trennzeichen
+
+    // Export -> Import in Milligramm: gleiche Werte in Gramm
+    ew::Measurement m;
+    m.id = 1U;
+    m.t = kTimeS;
+    m.value = kValueG;
+    m.stddev = kStddevG;
+    m.range = kRangeG;
+    m.n = kSamples;  // wird exportiert, beim Import ignoriert
+    m.settle_ms = kSettleMs;
+    std::istringstream exp(ew::measurements_csv_header("mg") + ew::measurement_csv_row(m, "mg") + "\r\n");
+    const auto r = ew::parse_measurements_csv(exp);
+    CHECK(r.size() == 1U);
+    if (r.size() == 1U) {
+        CHECK_NEAR(r[0].value, kValueG, kEps);
+        CHECK_NEAR(r[0].stddev, kStddevG, kEps);
+        CHECK_NEAR(r[0].range, kRangeG, kEps);
+        CHECK_NEAR(r[0].settle_ms, kSettleMs, kEps);
+        CHECK_NEAR(r[0].t, kTimeS, kEps);
+        CHECK(r[0].n == 0U);  // Spalte n wird beim Import ignoriert
+    }
+    CHECK(ew::measurements_csv_header("g").find(std::string(";") + ew::kCsvColSamples + ";") != std::string::npos);
+
+    std::istringstream plain("12,5\n\n" + std::to_string(kCommaG) + "\n");
+    const auto p = ew::parse_measurements_csv(plain);
+    CHECK(p.size() == 2U);
+    if (p.size() == 2U) {
+        CHECK_NEAR(p[0].value, kPlainG, kEps);
+        CHECK_NEAR(p[1].value, kCommaG, kEps);
+    }
+
+    std::istringstream comma("t_s,value_g\n1.5," + std::to_string(kCommaG) + "\n");
+    const auto c = ew::parse_measurements_csv(comma);
+    CHECK(c.size() == 1U && std::fabs(c[0].value - kCommaG) <= kEps);
+
+    const auto fails = [](const std::string& text) {
+        std::istringstream is(text);
+        try {
+            (void)ew::parse_measurements_csv(is);
+        } catch (const std::runtime_error&) {
+            return true;
+        }
+        return false;
+    };
+    CHECK(fails("id;t_s\n1;2\n"));         // Wertspalte fehlt
+    CHECK(fails("value_lb\n1\n"));          // unbekannte Einheit
+    CHECK(fails("value_g\nabc\n"));         // ungültige Zahl
 }
 
 TEST(characteristic_device) {

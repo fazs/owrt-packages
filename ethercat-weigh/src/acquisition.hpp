@@ -59,6 +59,8 @@ namespace ew {
 
         std::string measurements_csv(const std::string &unit) const;
 
+        size_t import_measurements(const std::vector<Measurement> &ms);
+
         Config config() const;
 
         ConfigUpdateResult update_config(const Config &next);

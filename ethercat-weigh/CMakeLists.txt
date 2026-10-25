@@ -47,6 +47,7 @@ add_library(ew_core STATIC
   src/config.cpp
   src/el3356.cpp
   src/measurement.cpp
+  src/measurement_csv.cpp
   src/statistics.cpp
   src/sim_backend.cpp)
 target_include_directories(ew_core PUBLIC src)

@@ -11,6 +11,7 @@
 #include <sstream>
 
 #include "log.hpp"
+#include "measurement_csv.hpp"
 #include "units.hpp"
 
 namespace ew {
@@ -505,14 +506,37 @@ namespace ew {
     std::string Acquisition::measurements_csv(const std::string &unit) const {
         const std::string u = valid_unit(unit) ? unit : "g";
         std::lock_guard<std::mutex> lk(mtx_);
-        std::ostringstream os;
-        os.precision(kCsvPrecision);
-        os << "id;t_s;value_" << u << ";stddev_" << u << ";range_" << u << ";n;settle_ms\n";
-        for (const auto &m: history_)
-            os << m.id << ';' << m.t << ';' << from_grams(m.value, u) << ';'
-                    << from_grams(m.stddev, u) << ';' << from_grams(m.range, u) << ';' << m.n << ';'
-                    << m.settle_ms << '\n';
-        return os.str();
+        std::string csv = measurements_csv_header(u);
+        for (const auto &m: history_) csv += measurement_csv_row(m, u);
+        return csv;
+    }
+
+    /**
+     * @brief Übernimmt Messungen, als wären sie gerade gemessen worden (z. B. aus --sim-csv).
+     *
+     * Die Messungen bekommen fortlaufende Nummern und gehen in Statistik und gehaltene Messungen
+     * ein (höchstens statistics.history_size, die letzten der Liste). Die Zeitabstände bleiben
+     * erhalten; die letzte Messung liegt auf dem aktuellen Zeitpunkt.
+     *
+     * Vor start() aufrufen (liest die Zykluszeit des Threads).
+     *
+     * @param ms Messungen in zeitlicher Reihenfolge (Massen in Gramm)
+     * @return Anzahl übernommener Messungen
+     */
+    size_t Acquisition::import_measurements(const std::vector<Measurement> &ms) {
+        std::lock_guard<std::mutex> lk(mtx_);
+        const size_t keep = std::min<size_t>(ms.size(), cfg_.statistics.history_size);
+        const auto first = ms.end() - static_cast<std::ptrdiff_t>(keep);
+        const double shift = keep > 0U ? now_ - ms.back().t : 0.0;
+        for (auto it = first; it != ms.end(); ++it) {
+            Measurement m = *it;
+            m.id = engine_.get_next_id();
+            m.t += shift;
+            stats_.add(m.value);
+            history_.push_back(m);
+        }
+        while (history_.size() > cfg_.statistics.history_size) history_.pop_front();
+        return keep;
     }
 
     /// @brief Gespeicherte Konfiguration (inkl. Änderungen, die einen Neustart erfordern).

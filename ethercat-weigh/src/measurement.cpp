@@ -49,6 +49,12 @@ void MeasurementEngine::reset() {
     win_ = {};
 }
 
+/**
+ * @brief Vergibt die nächste Nummer, z. B. für importierte Messungen.
+ * @return Nummer; folgende Messungen zählen danach weiter
+ */
+uint64_t MeasurementEngine::get_next_id() { return next_id_++; }
+
 /// @brief Berechnet win_ aus buf_ (Welford über das Fenster).
 void MeasurementEngine::compute_window() {
     win_ = {};

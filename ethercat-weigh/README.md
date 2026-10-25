@@ -26,6 +26,7 @@ Regeln für den Code und die zugrunde liegenden Standards: [CODING_GUIDELINES.md
 | `src/ethercat_backend.*` | SOEM-Master: Init bis OP, PDO-Zuordnung, Mapping-Auswertung, SDO, Wiederanlauf |
 | `src/el3356.*` | Objektindizes, PDO-Layout aus Mapping, Dekodierung Status/Value, CoE-Schreibliste 0x8000 |
 | `src/measurement.*` | State-Machine „gültige Messung“ |
+| `src/measurement_csv.*` | CSV-Format der Messungen (Export, Import für `--sim-csv`) |
 | `src/calibration.*` | Kennlinie Rohwert → Gramm (Klemme oder Stützpunkte der Anwendung) |
 | `src/calibration_controller.*` | Kalibrierabläufe: Erfassung von Stützpunkten, Beckhoff-Abgleich über `0xFB00` |
 | `src/units.hpp` | Masseneinheiten mg, g, kg, gr |
@@ -173,6 +174,13 @@ cd web && npm ci && npm run build && cd ..
 ```
 
 Die Simulation leitet den Sensor aus der Konfiguration ab: Kapazität = `nominal_load` (in `calibration.device_unit`), Kennwert und Nullpunkt = `rated_output_mv_v`/`zero_balance` mit kleiner Abweichung (+0,5 % bzw. +1 % des Kennwerts), Rauschen 6·10⁻⁵ der Kapazität, Lastprofil 10–90 % der Kapazität, Overrange ab 110 % der Nennlast. Ohne Kalibrierung zeigt sie daher einen kleinen Offset. Eine in der Simulation gespeicherte Kalibrierung verschiebt den simulierten Sensor nicht (Nennwerte werden gerundet). Im Kalibrierdialog lässt sich im Simulationsbetrieb eine definierte Masse auflegen (Enter im Feld legt auf). Die Unit-Tests verwenden `openwrt/ethercat-weigh/files/config.json`.
+
+Mit `--sim-csv <datei>` (schließt `--sim` ein) übernimmt das Backend beim Start Messungen aus einer CSV-Datei, als wären sie gerade gemessen worden: Sie erscheinen unter Messungen, im Histogramm und in der Statistik und bekommen fortlaufende Nummern; die Simulation erzeugt danach weitere Messungen. Die Zeitabstände bleiben erhalten, die letzte Messung liegt auf dem Startzeitpunkt; bei mehr Zeilen als `statistics.history_size` werden die letzten übernommen. Formate: der eigene Export (`/api/measurements.csv`, Spalten über die Kopfzeile, nur `value_<einheit>` ist Pflicht, Dezimalpunkt oder -komma), Komma als Trennzeichen mit Dezimalpunkt, oder ohne Kopfzeile ein Wert in Gramm je Zeile. Bei einem Fehler (mit Zeilennummer) beendet sich das Programm.
+
+```sh
+curl -o /tmp/messungen.csv "http://waage:8080/api/measurements.csv?unit=g"
+./build/ethercat-weigh --sim-csv /tmp/messungen.csv -c /tmp/ew.json
+```
 
 Frontend-Entwicklung mit Hot Reload: `cd web && npm run dev` (Proxy auf `http://127.0.0.1:8080`, abweichend über `EW_BACKEND`).
 

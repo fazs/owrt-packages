@@ -74,7 +74,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(DeviceConfig,
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(MeasurementConfig,
     min_load, zero_threshold, stable_time_ms, tolerance, sigma_max, use_device_steady_state)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(StatisticsConfig, rolling_window, history_size)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(UiConfig, rate_hz, display_unit)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(UiConfig, rate_hz, display_unit, hidden_columns)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(HttpConfig, bind, port, web_root, threads)
 
 /// @brief JSON-Darstellung eines Stützpunkts ({"raw", "mass_g"}).
@@ -205,6 +205,9 @@ std::vector<std::string> Config::validate() const {
     if (ui.rate_hz < kRateHzMin || ui.rate_hz > kRateHzMax)
         e.push_back(range_msg("ui.rate_hz", kRateHzMin, kRateHzMax));
     if (!valid_unit(ui.display_unit)) e.emplace_back("ui.display_unit: mg, g, kg oder gr");
+    for (const auto& col : ui.hidden_columns)
+        if (std::find(kMeasurementColumns.begin(), kMeasurementColumns.end(), col) == kMeasurementColumns.end())
+            e.push_back("ui.hidden_columns: unbekannte Spalte '" + col + "'");
     if (http.port == 0) e.emplace_back("http.port: != 0");
     if (http.threads < kThreadsMin || http.threads > kThreadsMax)
         e.push_back(range_msg("http.threads", kThreadsMin, kThreadsMax));

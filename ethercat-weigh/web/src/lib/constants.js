@@ -45,3 +45,17 @@ export const MIN_REFERENCE_RATIO = 0.2;
 export const SIM_DEFAULT_LOAD_RATIO = 0.5;
 /** Prozentfaktor für Anzeigen. */
 export const PERCENT = 100;
+
+/**
+ * Spalten der Messwerttabelle (Schlüssel wie kMeasurementColumns, src/config.hpp).
+ * dir: Sortierrichtung beim ersten Klick.
+ * @type {ReadonlyArray<{key: string, label: string, dir: 'asc'|'desc'}>}
+ */
+export const MEASUREMENT_COLUMNS = Object.freeze([
+  { key: 'pos', label: 'Pos.', dir: 'desc' },
+  { key: 'id', label: 'Nr.', dir: 'desc' },
+  { key: 'value', label: 'Wert', dir: 'asc' },
+  { key: 'stddev', label: 's', dir: 'asc' },
+  { key: 'settle_ms', label: 'Einschwingen', dir: 'asc' },
+  { key: 't', label: 'Zeit', dir: 'desc' },
+]);

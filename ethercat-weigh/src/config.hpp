@@ -1,6 +1,8 @@
 #pragma once
 
+#include <array>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include <nlohmann/json.hpp>
@@ -71,10 +73,15 @@ struct StatisticsConfig {
     uint32_t history_size = 500;        ///< gehaltene Messungen (RAM)
 };
 
+/// Spalten der Messwerttabelle im Frontend (Schlüssel wie in web/src/lib/Measurements.svelte).
+constexpr std::array<std::string_view, 6> kMeasurementColumns = {
+    "pos", "id", "value", "stddev", "settle_ms", "t"};
+
 /// Anzeige.
 struct UiConfig {
     uint32_t rate_hz = 20;              ///< Rate der sample-Nachrichten
     std::string display_unit = "g";     ///< Vorgabe für die Anzeige: mg, g, kg, gr
+    std::vector<std::string> hidden_columns; ///< ausgeblendete Spalten (kMeasurementColumns)
 };
 
 /// Webserver (wirkt nach Neustart).

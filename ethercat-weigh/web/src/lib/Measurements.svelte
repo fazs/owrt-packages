@@ -1,15 +1,62 @@
 <script>
   import { live, displayUnit, deleteMeasurement } from './live.svelte.js';
   import { decimalsFor, fmt, fromG } from './format.js';
-  import { CONFIRM_MS, S_PER_H, S_PER_MIN, SNAPSHOT_MEASUREMENTS } from './constants.js';
+  import {
+    CONFIRM_MS,
+    MEASUREMENT_COLUMNS,
+    S_PER_H,
+    S_PER_MIN,
+    SNAPSHOT_MEASUREMENTS,
+  } from './constants.js';
 
   /** angezeigte Zeilen (wie der Snapshot des Backends) */
   const VISIBLE_ROWS = SNAPSHOT_MEASUREMENTS;
 
   const unit = $derived(displayUnit());
   const dec = $derived(decimalsFor(live.config?.measurement?.tolerance, unit));
-  const rows = $derived(live.measurements.slice(0, VISIBLE_ROWS));
   const nowT = $derived(live.sample?.t ?? 0);
+  // pos: lückenlose Nummer der angezeigten Zeilen, älteste = 1 (Liste ist neueste zuerst)
+  const rows = $derived(
+    live.measurements.slice(0, VISIBLE_ROWS).map((m, i, shown) => ({ ...m, pos: shown.length - i })),
+  );
+  const columns = $derived(
+    MEASUREMENT_COLUMNS.filter((c) => !(live.config?.ui?.hidden_columns ?? []).includes(c.key)),
+  );
+
+  let sortKey = $state('id');
+  let sortDir = $state('desc');
+
+  /**
+   * Sortiert nach @p key; erneuter Klick auf dieselbe Spalte kehrt die Richtung um.
+   * @param {{key: string, dir: 'asc'|'desc'}} col Spalte aus MEASUREMENT_COLUMNS
+   */
+  function sortBy(col) {
+    if (sortKey === col.key) {
+      sortDir = sortDir === 'asc' ? 'desc' : 'asc';
+    } else {
+      sortKey = col.key;
+      sortDir = col.dir;
+    }
+  }
+
+  // erst auf VISIBLE_ROWS kürzen, dann sortieren: die Tabelle zeigt immer die letzten Messungen
+  const sorted = $derived.by(() => {
+    // ausgeblendete Sortierspalte: Messreihenfolge, neueste zuerst
+    const shown = columns.some((c) => c.key === sortKey);
+    const key = shown ? sortKey : 'id';
+    const sign = shown && sortDir === 'asc' ? 1 : -1;
+    // id als zweites Kriterium, damit gleiche Werte in Messreihenfolge bleiben
+    return [...rows].sort((a, b) => sign * (a[key] - b[key]) || b.id - a.id);
+  });
+
+  /**
+   * @param {string} key Spalte
+   * @returns {'ascending'|'descending'|'none'} Wert für aria-sort
+   */
+  function ariaSort(key) {
+    if (sortKey !== key) return 'none';
+    return sortDir === 'asc' ? 'ascending' : 'descending';
+  }
 
   let confirmId = $state(null); // Messung, deren Löschen auf Bestätigung wartet
   let confirmTimer;
@@ -41,6 +88,31 @@
   }
 </script>
 
+{#snippet head(col)}
+  <th scope="col" aria-sort={ariaSort(col.key)}>
+    <button class="sort" onclick={() => sortBy(col)}>
+      {col.key === 'value' ? `${col.label} [${unit}]` : col.label}<span
+        class="arrow"
+        aria-hidden="true">{sortKey === col.key ? (sortDir === 'asc' ? '▲' : '▼') : ''}</span
+      >
+    </button>
+  </th>
+{/snippet}
+
+{#snippet cell(key, r)}
+  {#if key === 'pos' || key === 'id'}
+    <td class="num">{r[key]}</td>
+  {:else if key === 'value'}
+    <td class="val">{fmt(fromG(r.value, unit), dec)}</td>
+  {:else if key === 'stddev'}
+    <td>{fmt(fromG(r.stddev, unit), dec + 1)}</td>
+  {:else if key === 'settle_ms'}
+    <td>{Math.round(r.settle_ms)} ms</td>
+  {:else if key === 't'}
+    <td class="muted">{ago(r.t)}</td>
+  {/if}
+{/snippet}
+
 <section class="panel">
   <div class="panel-head">
     <h2>Messungen</h2>
@@ -56,22 +128,14 @@
       <table>
         <thead>
           <tr>
-            <th scope="col">Nr.</th>
-            <th scope="col">Wert [{unit}]</th>
-            <th scope="col">s</th>
-            <th scope="col">Einschwingen</th>
-            <th scope="col">Zeit</th>
+            {#each columns as col (col.key)}{@render head(col)}{/each}
             <th scope="col"><span class="sr">Löschen</span></th>
           </tr>
         </thead>
         <tbody>
-          {#each rows as r (r.id)}
+          {#each sorted as r (r.id)}
             <tr class:confirm={confirmId === r.id}>
-              <td class="id">{r.id}</td>
-              <td class="val">{fmt(fromG(r.value, unit), dec)}</td>
-              <td>{fmt(fromG(r.stddev, unit), dec + 1)}</td>
-              <td>{Math.round(r.settle_ms)} ms</td>
-              <td class="muted">{ago(r.t)}</td>
+              {#each columns as col (col.key)}{@render cell(col.key, r)}{/each}
               <td class="del">
                 <button
                   class:warn={confirmId === r.id}
@@ -109,17 +173,33 @@
     padding: 0.3rem 0 0.4rem 0.6rem;
     border-bottom: 1px solid var(--line);
   }
+  button.sort {
+    all: unset;
+    cursor: pointer;
+  }
+  button.sort:hover {
+    color: var(--ink);
+  }
+  button.sort:focus-visible {
+    outline: 2px solid var(--accent);
+  }
+  .arrow {
+    display: inline-block;
+    width: 1em; /* reserviert Platz, damit die Spalte beim Umschalten nicht springt */
+    font-size: 0.7em;
+    text-align: center;
+  }
   td {
     text-align: right;
     padding: 0.32rem 0 0.32rem 0.6rem;
     border-bottom: 1px solid var(--line);
   }
   th:first-child,
-  td.id {
+  td:first-child {
     text-align: left;
     padding-left: 0;
   }
-  td.id {
+  td.num {
     color: var(--muted);
   }
   td.val {

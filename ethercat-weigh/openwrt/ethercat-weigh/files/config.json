@@ -49,6 +49,7 @@
   },
   "ui": {
     "display_unit": "g",
+    "hidden_columns": [],
     "rate_hz": 20
   }
 }

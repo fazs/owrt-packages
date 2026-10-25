@@ -71,6 +71,8 @@ namespace ew {
 
         void reset();
 
+        uint64_t get_next_id();
+
     private:
         /// Ein Wert im Fenster
         struct Pt {
