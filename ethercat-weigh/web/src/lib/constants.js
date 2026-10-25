@@ -36,6 +36,8 @@ export const DEFAULT_ROLLING_WINDOW = 50;
 export const DEFAULT_STABLE_TIME_S = 10;
 /** Messungen im Snapshot des Backends (kSnapshotMeasurements, src/acquisition.cpp). */
 export const SNAPSHOT_MEASUREMENTS = 50;
+/** Zeilen der Messwerttabelle; auch Basis von „Im Bereich“ (Statistik) und der Verteilung. */
+export const VISIBLE_MEASUREMENTS = SNAPSHOT_MEASUREMENTS;
 /** Mindestanzahl Stützpunkte einer Kennlinie (kMinCalPoints, src/config.cpp). */
 export const MIN_CAL_POINTS = 2;
 /** Kalibrierung in der Klemme: Referenzlast mindestens dieser Anteil der Nennlast (kMinReferenceRatio). */

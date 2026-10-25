@@ -1,7 +1,7 @@
 <script>
-  import { live, resetStatistics, displayUnit } from './live.svelte.js';
+  import { live, resetStatistics, displayUnit, outsideLimits } from './live.svelte.js';
   import { decimalsFor, fmt, fmtInt, fromG } from './format.js';
-  import { CONFIRM_MS } from './constants.js';
+  import { CONFIRM_MS, VISIBLE_MEASUREMENTS } from './constants.js';
 
   const unit = $derived(displayUnit());
   const dec = $derived(decimalsFor(live.config?.measurement?.tolerance, unit));
@@ -9,6 +9,27 @@
   const f = (v, d) => fmt(fromG(v, unit), d);
   const ses = $derived(live.statistics?.session);
   const rol = $derived(live.statistics?.rolling);
+
+  /**
+   * Kennwerte wie das Backend (Standardabweichung mit n − 1).
+   * @param {number[]} v Werte [g]
+   * @returns {{n: number, mean: number, stddev: number, min: number, max: number, range: number}}
+   */
+  function summarize(v) {
+    const n = v.length;
+    const mean = n ? v.reduce((a, x) => a + x, 0) / n : 0;
+    const stddev = n > 1 ? Math.sqrt(v.reduce((a, x) => a + (x - mean) ** 2, 0) / (n - 1)) : 0;
+    const min = n ? Math.min(...v) : 0;
+    const max = n ? Math.max(...v) : 0;
+    return { n, mean, stddev, min, max, range: max - min };
+  }
+
+  // in der Messwerttabelle angezeigte Messungen innerhalb der Grenzen; null, solange die Grenzen dort nichts ausschließen
+  const inRange = $derived.by(() => {
+    const shown = live.measurements.slice(0, VISIBLE_MEASUREMENTS);
+    const kept = shown.filter((m) => !outsideLimits(m.value));
+    return kept.length < shown.length ? summarize(kept.map((m) => m.value)) : null;
+  });
   const rows = $derived([
     ['Anzahl', (s) => fmtInt(s?.n)],
     ['Mittelwert', (s) => (s?.n ? f(s.mean, dec) : '–')],
@@ -44,6 +65,9 @@
         <th scope="col"><span class="muted">{unit}</span></th>
         <th scope="col">Seit Reset</th>
         <th scope="col">Letzte {live.config?.statistics?.rolling_window ?? ''}</th>
+        {#if inRange}
+          <th scope="col" title="Angezeigte Messungen innerhalb der Grenzen (nicht rot hinterlegt)">Im Bereich</th>
+        {/if}
       </tr>
     </thead>
     <tbody>
@@ -52,6 +76,7 @@
           <th scope="row">{label}</th>
           <td>{cell(ses)}</td>
           <td>{cell(rol)}</td>
+          {#if inRange}<td class="filtered">{cell(inRange)}</td>{/if}
         </tr>
       {/each}
     </tbody>
@@ -89,6 +114,9 @@
   td {
     text-align: right;
     font-weight: 560;
+  }
+  .filtered {
+    color: var(--accent);
   }
   button.warn {
     border-color: var(--st-fault);

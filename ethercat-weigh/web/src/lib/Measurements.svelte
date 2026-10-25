@@ -1,23 +1,20 @@
 <script>
-  import { live, displayUnit, deleteMeasurement } from './live.svelte.js';
+  import { live, displayUnit, deleteMeasurement, outsideLimits } from './live.svelte.js';
   import { decimalsFor, fmt, fromG } from './format.js';
   import {
     CONFIRM_MS,
     MEASUREMENT_COLUMNS,
     S_PER_H,
     S_PER_MIN,
-    SNAPSHOT_MEASUREMENTS,
+    VISIBLE_MEASUREMENTS,
   } from './constants.js';
-
-  /** angezeigte Zeilen (wie der Snapshot des Backends) */
-  const VISIBLE_ROWS = SNAPSHOT_MEASUREMENTS;
 
   const unit = $derived(displayUnit());
   const dec = $derived(decimalsFor(live.config?.measurement?.tolerance, unit));
   const nowT = $derived(live.sample?.t ?? 0);
   // pos: lückenlose Nummer der angezeigten Zeilen, älteste = 1 (Liste ist neueste zuerst)
   const rows = $derived(
-    live.measurements.slice(0, VISIBLE_ROWS).map((m, i, shown) => ({ ...m, pos: shown.length - i })),
+    live.measurements.slice(0, VISIBLE_MEASUREMENTS).map((m, i, shown) => ({ ...m, pos: shown.length - i })),
   );
   const columns = $derived(
     MEASUREMENT_COLUMNS.filter((c) => !(live.config?.ui?.hidden_columns ?? []).includes(c.key)),
@@ -39,7 +36,7 @@
     }
   }
 
-  // erst auf VISIBLE_ROWS kürzen, dann sortieren: die Tabelle zeigt immer die letzten Messungen
+  // erst auf VISIBLE_MEASUREMENTS kürzen, dann sortieren: die Tabelle zeigt immer die letzten Messungen
   const sorted = $derived.by(() => {
     // ausgeblendete Sortierspalte: Messreihenfolge, neueste zuerst
     const shown = columns.some((c) => c.key === sortKey);
@@ -113,7 +110,7 @@
   {/if}
 {/snippet}
 
-<section class="panel">
+<section class="panel measurements">
   <div class="panel-head">
     <h2>Messungen</h2>
     <a href="/api/measurements.csv?unit={unit}" download>CSV herunterladen</a>
@@ -134,7 +131,8 @@
         </thead>
         <tbody>
           {#each sorted as r (r.id)}
-            <tr class:confirm={confirmId === r.id}>
+            {@const out = outsideLimits(r.value)}
+            <tr class:out class:confirm={confirmId === r.id} title={out ? 'Außerhalb der Grenzen (Verteilung)' : undefined}>
               {#each columns as col (col.key)}{@render cell(col.key, r)}{/each}
               <td class="del">
                 <button
@@ -153,10 +151,24 @@
 </section>
 
 <style>
+  /* füllt die rechte Spalte bis zur Unterkante der linken; die Tabelle scrollt darin */
+  .measurements {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+  }
   .scroll {
-    max-height: 360px;
+    flex: 1 1 0; /* Höhe kommt aus der linken Spalte, nicht aus der Zeilenzahl */
+    min-height: 200px;
     overflow-y: auto;
     overflow-x: hidden; /* Tabelle ist 100 % breit; Rundungsreste sonst als Scrollleiste */
+  }
+  /* einspaltig (Umbruch wie in App.svelte): keine linke Spalte, an der sich die Höhe ausrichten kann */
+  @media (max-width: 960px) {
+    .scroll {
+      flex: none;
+      max-height: 360px;
+    }
   }
   table {
     width: 100%;
@@ -226,6 +238,9 @@
     border-color: var(--st-fault);
     background: var(--st-fault);
     color: #fff;
+  }
+  tr.out td {
+    background: color-mix(in srgb, var(--st-fault) 16%, transparent);
   }
   tr.confirm td {
     background: color-mix(in srgb, var(--st-fault) 8%, transparent);

@@ -28,6 +28,7 @@ export const live = $state({
   notice: null, // {kind: 'ok'|'error', text}
   calibration: null, // Status des Kalibrierablaufs
   unit: readUnit(), // Anzeigeeinheit (lokal gespeichert), sonst config.ui.display_unit
+  limits: { lo: null, hi: null }, // Grenzen der Verteilung [g], null = offen; nur bis zum Neuladen
 });
 
 /**
@@ -53,6 +54,25 @@ export function setUnit(u) {
   } catch {
     /* Anzeigeeinheit gilt dann nur bis zum Neuladen */
   }
+}
+
+/**
+ * Setzt die Grenzen der Verteilung (gelten bis zum Neuladen der Seite).
+ * @param {number|null} lo linke Grenze [g], null = offen
+ * @param {number|null} hi rechte Grenze [g], null = offen
+ */
+export function setLimits(lo, hi) {
+  live.limits = { lo, hi };
+}
+
+/**
+ * Prüft, ob ein Wert außerhalb der Grenzen liegt (die Grenzen selbst gehören dazu).
+ * @param {number} grams Wert [g]
+ * @returns {boolean}
+ */
+export function outsideLimits(grams) {
+  const { lo, hi } = live.limits;
+  return (lo != null && grams < lo) || (hi != null && grams > hi);
 }
 
 /**

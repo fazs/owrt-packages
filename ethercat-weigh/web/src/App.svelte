@@ -77,8 +77,14 @@
         >
       {/each}
     </div>
-    <button class="primary" onclick={tare} disabled={!live.connected}>Tara</button>
-    {#if hasTare}<button onclick={clearTare}>Tara löschen</button>{/if}
+    <button
+      class="primary"
+      class:on={hasTare}
+      aria-pressed={hasTare}
+      title={hasTare ? 'Tara aktiv; erneut klicken löscht sie' : 'Aktuellen Wert als Tara übernehmen'}
+      onclick={hasTare ? clearTare : tare}
+      disabled={!live.connected}>Tara</button
+    >
     <button onclick={() => (calOpen = true)} disabled={!live.config}>Kalibrieren</button>
     <button onclick={() => (configOpen = true)} disabled={!live.config}>Parameter</button>
     <button onclick={() => (debugOpen = true)} disabled={!live.connected}>Debug</button>
@@ -105,13 +111,22 @@
   <div class="col-side">
     <Stats />
     {#if isSim}
-      <div class="sim">
-        <span class="muted">Simulation: <br />aufgelegte Masse [g]</span>
-        <input type="number" step="0.1" min="0" bind:value={simGrams} />
-        <button onclick={() => simLoad(Number(simGrams))}>Auflegen</button>
-        <button onclick={() => simLoad(0)}>Entlasten</button>
-        <button onclick={() => simLoad(null)}>Automatik</button>
-      </div>
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Simulation</h2>
+        </div>
+        <form class="sim"
+              onsubmit={(e) => {
+              e.preventDefault();
+              simLoad(Number(simGrams));
+            }}>
+          <span class="muted">aufgelegte Masse [g] </span>
+          <input type="number" step="0.1" min="0" bind:value={simGrams} />
+          <button type="submit">Auflegen</button>
+          <button type="button" onclick={() => simLoad(0)}>Entlasten</button>
+          <button type="button" onclick={() => simLoad(null)}>Automatik</button>
+        </form>
+      </section>
     {/if}
     <Measurements />
   </div>
@@ -205,6 +220,12 @@
   }
   .units button.on {
     background: var(--ink);
+    color: var(--panel);
+  }
+  /* aktive Tara: invertiert wie die gewählte Einheit */
+  .actions button.primary.on {
+    background: var(--ink);
+    border-color: var(--ink);
     color: var(--panel);
   }
   .banner .inline {

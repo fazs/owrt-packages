@@ -23,7 +23,6 @@ namespace ew {
         constexpr int kCalibrationTimeoutMs = 5000; ///< Kalibrierkommandos (SDO-Zugriffe) [ms]
         constexpr size_t kSdoReadBuffer = 64U; ///< Debug: Puffer für SDO-Lesezugriffe (> Objektgröße)
         constexpr size_t kSnapshotMeasurements = 50U; ///< Messungen im Snapshot (/api/state, init)
-        constexpr int kCsvPrecision = 9; ///< signifikante Stellen im CSV-Export
         constexpr int kRetryDelayMs = 100; ///< Wartezeit zwischen Prüfungen bei Backend-Fehler [ms]
         constexpr int kRetrySteps = 20; ///< Prüfungen bis zum nächsten Öffnungsversuch (2 s)
         constexpr unsigned kNibbleBits = 4U; ///< Bits einer Hex-Ziffer
@@ -324,7 +323,7 @@ namespace ew {
      * @param value Wert; std::nullopt hebt die Übersteuerung von @p sub auf
      */
     CalResult Acquisition::debug_override(std::optional<uint8_t> sub, std::optional<bool> value) {
-        if (sub) {
+        if (sub.has_value()) {
             El3356Control probe;
             if (!el3356::control_bit(probe, *sub)) return {false, "Kein Steuerbit 0x7000:" + std::to_string(*sub)};
         }

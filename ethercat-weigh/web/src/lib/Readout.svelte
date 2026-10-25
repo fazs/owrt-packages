@@ -46,9 +46,10 @@
     </output>
     <span class="unit">{unit}</span>
   </div>
-  {#if tare != null}
-    <div class="net">Netto, Tara {fmt(fromG(tare, unit), dec)} {unit}</div>
-  {/if}
+  <!-- immer vorhanden (ohne Tara leer), damit sich beim Tarieren nichts verschiebt -->
+  <div class="net">
+    {#if tare != null}Netto, Tara {fmt(fromG(tare, unit), dec)} {unit}{:else}&nbsp;{/if}
+  </div>
 
   <div class="band">
     <span class="state">{stateText}</span>
