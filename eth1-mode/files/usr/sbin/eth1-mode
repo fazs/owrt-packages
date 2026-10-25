@@ -1,0 +1,208 @@
+#!/bin/sh
+# Umschaltung eth1 zwischen WAN und LAN
+#   wan: eth1 einziger WAN-Port (DHCP-Client), phy0-sta0 deaktiviert
+#   lan: eth1 Port von br-lan, phy0-sta0 aktiv als WAN (DHCP-Client)
+# Logausgabe: logread -e eth1-mode
+
+. /lib/functions.sh
+
+PORT=eth1
+STA_SECTION=eth1mode_sta
+LOCK=/var/lock/eth1-mode.lock
+
+log() {
+	logger -t eth1-mode "$*"
+	echo "$*" >&2
+}
+
+usage() {
+	cat >&2 <<-USAGE
+	Usage: eth1-mode <wan|lan|status|sync|switch <0|1>> [--no-reload]
+	  wan        eth1 als WAN, phy0-sta0 aus
+	  lan        eth1 in Bridge, phy0-sta0 als WAN
+	  status     aktuellen Modus und Schalterzustand ausgeben
+	  sync       Modus aus Schalterzustand (debugfs) übernehmen
+	  switch N   Modus aus logischem Schalterzustand N übernehmen (rc.button)
+	USAGE
+	exit 1
+}
+
+load_config() {
+	config_load eth1-mode
+	config_get PRESSED_MODE main pressed_mode lan
+	config_get SWITCH_LABEL main switch_label switch
+	config_get BRIDGE main bridge br-lan
+	config_get WAN_IFACE main wan_iface wan
+	config_get STA_DEVICE main sta_device radio0
+	config_get STA_IFNAME main sta_ifname phy0-sta0
+	config_get STA_SSID main sta_ssid
+	config_get STA_ENCRYPTION main sta_encryption psk2
+	config_get STA_KEY main sta_key
+}
+
+# UCI-Sektion des Bridge-Device ermitteln (config device, option name)
+bridge_section() {
+	uci -q show network | sed -n "s/^network\.\([^.]*\)\.name='$BRIDGE'$/\1/p" | head -n1
+}
+
+# Logischer Schalterzustand (1 = aktiv) aus debugfs, leer bei Fehler
+switch_state() {
+	local line raw
+	line=$(grep -m1 "|$SWITCH_LABEL " /sys/kernel/debug/gpio 2>/dev/null) || return 1
+	case "$line" in
+		*" hi"*) raw=1 ;;
+		*" lo"*) raw=0 ;;
+		*) return 1 ;;
+	esac
+	case "$line" in
+		*"ACTIVE LOW"*) raw=$((1 - raw)) ;;
+	esac
+	echo "$raw"
+}
+
+state_to_mode() {
+	if [ "$1" = 1 ]; then
+		echo "$PRESSED_MODE"
+	elif [ "$PRESSED_MODE" = lan ]; then
+		echo wan
+	else
+		echo lan
+	fi
+}
+
+current_mode() {
+	[ "$(uci -q get network.$WAN_IFACE.device)" = "$PORT" ] && echo wan || echo lan
+}
+
+# wifi-iface für phy0-sta0 anlegen bzw. aus Konfiguration aktualisieren
+ensure_sta() {
+	if [ -z "$(uci -q get wireless.$STA_SECTION)" ]; then
+		if [ -z "$STA_SSID" ]; then
+			log "Warnung: sta_ssid nicht gesetzt, $STA_IFNAME wird nicht angelegt"
+			return 1
+		fi
+		uci set wireless.$STA_SECTION=wifi-iface
+	fi
+	uci set wireless.$STA_SECTION.device="$STA_DEVICE"
+	uci set wireless.$STA_SECTION.mode=sta
+	uci set wireless.$STA_SECTION.ifname="$STA_IFNAME"
+	uci set wireless.$STA_SECTION.network="$WAN_IFACE"
+	if [ -n "$STA_SSID" ]; then
+		uci set wireless.$STA_SECTION.ssid="$STA_SSID"
+		uci set wireless.$STA_SECTION.encryption="$STA_ENCRYPTION"
+		if [ -n "$STA_KEY" ]; then
+			uci set wireless.$STA_SECTION.key="$STA_KEY"
+		else
+			uci -q delete wireless.$STA_SECTION.key
+		fi
+	fi
+	return 0
+}
+
+# wan6 an das logische WAN-Interface binden (keine Referenz auf eth0)
+fix_wan6() {
+	[ -n "$(uci -q get network.wan6)" ] && uci set network.wan6.device="@$WAN_IFACE"
+}
+
+apply_wan() {
+	local br="$1"
+	case " $(uci -q get network.$br.ports) " in
+		*" $PORT "*) uci del_list network.$br.ports="$PORT" ;;
+	esac
+	uci set network.$WAN_IFACE=interface
+	uci set network.$WAN_IFACE.device="$PORT"
+	uci set network.$WAN_IFACE.proto=dhcp
+	fix_wan6
+	[ -n "$(uci -q get wireless.$STA_SECTION)" ] && uci set wireless.$STA_SECTION.disabled=1
+}
+
+apply_lan() {
+	local br="$1"
+	case " $(uci -q get network.$br.ports) " in
+		*" $PORT "*) ;;
+		*) uci add_list network.$br.ports="$PORT" ;;
+	esac
+	uci set network.$WAN_IFACE=interface
+	uci -q delete network.$WAN_IFACE.device
+	uci set network.$WAN_IFACE.proto=dhcp
+	fix_wan6
+	ensure_sta && uci set wireless.$STA_SECTION.disabled=0
+}
+
+set_mode() {
+	local mode="$1" reload="$2" br
+
+	br=$(bridge_section)
+	if [ -z "$br" ]; then
+		log "Fehler: Bridge-Device '$BRIDGE' nicht gefunden"
+		return 1
+	fi
+
+	case "$mode" in
+		wan) apply_wan "$br" ;;
+		lan) apply_lan "$br" ;;
+	esac
+
+	if [ -z "$(uci changes network; uci changes wireless)" ]; then
+		log "eth1 bereits im Modus $mode"
+		return 0
+	fi
+
+	uci commit network
+	uci commit wireless
+	log "eth1 auf Modus $mode umgeschaltet"
+
+	if [ "$reload" = 1 ]; then
+		/etc/init.d/network reload
+		wifi reload
+	fi
+}
+
+print_status() {
+	local state
+	state=$(switch_state)
+	echo "mode:   $(current_mode)"
+	echo "switch: ${state:-unbekannt}${state:+ ($(state_to_mode "$state"))}"
+	echo "sta:    $(uci -q get wireless.$STA_SECTION.disabled | sed 's/^1$/disabled/;s/^0$/enabled/')"
+}
+
+cmd="$1"
+shift
+reload=1
+case "$1 $2" in
+	*--no-reload*) reload=0 ;;
+esac
+
+load_config
+
+case "$cmd" in
+	wan|lan)
+		mode="$cmd"
+		;;
+	switch)
+		case "$1" in
+			0|1) mode=$(state_to_mode "$1") ;;
+			*) usage ;;
+		esac
+		;;
+	sync)
+		state=$(switch_state) || {
+			log "Schalterzustand nicht lesbar, Konfiguration unverändert"
+			exit 0
+		}
+		mode=$(state_to_mode "$state")
+		;;
+	status)
+		print_status
+		exit 0
+		;;
+	*)
+		usage
+		;;
+esac
+
+lock "$LOCK"
+set_mode "$mode" "$reload"
+rc=$?
+lock -u "$LOCK"
+exit $rc

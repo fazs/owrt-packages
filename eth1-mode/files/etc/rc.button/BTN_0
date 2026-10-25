@@ -1,0 +1,12 @@
+#!/bin/sh
+# Seitlicher Schiebeschalter GL-MT3000 (EV_SW, BTN_0)
+
+case "$ACTION" in
+	pressed) state=1 ;;
+	released) state=0 ;;
+	*) exit 0 ;;
+esac
+
+/usr/sbin/eth1-mode switch "$state" >/dev/null 2>&1 &
+
+return 0

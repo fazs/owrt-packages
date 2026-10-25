@@ -1,0 +1,13 @@
+#!/bin/sh /etc/rc.common
+# Abgleich eth1-Modus mit Schalterstellung vor dem Start von network
+# Logausgabe: logread -e eth1-mode
+
+START=19
+
+boot() {
+	/usr/sbin/eth1-mode sync --no-reload
+}
+
+start() {
+	/usr/sbin/eth1-mode sync
+}

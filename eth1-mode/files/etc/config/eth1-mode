@@ -1,0 +1,19 @@
+# Konfiguration für /usr/sbin/eth1-mode
+# eth0 wird von diesem Mechanismus nicht referenziert.
+
+config eth1mode 'main'
+	# Modus bei aktivem Schalter (ACTION=pressed); inaktiv ergibt den jeweils anderen Modus
+	option pressed_mode 'lan'
+	# Consumer-Label des Schalters in /sys/kernel/debug/gpio (Abgleich beim Boot)
+	option switch_label 'switch'
+	# Name des Bridge-Device
+	option bridge 'br-lan'
+	# Logisches Interface für WAN (eth1 bzw. phy0-sta0)
+	option wan_iface 'wan'
+
+	# Wireless-Client für den LAN-Modus
+	option sta_device 'radio0'
+	option sta_ifname 'phy0-sta0'
+	option sta_ssid ''
+	option sta_encryption 'psk2'
+	option sta_key ''
