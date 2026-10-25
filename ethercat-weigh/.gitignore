@@ -1,7 +1,8 @@
 /build/
 /build-*/
-/cmake-build-*/
+/*-build-*/
 /web/node_modules/
 /web/dist/
 /third_party/*/
 *.tmp
+*/.idea/

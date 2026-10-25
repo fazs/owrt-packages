@@ -2,10 +2,14 @@
 
 Umschaltung von `eth1` über den seitlichen Schiebeschalter (`BTN_0`). `eth0` wird nicht referenziert.
 
-| Modus | eth1                          | phy0-sta0                     |
-|-------|-------------------------------|-------------------------------|
-| `wan` | einziger Port von `wan` (DHCP) | `disabled=1`                  |
-| `lan` | Port von `br-lan`             | aktiv, `network=wan` (DHCP)   |
+| Modus | eth1                           | Wireless-Client (`sta_section`) |
+|-------|--------------------------------|---------------------------------|
+| `wan` | einziger Port von `wan` (DHCP) | `disabled=1`                    |
+| `lan` | Port von `br-lan`              | `disabled=0`, Uplink            |
+
+Der Wireless-Client (Standard `wifinet3`) muss als `wifi-iface` mit `mode=sta` bereits
+eingerichtet sein (SSID, Schlüssel, `network`, z. B. `wwan` in der Firewall-Zone `wan`).
+`eth1-mode` schaltet nur dessen `disabled`-Option um.
 
 `wan6` wird, falls vorhanden, auf `device='@wan'` gesetzt.
 
@@ -24,8 +28,7 @@ Umschaltung von `eth1` über den seitlichen Schiebeschalter (`BTN_0`). `eth0` wi
 scp -O -r files/* root@192.168.1.1:/
 ssh root@192.168.1.1
 chmod 755 /usr/sbin/eth1-mode /etc/rc.button/BTN_0 /etc/init.d/eth1-mode
-uci set eth1-mode.main.sta_ssid='<SSID>'
-uci set eth1-mode.main.sta_key='<KEY>'
+uci set eth1-mode.main.sta_section='<wifi-iface>'   # nur falls nicht wifinet3
 uci commit eth1-mode
 /etc/init.d/eth1-mode enable
 eth1-mode status

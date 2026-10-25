@@ -1,13 +1,12 @@
 #!/bin/sh
 # Umschaltung eth1 zwischen WAN und LAN
-#   wan: eth1 einziger WAN-Port (DHCP-Client), phy0-sta0 deaktiviert
-#   lan: eth1 Port von br-lan, phy0-sta0 aktiv als WAN (DHCP-Client)
+#   wan: eth1 einziger WAN-Port (DHCP-Client), Wireless-Client deaktiviert
+#   lan: eth1 Port von br-lan, Wireless-Client aktiv als Uplink
 # Logausgabe: logread -e eth1-mode
 
 . /lib/functions.sh
 
 PORT=eth1
-STA_SECTION=eth1mode_sta
 LOCK=/var/lock/eth1-mode.lock
 
 log() {
@@ -18,8 +17,8 @@ log() {
 usage() {
 	cat >&2 <<-USAGE
 	Usage: eth1-mode <wan|lan|status|sync|switch <0|1>> [--no-reload]
-	  wan        eth1 als WAN, phy0-sta0 aus
-	  lan        eth1 in Bridge, phy0-sta0 als WAN
+	  wan        eth1 als WAN, Wireless-Client aus
+	  lan        eth1 in Bridge, Wireless-Client als Uplink
 	  status     aktuellen Modus und Schalterzustand ausgeben
 	  sync       Modus aus Schalterzustand (debugfs) übernehmen
 	  switch N   Modus aus logischem Schalterzustand N übernehmen (rc.button)
@@ -30,14 +29,10 @@ usage() {
 load_config() {
 	config_load eth1-mode
 	config_get PRESSED_MODE main pressed_mode lan
-	config_get SWITCH_LABEL main switch_label switch
+	config_get SWITCH_LABEL main switch_label mode
 	config_get BRIDGE main bridge br-lan
 	config_get WAN_IFACE main wan_iface wan
-	config_get STA_DEVICE main sta_device radio0
-	config_get STA_IFNAME main sta_ifname phy0-sta0
-	config_get STA_SSID main sta_ssid
-	config_get STA_ENCRYPTION main sta_encryption psk2
-	config_get STA_KEY main sta_key
+	config_get STA_SECTION main sta_section wifinet3
 }
 
 # UCI-Sektion des Bridge-Device ermitteln (config device, option name)
@@ -74,29 +69,13 @@ current_mode() {
 	[ "$(uci -q get network.$WAN_IFACE.device)" = "$PORT" ] && echo wan || echo lan
 }
 
-# wifi-iface für phy0-sta0 anlegen bzw. aus Konfiguration aktualisieren
-ensure_sta() {
-	if [ -z "$(uci -q get wireless.$STA_SECTION)" ]; then
-		if [ -z "$STA_SSID" ]; then
-			log "Warnung: sta_ssid nicht gesetzt, $STA_IFNAME wird nicht angelegt"
-			return 1
-		fi
-		uci set wireless.$STA_SECTION=wifi-iface
+# Wireless-Client aktivieren (0) bzw. deaktivieren (1)
+set_sta_disabled() {
+	if [ "$(uci -q get wireless.$STA_SECTION.mode)" != sta ]; then
+		log "WARN: wifi-iface '$STA_SECTION' with mode=sta not found"
+		return 1
 	fi
-	uci set wireless.$STA_SECTION.device="$STA_DEVICE"
-	uci set wireless.$STA_SECTION.mode=sta
-	uci set wireless.$STA_SECTION.ifname="$STA_IFNAME"
-	uci set wireless.$STA_SECTION.network="$WAN_IFACE"
-	if [ -n "$STA_SSID" ]; then
-		uci set wireless.$STA_SECTION.ssid="$STA_SSID"
-		uci set wireless.$STA_SECTION.encryption="$STA_ENCRYPTION"
-		if [ -n "$STA_KEY" ]; then
-			uci set wireless.$STA_SECTION.key="$STA_KEY"
-		else
-			uci -q delete wireless.$STA_SECTION.key
-		fi
-	fi
-	return 0
+	uci set wireless.$STA_SECTION.disabled="$1"
 }
 
 # wan6 an das logische WAN-Interface binden (keine Referenz auf eth0)
@@ -113,7 +92,7 @@ apply_wan() {
 	uci set network.$WAN_IFACE.device="$PORT"
 	uci set network.$WAN_IFACE.proto=dhcp
 	fix_wan6
-	[ -n "$(uci -q get wireless.$STA_SECTION)" ] && uci set wireless.$STA_SECTION.disabled=1
+	set_sta_disabled 1
 }
 
 apply_lan() {
@@ -126,7 +105,7 @@ apply_lan() {
 	uci -q delete network.$WAN_IFACE.device
 	uci set network.$WAN_IFACE.proto=dhcp
 	fix_wan6
-	ensure_sta && uci set wireless.$STA_SECTION.disabled=0
+	set_sta_disabled 0
 }
 
 set_mode() {
@@ -163,7 +142,11 @@ print_status() {
 	state=$(switch_state)
 	echo "mode:   $(current_mode)"
 	echo "switch: ${state:-unbekannt}${state:+ ($(state_to_mode "$state"))}"
-	echo "sta:    $(uci -q get wireless.$STA_SECTION.disabled | sed 's/^1$/disabled/;s/^0$/enabled/')"
+	if [ "$(uci -q get wireless.$STA_SECTION.disabled)" = 1 ]; then
+		echo "sta:    $STA_SECTION disabled"
+	else
+		echo "sta:    $STA_SECTION enabled"
+	fi
 }
 
 cmd="$1"
