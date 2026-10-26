@@ -239,8 +239,7 @@ const char* dtype_name(DType t) {
  * @return false bei unbekanntem Namen
  */
 bool dtype_from_name(const std::string& s, DType& t) {
-    for (DType c : {DType::Bool, DType::U8, DType::U16, DType::U32, DType::U64, DType::I8, DType::I16,
-                    DType::I32, DType::F32})
+    for (DType c : kValueTypes)
         if (s == dtype_name(c)) {
             t = c;
             return true;

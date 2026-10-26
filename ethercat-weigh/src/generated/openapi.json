@@ -1,0 +1,1532 @@
+{
+  "components": {
+    "schemas": {
+      "Config": {
+        "properties": {
+          "calibration": {
+            "properties": {
+              "capture_time_ms": {
+                "type": "integer"
+              },
+              "device_unit": {
+                "type": "string"
+              },
+              "mode": {
+                "type": "string"
+              },
+              "points": {
+                "type": "array"
+              },
+              "stable_band_rel": {
+                "type": "number"
+              },
+              "stable_time_s": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "device": {
+            "properties": {
+              "calibration_interval": {
+                "type": "integer"
+              },
+              "coe": {
+                "properties": {},
+                "type": "object"
+              },
+              "disable_calibration": {
+                "type": "boolean"
+              },
+              "filter_frequency": {
+                "type": "integer"
+              },
+              "gravity_of_earth": {
+                "type": "number"
+              },
+              "mode0_enable_averager": {
+                "type": "boolean"
+              },
+              "mode0_enable_filter": {
+                "type": "boolean"
+              },
+              "mode0_filter_settings": {
+                "type": "integer"
+              },
+              "nominal_load": {
+                "type": "number"
+              },
+              "pdo_variant": {
+                "type": "string"
+              },
+              "rated_output_mv_v": {
+                "type": "number"
+              },
+              "reference_load": {
+                "type": "number"
+              },
+              "sample_mode": {
+                "type": "boolean"
+              },
+              "scale_factor": {
+                "type": "number"
+              },
+              "steady_state_tolerance": {
+                "type": "integer"
+              },
+              "steady_state_window": {
+                "type": "integer"
+              },
+              "write_on_start": {
+                "type": "boolean"
+              },
+              "zero_balance": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "ethercat": {
+            "properties": {
+              "cycle_ms": {
+                "type": "integer"
+              },
+              "interface": {
+                "type": "string"
+              },
+              "rt_priority": {
+                "type": "integer"
+              },
+              "slave_name": {
+                "type": "string"
+              },
+              "wkc_fault_cycles": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "http": {
+            "properties": {
+              "bind": {
+                "type": "string"
+              },
+              "port": {
+                "type": "integer"
+              },
+              "threads": {
+                "type": "integer"
+              },
+              "web_root": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "measurement": {
+            "properties": {
+              "min_load": {
+                "type": "number"
+              },
+              "sigma_max": {
+                "type": "number"
+              },
+              "stable_time_ms": {
+                "type": "integer"
+              },
+              "tolerance": {
+                "type": "number"
+              },
+              "use_device_steady_state": {
+                "type": "boolean"
+              },
+              "zero_threshold": {
+                "type": "number"
+              }
+            },
+            "type": "object"
+          },
+          "statistics": {
+            "properties": {
+              "history_size": {
+                "type": "integer"
+              },
+              "rolling_window": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          },
+          "ui": {
+            "properties": {
+              "display_unit": {
+                "type": "string"
+              },
+              "hidden_columns": {
+                "type": "array"
+              },
+              "rate_hz": {
+                "type": "integer"
+              }
+            },
+            "type": "object"
+          }
+        },
+        "type": "object"
+      },
+      "ConfigResult": {
+        "properties": {
+          "errors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "restart_required": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok",
+          "errors"
+        ],
+        "type": "object"
+      },
+      "Info": {
+        "properties": {
+          "backend": {
+            "type": "string"
+          },
+          "backend_error": {
+            "type": "string"
+          },
+          "backend_state": {
+            "type": "string"
+          },
+          "calibrated": {
+            "type": "boolean"
+          },
+          "calibration_mode": {
+            "type": "string"
+          },
+          "cycle_ms": {
+            "type": "integer"
+          },
+          "cycles": {
+            "type": "integer"
+          },
+          "interface": {
+            "type": "string"
+          },
+          "max_cycle_ms": {
+            "type": "number"
+          },
+          "overruns": {
+            "type": "integer"
+          },
+          "restart_required": {
+            "type": "boolean"
+          },
+          "version": {
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
+      "Measurement": {
+        "properties": {
+          "id": {
+            "type": "integer"
+          },
+          "n": {
+            "type": "integer"
+          },
+          "range": {
+            "type": "number"
+          },
+          "settle_ms": {
+            "type": "number"
+          },
+          "stddev": {
+            "type": "number"
+          },
+          "t": {
+            "type": "number"
+          },
+          "value": {
+            "type": "number"
+          }
+        },
+        "type": "object"
+      },
+      "Result": {
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "REST-API von ethercat-weigh. Ereignisse (sample, measurement, config, ...) kommen über den WebSocket /ws; die erste Nachricht nach dem Verbindungsaufbau ist {\"type\": \"init\", \"snapshot\", \"config\"}.",
+    "title": "ethercat-weigh",
+    "version": "0.2.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/api/calibration": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "action": {
+                    "type": "string"
+                  },
+                  "index": {
+                    "type": "integer"
+                  },
+                  "mass": {
+                    "type": "number"
+                  },
+                  "nominal_load": {
+                    "type": "number"
+                  },
+                  "unit": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "action"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "Ungültige Anfrage"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "Im aktuellen Zustand nicht ausführbar"
+          }
+        },
+        "summary": "Kalibrierschritt ausführen (Aktionen siehe README)",
+        "tags": [
+          "Kalibrierung"
+        ]
+      }
+    },
+    "/api/config": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Config"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Gespeicherte Konfiguration",
+        "tags": [
+          "Konfiguration"
+        ]
+      },
+      "put": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Config"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigResult"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConfigResult"
+                }
+              }
+            },
+            "description": "Ungültige Anfrage"
+          }
+        },
+        "summary": "Konfiguration validieren, speichern und anwenden",
+        "tags": [
+          "Konfiguration"
+        ]
+      }
+    },
+    "/api/debug/init": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "steps": {
+                      "items": {
+                        "properties": {
+                          "hex": {
+                            "type": "string"
+                          },
+                          "index": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "pre_op_only": {
+                            "type": "boolean"
+                          },
+                          "sub": {
+                            "type": "integer"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "value": {
+                            "type": "integer"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Initialisierungssequenz mit den Werten der aktuellen Konfiguration",
+        "tags": [
+          "Debug"
+        ]
+      }
+    },
+    "/api/debug/override": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "clear": {
+                    "type": "boolean"
+                  },
+                  "sub": {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "value": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ]
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "Ungültige Anfrage"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "Im aktuellen Zustand nicht ausführbar"
+          }
+        },
+        "summary": "Steuerbit 0x7000 übersteuern; value null hebt auf, clear hebt alle auf",
+        "tags": [
+          "Debug"
+        ]
+      }
+    },
+    "/api/debug/pdos": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "inputs": {
+                      "type": "string"
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "outputs": {
+                      "type": "string"
+                    },
+                    "pdos": {
+                      "items": {
+                        "properties": {
+                          "assigned": {
+                            "type": "boolean"
+                          },
+                          "entries": {
+                            "items": {
+                              "properties": {
+                                "bits": {
+                                  "type": "integer"
+                                },
+                                "index": {
+                                  "type": "integer"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "offset": {
+                                  "type": [
+                                    "integer",
+                                    "null"
+                                  ]
+                                },
+                                "override": {
+                                  "type": [
+                                    "boolean",
+                                    "null"
+                                  ]
+                                },
+                                "sub": {
+                                  "type": "integer"
+                                },
+                                "type": {
+                                  "enum": [
+                                    "bool",
+                                    "u8",
+                                    "u16",
+                                    "u32",
+                                    "u64",
+                                    "i8",
+                                    "i16",
+                                    "i32",
+                                    "f32"
+                                  ],
+                                  "type": "string"
+                                },
+                                "value": {}
+                              },
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "excludes": {
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          },
+                          "index": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "rx": {
+                            "type": "boolean"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "inputs": {
+                      "type": "string"
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "outputs": {
+                      "type": "string"
+                    },
+                    "pdos": {
+                      "items": {
+                        "properties": {
+                          "assigned": {
+                            "type": "boolean"
+                          },
+                          "entries": {
+                            "items": {
+                              "properties": {
+                                "bits": {
+                                  "type": "integer"
+                                },
+                                "index": {
+                                  "type": "integer"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "offset": {
+                                  "type": [
+                                    "integer",
+                                    "null"
+                                  ]
+                                },
+                                "override": {
+                                  "type": [
+                                    "boolean",
+                                    "null"
+                                  ]
+                                },
+                                "sub": {
+                                  "type": "integer"
+                                },
+                                "type": {
+                                  "enum": [
+                                    "bool",
+                                    "u8",
+                                    "u16",
+                                    "u32",
+                                    "u64",
+                                    "i8",
+                                    "i16",
+                                    "i32",
+                                    "f32"
+                                  ],
+                                  "type": "string"
+                                },
+                                "value": {}
+                              },
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "excludes": {
+                            "items": {
+                              "type": "integer"
+                            },
+                            "type": "array"
+                          },
+                          "index": {
+                            "type": "integer"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "rx": {
+                            "type": "boolean"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Im aktuellen Zustand nicht ausführbar"
+          }
+        },
+        "summary": "PDO-Katalog mit Zuordnung, Bitlage, Werten, Übersteuerungen und Prozessabbild (Hex)",
+        "tags": [
+          "Debug"
+        ]
+      }
+    },
+    "/api/debug/reinit": {
+      "post": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Prozessdatenquelle schließen und neu initialisieren",
+        "tags": [
+          "Debug"
+        ]
+      }
+    },
+    "/api/debug/sdo": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "index": {
+                    "maximum": 65535,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "op": {
+                    "enum": [
+                      "read",
+                      "write"
+                    ],
+                    "type": "string"
+                  },
+                  "sub": {
+                    "maximum": 255,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "type": {
+                    "enum": [
+                      "bool",
+                      "u8",
+                      "u16",
+                      "u32",
+                      "u64",
+                      "i8",
+                      "i16",
+                      "i32",
+                      "f32"
+                    ],
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": [
+                      "number",
+                      "boolean"
+                    ]
+                  }
+                },
+                "required": [
+                  "op",
+                  "index",
+                  "sub",
+                  "type"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "hex": {
+                      "type": "string"
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "value": {
+                      "type": [
+                        "number",
+                        "boolean"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "Ungültige Anfrage"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "hex": {
+                      "type": "string"
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "value": {
+                      "type": [
+                        "number",
+                        "boolean"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Im aktuellen Zustand nicht ausführbar"
+          }
+        },
+        "summary": "Einzelner SDO-Zugriff",
+        "tags": [
+          "Debug"
+        ]
+      }
+    },
+    "/api/device/command": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "id": {
+                    "enum": [
+                      "esi_148",
+                      "esi_147",
+                      "tare_temporary",
+                      "zero_balance",
+                      "calibration",
+                      "restore_defaults"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "Ungültige Anfrage"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "Im aktuellen Zustand nicht ausführbar"
+          }
+        },
+        "summary": "Kommando der Gerätebeschreibung starten; Abschluss als WebSocket-Ereignis device_command",
+        "tags": [
+          "Klemme"
+        ]
+      }
+    },
+    "/api/device/description": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Gerätebeschreibung der Klemme (aus der ESI erzeugt)",
+        "tags": [
+          "Klemme"
+        ]
+      }
+    },
+    "/api/device/diag": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "error": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "value": {}
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "items": {
+                      "items": {
+                        "properties": {
+                          "error": {
+                            "type": "string"
+                          },
+                          "key": {
+                            "type": "string"
+                          },
+                          "value": {}
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ok"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Im aktuellen Zustand nicht ausführbar"
+          }
+        },
+        "summary": "Diagnose per SDO (nur auf Anfrage)",
+        "tags": [
+          "Klemme"
+        ]
+      }
+    },
+    "/api/info": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Info"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Version, Backend-Zustand, Zyklen, Überläufe, max. Zykluszeit",
+        "tags": [
+          "Zustand"
+        ]
+      }
+    },
+    "/api/measurements": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Measurement"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Gehaltene Messungen (Massen in g)",
+        "tags": [
+          "Messungen"
+        ]
+      }
+    },
+    "/api/measurements.csv": {
+      "get": {
+        "parameters": [
+          {
+            "in": "query",
+            "name": "unit",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Gehaltene Messungen als CSV (Trennzeichen ';')",
+        "tags": [
+          "Messungen"
+        ]
+      }
+    },
+    "/api/measurements/{id}": {
+      "delete": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "Nicht gefunden"
+          }
+        },
+        "summary": "Messung löschen",
+        "tags": [
+          "Messungen"
+        ]
+      }
+    },
+    "/api/openapi.json": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Diese OpenAPI-Spec",
+        "tags": [
+          "Zustand"
+        ]
+      }
+    },
+    "/api/sim/load": {
+      "post": {
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "grams": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "Ungültige Anfrage"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "Im aktuellen Zustand nicht ausführbar"
+          }
+        },
+        "summary": "Nur Simulation: Last in g auflegen; null = automatisches Profil",
+        "tags": [
+          "Simulation"
+        ]
+      }
+    },
+    "/api/state": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "info": {
+                      "$ref": "#/components/schemas/Info"
+                    },
+                    "measurements": {
+                      "items": {
+                        "$ref": "#/components/schemas/Measurement"
+                      },
+                      "type": "array"
+                    },
+                    "sample": {
+                      "properties": {
+                        "armed": {
+                          "type": "boolean"
+                        },
+                        "calibration": {
+                          "properties": {
+                            "active": {
+                              "type": "boolean"
+                            },
+                            "error": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string"
+                            },
+                            "message": {
+                              "type": "string"
+                            },
+                            "phase": {
+                              "type": "string"
+                            },
+                            "raw": {
+                              "type": "number"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "fault": {
+                          "type": "string"
+                        },
+                        "gross": {
+                          "type": "number"
+                        },
+                        "link_ok": {
+                          "type": "boolean"
+                        },
+                        "raw": {
+                          "type": "number"
+                        },
+                        "state": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "properties": {
+                            "calibration_in_progress": {
+                              "type": "boolean"
+                            },
+                            "data_invalid": {
+                              "type": "boolean"
+                            },
+                            "error": {
+                              "type": "boolean"
+                            },
+                            "overrange": {
+                              "type": "boolean"
+                            },
+                            "steady_state": {
+                              "type": "boolean"
+                            },
+                            "sync_error": {
+                              "type": "boolean"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "t": {
+                          "type": "number"
+                        },
+                        "tare": {},
+                        "type": {
+                          "type": "string"
+                        },
+                        "valid": {
+                          "type": "boolean"
+                        },
+                        "value": {
+                          "type": "number"
+                        },
+                        "window": {
+                          "properties": {
+                            "mean": {
+                              "type": "number"
+                            },
+                            "n": {
+                              "type": "integer"
+                            },
+                            "range": {
+                              "type": "number"
+                            },
+                            "span_ms": {
+                              "type": "number"
+                            },
+                            "stddev": {
+                              "type": "number"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "wkc_ok": {
+                          "type": "boolean"
+                        }
+                      },
+                      "type": "object"
+                    },
+                    "statistics": {
+                      "properties": {
+                        "rolling": {
+                          "properties": {
+                            "last": {
+                              "type": "number"
+                            },
+                            "max": {
+                              "type": "number"
+                            },
+                            "mean": {
+                              "type": "number"
+                            },
+                            "min": {
+                              "type": "number"
+                            },
+                            "n": {
+                              "type": "integer"
+                            },
+                            "range": {
+                              "type": "number"
+                            },
+                            "stddev": {
+                              "type": "number"
+                            }
+                          },
+                          "type": "object"
+                        },
+                        "session": {
+                          "properties": {
+                            "last": {
+                              "type": "number"
+                            },
+                            "max": {
+                              "type": "number"
+                            },
+                            "mean": {
+                              "type": "number"
+                            },
+                            "min": {
+                              "type": "number"
+                            },
+                            "n": {
+                              "type": "integer"
+                            },
+                            "range": {
+                              "type": "number"
+                            },
+                            "stddev": {
+                              "type": "number"
+                            }
+                          },
+                          "type": "object"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Snapshot: letztes Sample, Statistik, letzte Messungen, info",
+        "tags": [
+          "Zustand"
+        ]
+      }
+    },
+    "/api/statistics/reset": {
+      "post": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Statistik und Messungen löschen",
+        "tags": [
+          "Messungen"
+        ]
+      }
+    },
+    "/api/tare": {
+      "post": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "Im aktuellen Zustand nicht ausführbar"
+          }
+        },
+        "summary": "Tara (Software) aus dem Mittel der letzten 0,5 s setzen",
+        "tags": [
+          "Kalibrierung"
+        ]
+      }
+    },
+    "/api/tare/clear": {
+      "post": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "OK"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            },
+            "description": "Im aktuellen Zustand nicht ausführbar"
+          }
+        },
+        "summary": "Tara (Software) löschen",
+        "tags": [
+          "Kalibrierung"
+        ]
+      }
+    }
+  }
+}

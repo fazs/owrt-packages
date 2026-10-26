@@ -141,25 +141,9 @@ Statistik (nur RAM): Anzahl, Mittelwert, Standardabweichung (n−1), Minimum, Ma
 
 ## REST-API und WebSocket
 
-| Methode | Endpoint | Funktion |
-|---|---|---|
-| GET | `/api/info` | Version, Backend-Zustand, Zyklen, Überläufe, max. Zykluszeit |
-| GET | `/api/state` | Snapshot: letztes Sample, Statistik, letzte 50 Messungen |
-| GET / PUT | `/api/config` | Config lesen / validieren, speichern, anwenden |
-| GET | `/api/measurements`, `/api/measurements.csv?unit=` | Gehaltene Messungen (JSON in g, CSV in gewählter Einheit) |
-| POST | `/api/tare`, `/api/tare/clear` | Tara aus dem Mittel der letzten 0,5 s setzen / löschen |
-| POST | `/api/calibration` | Kalibrierung, Body `{"action": …}` (siehe unten) |
-| POST | `/api/sim/load` | Nur Simulation: `{"grams": 25}` bzw. `{"grams": null}` für das automatische Profil |
-| POST | `/api/statistics/reset` | Statistik und Messungen löschen |
-| GET | `/api/device/description` | Gerätebeschreibung der Klemme (aus der ESI erzeugt) |
-| POST | `/api/device/command` | Kommando der Gerätebeschreibung starten: `{"id": "tare_temporary"}`; Abschluss als WebSocket-Ereignis `device_command` |
-| GET | `/api/device/diag` | Diagnose per SDO: `0x9000:11`, `0xA000:11`–`:18`, `0x801E:01`, `0x802E:01` |
-| GET | `/api/debug/pdos` | PDO-Katalog mit Zuordnung, Bitlage, Werten, Übersteuerungen und Prozessabbild (Hex) |
-| POST | `/api/debug/override` | Steuerbit übersteuern: `{"sub": 5, "value": true}`, aufheben mit `"value": null`, alle: `{"clear": true}` |
-| POST | `/api/debug/sdo` | `{"op": "read"\|"write", "index", "sub", "type": "bool\|u8\|u16\|u32\|u64\|i8\|i16\|i32\|f32", "value"}` |
-| GET | `/api/debug/init` | Initialisierungssequenz mit Sollwerten |
-| POST | `/api/debug/reinit` | Prozessdatenquelle schließen und neu initialisieren |
-| WS | `/ws` | `hello`, `sample` (mit `ui.rate_hz`), `measurement`, `statistics_reset`, `config`, `backend`, `device_config`, `device_command`, `calibration` |
+Die REST-API ist als OpenAPI 3.1 beschrieben: `GET /api/openapi.json` am laufenden Dienst bzw. `src/generated/openapi.json` im Repository. Die Spec entsteht aus den Routen selbst (`register_api()` in `src/web_server.cpp`, `ApiRegistry`); Antwortschemas werden, wo möglich, aus den Datenstrukturen abgeleitet. `scripts/build_host.sh` erzeugt die Datei mit `ethercat-weigh --write-openapi`. Sie lässt sich in Swagger UI, Redoc o. ä. öffnen.
+
+WebSocket `/ws` (nicht Teil der OpenAPI-Spec): erste Nachricht `init` mit `snapshot` und `config`, danach `sample` (mit `ui.rate_hz`), `measurement`, `statistics_reset`, `config`, `backend`, `device_config`, `device_command`, `calibration`.
 
 Aktionen für `/api/calibration`:
 

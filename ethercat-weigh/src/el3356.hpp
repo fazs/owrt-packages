@@ -208,6 +208,9 @@ enum class DType : uint8_t {
     I32,   ///< DINT
     F32    ///< REAL
 };
+/// Alle Datentypen mit Wert (ohne DType::None), z. B. für Auswahllisten
+inline constexpr DType kValueTypes[] = {DType::Bool, DType::U8,  DType::U16, DType::U32, DType::U64,
+                                        DType::I8,   DType::I16, DType::I32, DType::F32};
 const char* dtype_name(DType t);
 bool dtype_from_name(const std::string& s, DType& t);
 DType dtype_from_coe(uint16_t coe, uint8_t bits);

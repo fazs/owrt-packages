@@ -22,13 +22,14 @@ constexpr int kExitUsage = 2;             ///< ungültige Optionen (Konvention d
 void usage() {
     std::cout << "ethercat-weigh " EW_VERSION "\n"
                  "Usage: ethercat-weigh [-c <config.json>] [--sim] [--sim-csv <datei>] [--syslog]\n"
-                 "                      [--write-default-config <pfad>]\n"
+                 "                      [--write-default-config <pfad>] [--write-openapi <pfad>]\n"
                  "  -c, --config   Konfigurationsdatei (Default: /etc/ethercat-weigh/config.json)\n"
                  "  --sim          Simulation statt EtherCAT (ohne Hardware)\n"
                  "  --sim-csv <datei>  Simulation; Messungen aus CSV (Format des Exports oder\n"
                  "                 ein Wert in g je Zeile) beim Start übernehmen\n"
                  "  --syslog       Logausgabe per syslog (daemon.info/warn/err) statt stderr\n"
-                 "  --write-default-config <pfad>  Default-Konfiguration schreiben und beenden\n";
+                 "  --write-default-config <pfad>  Default-Konfiguration schreiben und beenden\n"
+                 "  --write-openapi <pfad>  OpenAPI-Spec der REST-API schreiben und beenden\n";
 }
 
 } // namespace
@@ -58,6 +59,14 @@ int main(int argc, char** argv) {
                 ew::save_config(argv[++i], ew::Config{});
             } catch (const std::exception& ex) {
                 std::cerr << ex.what() << '\n';
+                return kExitError;
+            }
+            return kExitOk;
+        } else if (a == "--write-openapi" && i + 1 < argc) {
+            const char* path = argv[++i];
+            std::ofstream f(path);
+            if (!(f << ew::openapi_spec().dump(2) << '\n')) {
+                std::cerr << "Schreiben fehlgeschlagen: " << path << '\n';
                 return kExitError;
             }
             return kExitOk;

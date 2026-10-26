@@ -70,6 +70,10 @@ Ausnahmen, die als Literal stehen bleiben dürfen:
   jede mit `source` (Dokument, Kapitel, Norm oder Projektentscheidung). Die Zusatzdatei darf
   ESI-Felder nicht überschreiben.
 - CMake bettet das JSON als Raw-String ein (`src/device_description_data.cpp.in`).
+- `src/generated/openapi.json` stammt aus `ethercat-weigh --write-openapi`
+  (`scripts/build_host.sh` nach dem Build). REST-Routen werden ausschließlich über
+  `ApiRegistry::add()` mit `ApiDoc` registriert, nicht mit `CROW_ROUTE`; Antwortschemas
+  möglichst mit `schema_from()` aus den Datenstrukturen ableiten.
 
 ## Weitere Regeln
 

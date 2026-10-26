@@ -9,12 +9,14 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <fstream>
 #include <functional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
+#include "api_registry.hpp"
 #include "config.hpp"
 #include "device_commands.hpp"
 #include "device_description.hpp"
@@ -1026,6 +1028,82 @@ TEST(calibration_device_flow) {
     ew::Sample s;
     t = run_cycles(sim, cc, cfg, t, kSettleS + kMarginS, &s);
     CHECK_NEAR(*ch.to_grams(s.raw), kCheckRatio * cap, kAccuracyRel * cap);
+}
+
+TEST(api_registry_openapi) {
+    using crow::HTTPMethod;
+    const auto ok = [] { return crow::response(crow::status::OK); };
+    crow::SimpleApp app;
+    ew::ApiRegistry api(app);
+    ew::ApiDoc del{"t", "Löschen", nullptr, {{crow::status::OK, nullptr}}};
+    del.params = {"id"};
+    api.add(HTTPMethod::Delete, "/x/<uint>", del, [](uint64_t) { return crow::response(crow::status::OK); });
+    api.add(HTTPMethod::Get, "/y", {"t", "Lesen", nullptr, {{crow::status::OK, {{"type", "object"}}}}}, ok);
+    api.add(HTTPMethod::Put, "/y", {"t", "Schreiben", {{"type", "object"}}, {{crow::status::OK, nullptr}}},
+            [](const crow::request&) { return crow::response(crow::status::OK); });
+    const auto d = api.openapi("1.0", "Test");
+    CHECK(d.at("openapi") == "3.1.0");
+    CHECK(d["paths"].contains("/x/{id}"));
+    CHECK(d["paths"]["/x/{id}"]["delete"]["parameters"][0]["name"] == "id");
+    CHECK(d["paths"]["/x/{id}"]["delete"]["parameters"][0]["schema"]["type"] == "integer");
+    CHECK(d["paths"]["/y"].contains("get") && d["paths"]["/y"].contains("put"));
+    CHECK(!d["paths"]["/y"]["get"].contains("requestBody"));
+    CHECK(d["paths"]["/y"]["put"].contains("requestBody"));
+    CHECK(d["paths"]["/y"]["get"]["responses"]["200"]["content"].contains("application/json"));
+
+    // Fehlender Parametername, doppelte Route, unpassender Handler
+    auto throws = [](const std::function<void()>& f) {
+        try {
+            f();
+        } catch (const std::runtime_error&) {
+            return true;
+        }
+        return false;
+    };
+    CHECK(throws([&] { api.add(HTTPMethod::Get, "/z/<uint>", {"t", "", nullptr, {}}, ok); }));
+    CHECK(throws([&] { api.add(HTTPMethod::Get, "/y", {"t", "", nullptr, {}}, ok); }));
+    ew::ApiDoc mismatch{"t", "", nullptr, {}};
+    mismatch.params = {"id"};
+    CHECK(throws([&] { api.add(HTTPMethod::Get, "/w/<uint>", mismatch, ok); }));
+
+    const auto s = ew::schema_from({{"a", 1},
+                                    {"b", 1.5},
+                                    {"c", {{"d", true}}},
+                                    {"e", nlohmann::json::array({"x"})},
+                                    {"f", nullptr}});
+    CHECK(s["type"] == "object" && !s.contains("required"));
+    CHECK(s["properties"]["a"]["type"] == "integer");
+    CHECK(s["properties"]["b"]["type"] == "number");
+    CHECK(s["properties"]["c"]["properties"]["d"]["type"] == "boolean");
+    CHECK(s["properties"]["e"]["items"]["type"] == "string");
+    CHECK(s["properties"]["f"].empty());
+}
+
+TEST(openapi_file_consistent) {
+    std::ifstream f(EW_OPENAPI_FILE);
+    CHECK(f.good());
+    if (!f) return;
+    const auto d = nlohmann::json::parse(f);
+    CHECK(!d.at("paths").empty());
+    // Jede Operation hat summary und Antworten
+    for (const auto& [path, item] : d.at("paths").items())
+        for (const auto& [verb, op] : item.items()) {
+            CHECK(!op.value("summary", std::string()).empty());
+            CHECK(!op.value("responses", nlohmann::json::object()).empty());
+        }
+    // Alle $ref lassen sich auflösen
+    std::function<void(const nlohmann::json&)> walk = [&](const nlohmann::json& j) {
+        if (j.is_object()) {
+            if (j.contains("$ref")) {
+                const std::string ref = j.at("$ref");
+                CHECK(ref.rfind("#/", 0) == 0 && d.contains(nlohmann::json::json_pointer(ref.substr(1))));
+            }
+            for (const auto& v : j) walk(v);
+        } else if (j.is_array()) {
+            for (const auto& v : j) walk(v);
+        }
+    };
+    walk(d);
 }
 
 } // namespace

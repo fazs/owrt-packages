@@ -81,12 +81,12 @@
       class="primary"
       class:on={hasTare}
       aria-pressed={hasTare}
-      title={hasTare ? 'Tara aktiv; erneut klicken löscht sie' : 'Aktuellen Wert als Tara übernehmen'}
+      title={hasTare ? 'Tara ist aktiv' : 'nicht tariert\nAktuellen Wert als Tara übernehmen'}
       onclick={hasTare ? clearTare : tare}
       disabled={!live.connected}>Tara</button
     >
     <button onclick={() => (calOpen = true)} disabled={!live.config}>Kalibrieren</button>
-    <button onclick={() => (configOpen = true)} disabled={!live.config}>Parameter</button>
+    <button onclick={() => (configOpen = true)} disabled={!live.config}>Einstellungen</button>
     <button onclick={() => (debugOpen = true)} disabled={!live.connected}>Debug</button>
   </div>
 </header>

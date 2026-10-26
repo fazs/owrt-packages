@@ -17,7 +17,7 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=ethercat-weigh
 PKG_VERSION:=0.1.0
-PKG_RELEASE:=12
+PKG_RELEASE:=13
 
 PKG_MAINTAINER:=Fabian <fabiannd@gmail.com>
 

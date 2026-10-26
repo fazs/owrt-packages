@@ -55,6 +55,7 @@ configure_file(src/device_description_data.cpp.in
 
 # --- Kernlogik (hardwareunabhängig, testbar) ----------------------------------
 add_library(ew_core STATIC
+  src/api_registry.cpp
   src/calibration.cpp
   src/calibration_controller.cpp
   src/config.cpp
@@ -89,6 +90,8 @@ if(EW_BUILD_TESTS)
   target_compile_options(ew_tests PRIVATE -Wall -Wextra -Wshadow)
   # Simulation und Tests verwenden die ausgelieferte Konfiguration
   target_compile_definitions(ew_tests PRIVATE
-    EW_PACKAGE_CONFIG="${CMAKE_CURRENT_SOURCE_DIR}/openwrt/ethercat-weigh/files/config.json")
+    EW_PACKAGE_CONFIG="${CMAKE_CURRENT_SOURCE_DIR}/openwrt/ethercat-weigh/files/config.json"
+    # erzeugt von ethercat-weigh --write-openapi (scripts/build_host.sh)
+    EW_OPENAPI_FILE="${CMAKE_CURRENT_SOURCE_DIR}/src/generated/openapi.json")
   add_test(NAME ew_tests COMMAND ew_tests)
 endif()
