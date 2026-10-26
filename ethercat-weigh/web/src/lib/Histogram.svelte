@@ -45,13 +45,11 @@
   const OUTLIER_IQR = 3;
   /** Freedman–Diaconis: bin width 2·IQR / ∛n */
   const FD_FACTOR = 2;
-  /** Permitted number of bins (MAX_BINS at factor 1) */
+  /** Permitted number of bins with the automatic bin width */
   const MIN_BINS = 5;
   const MAX_BINS = 40;
-  /** Factor for the number of bins: range and step of the input field */
-  const BIN_FACTOR_MIN = 0.25;
-  const BIN_FACTOR_MAX = 4;
-  const BIN_FACTOR_STEP = 0.25;
+  /** Maximum number of bins with a fixed bin width (wider bins beyond that) */
+  const MAX_FIXED_BINS = 500;
   /** Mantissas for „nice“ step sizes 1, 2, 5 × 10^k */
   const NICE_STEPS = [1, 2, 5, 10];
   /** Base of the step sizes */
@@ -71,7 +69,7 @@
   let height = $state(MIN_HEIGHT);
   let scope = $state('all'); // all | shown (values displayed in the measurement table)
   let hover = $state(null); // index of the bar under the pointer
-  let binFactor = $state(1); // factor for the number of bins, only until reload
+  let binWidthG = $state(null); // fixed bin width [g], null = automatic; only until reload
   let dragging = $state(null); // 'lo' | 'hi' while a limit bar is being dragged
   let svgEl = $state(); // for converting pointer → value
 
@@ -85,6 +83,12 @@
     ),
   );
   const latest = $derived(values[0]);
+  // Binning in grams so that the bins are the same in every display unit (1 gr is not a power of ten of 1 g)
+  const valuesG = $derived(
+    (scope === 'shown' ? live.measurements.slice(0, VISIBLE_MEASUREMENTS) : live.measurements).map((m) => m.value),
+  );
+  /** Finest bin width [g]: display resolution of the unit g */
+  const resG = $derived(DECIMAL_BASE ** -decimalsFor(live.config?.measurement?.tolerance, 'g'));
 
   // Limits in the display unit (live.limits in g), null = open
   const lo = $derived(fromG(live.limits.lo, unit));
@@ -134,8 +138,8 @@
   }
 
   const hist = $derived.by(() => {
-    if (values.length < MIN_VALUES) return null;
-    const sorted = [...values].sort((a, b) => a - b);
+    if (valuesG.length < MIN_VALUES) return null;
+    const sorted = [...valuesG].sort((a, b) => a - b);
     // Do not include outliers (outside Q1 − OUTLIER_IQR·IQR … Q3 + OUTLIER_IQR·IQR) in the bins
     const q1 = quantile(sorted, Q1);
     const q3 = quantile(sorted, Q3);
@@ -149,19 +153,35 @@
     const mean = inner.reduce((a, v) => a + v, 0) / n;
     const sd = n > 1 ? Math.sqrt(inner.reduce((a, v) => a + (v - mean) ** 2, 0) / (n - 1)) : 0;
     // Bin width according to Freedman–Diaconis (fallback √n rule), MIN_BINS..MAX_BINS bins,
-    // rounded to NICE_STEPS · 10^k and not finer than the display resolution
+    // rounded to NICE_STEPS · 10^k grams and not finer than resG
     const span = max - min;
-    // binFactor scales the maximum count and the Freedman–Diaconis default
-    let w = (iqr > 0 ? (FD_FACTOR * iqr) / Math.cbrt(n) : span / Math.ceil(Math.sqrt(n))) / binFactor;
-    const maxBins = Math.max(MIN_BINS, Math.round(MAX_BINS * binFactor));
-    if (span > 0) w = Math.min(Math.max(w, span / maxBins), span / MIN_BINS);
-    const res = DECIMAL_BASE ** -dec;
-    w = Math.max(res, niceStep(w || res));
+    let auto = iqr > 0 ? (FD_FACTOR * iqr) / Math.cbrt(n) : span / Math.ceil(Math.sqrt(n));
+    if (span > 0) auto = Math.min(Math.max(auto, span / MAX_BINS), span / MIN_BINS);
+    auto = Math.max(resG, niceStep(auto || resG));
+    // Fixed bin width from the input field: not finer than resG
+    let w = auto;
+    if (binWidthG != null) {
+      w = Math.max(resG, binWidthG);
+      if (span / w > MAX_FIXED_BINS) w = span / MAX_FIXED_BINS;
+    }
     const start = Math.floor(min / w + EPS) * w || 0;
     const nb = Math.max(1, Math.floor((max - start) / w + EPS) + 1);
     const counts = new Array(nb).fill(0);
     for (const v of inner) counts[Math.min(nb - 1, Math.floor((v - start) / w + EPS))]++;
-    return { n, outliers, mean, sd, w, start, end: start + nb * w, counts, top: Math.max(...counts) };
+    // Result in the display unit (linear conversion)
+    const u = (v) => fromG(v, unit);
+    return {
+      n,
+      outliers,
+      mean: u(mean),
+      sd: u(sd),
+      w: u(w),
+      auto: u(auto),
+      start: u(start),
+      end: u(start + nb * w),
+      counts,
+      top: Math.max(...counts),
+    };
   });
 
   const pw = $derived(Math.max(MIN_PLOT_WIDTH, width - M.l - M.r));
@@ -197,12 +217,16 @@
     return 'M' + pts.join('L');
   });
 
+  /** Spacing of the x ticks: nice step in the display unit for the available width (independent of the bins) */
+  const xStep = $derived(
+    hist ? niceStep((hist.end - hist.start) / Math.max(MIN_VALUES, Math.floor(pw / X_TICK_SPACING))) : 1,
+  );
+
   const xTicks = $derived.by(() => {
     if (!hist) return [];
-    const step = Math.max(hist.w, niceStep((hist.end - hist.start) / Math.max(MIN_VALUES, Math.floor(pw / X_TICK_SPACING))));
     const out = [];
     // count over integers so that no rounding remainders (e.g. „-0“) arise
-    for (let i = Math.ceil(hist.start / step - EPS); i * step <= hist.end + EPS; i++) out.push(i * step || 0);
+    for (let i = Math.ceil(hist.start / xStep - EPS); i * xStep <= hist.end + EPS; i++) out.push(i * xStep || 0);
     return out;
   });
 
@@ -268,7 +292,22 @@
     return (lo != null && a + hist.w <= lo + EPS) || (hi != null && a >= hi - EPS);
   };
 
-  const tickDec = $derived(hist ? Math.max(0, Math.min(MAX_DECIMALS, Math.ceil(-Math.log10(hist.w) - EPS))) : dec);
+  /**
+   * Decimal places needed to show @p x exactly (at most MAX_DECIMALS).
+   * @param {number} x value
+   * @returns {number}
+   */
+  function decimalsOf(x) {
+    for (let d = 0; d < MAX_DECIMALS; d++) {
+      const scaled = x * DECIMAL_BASE ** d;
+      if (Math.abs(scaled - Math.round(scaled)) < EPS * Math.max(1, Math.abs(scaled))) return d;
+    }
+    return MAX_DECIMALS;
+  }
+
+  const tickDec = $derived(hist ? decimalsOf(xStep) : dec);
+  /** @param {number} w bin width [display unit] @returns {number} decimal places, at most one finer than the display */
+  const widthDec = (w) => Math.min(decimalsOf(w), dec + 1);
   // Bin of the last measurement (-1 if it lies outside as an outlier)
   const latestBin = $derived.by(() => {
     if (!hist || latest == null || latest < hist.start || latest > hist.end) return -1;
@@ -402,7 +441,7 @@
       {#if hist.outliers}<span class="warn">{hist.outliers} Ausreißer nicht dargestellt</span>{/if}
       <span><span class="key mean-key"></span>x̄ = {fmt(hist.mean, dec)}</span>
       <span>s = {fmt(hist.sd, dec + 1)}</span>
-      <span>{hist.counts.length} Klassen, Breite {fmt(hist.w, tickDec)}</span>
+      <span>{hist.counts.length} Klassen, Breite {fmt(hist.w, widthDec(hist.w))}</span>
       <span><span class="key normal-key"></span>Normalverteilung</span>
       <span><span class="key latest-key"></span>letzte Messung</span>
       {#if outside}<span class="bad"><span class="key limit-key"></span>{outside} außerhalb der Grenzen</span>{/if}
@@ -432,17 +471,17 @@
       <button onclick={() => ((limitError = ''), setLimits(null, null))}>Aufheben</button>
     {/if}
     {#if limitError}<span class="bad" role="alert">{limitError}</span>{/if}
-    <label class="factor" title="Skaliert die Höchstzahl der Klassen ({MAX_BINS} bei 1) und die Klassenbreite"
-      >Klassen × <input
+    <label class="binwidth" title="Leer: automatisch (Freedman–Diaconis). Nicht feiner als die Anzeigeauflösung."
+      >Klassenbreite [{unit}] <input
         type="number"
-        min={BIN_FACTOR_MIN}
-        max={BIN_FACTOR_MAX}
-        step={BIN_FACTOR_STEP}
-        value={binFactor}
+        step="any"
+        min={DECIMAL_BASE ** -dec}
+        placeholder={hist ? fmt(hist.auto, widthDec(hist.auto)) : 'automatisch'}
+        value={fieldValue(fromG(binWidthG, unit))}
         onchange={(e) => {
           const v = Number(e.currentTarget.value);
-          binFactor = Number.isFinite(v) && v > 0 ? Math.min(Math.max(v, BIN_FACTOR_MIN), BIN_FACTOR_MAX) : 1;
-          e.currentTarget.value = String(binFactor);
+          binWidthG = e.currentTarget.value.trim() !== '' && Number.isFinite(v) && v > 0 ? toG(v, unit) : null;
+          e.currentTarget.value = String(fieldValue(fromG(binWidthG, unit)));
         }}
       /></label
     >
@@ -611,11 +650,8 @@
     width: 7rem;
     margin-left: 0.3rem;
   }
-  .limits .factor {
+  .limits .binwidth {
     margin-left: auto;
-  }
-  .limits .factor input {
-    width: 4.5rem;
   }
   .limits button {
     padding: 0.2rem 0.6rem;
