@@ -601,7 +601,7 @@
   .wrap {
     display: flex;
     flex-direction: column;
-    max-height: calc(100dvh - 1rem);
+    /*max-height: calc(100dvh - 1rem);*/
   }
   header,
   footer {

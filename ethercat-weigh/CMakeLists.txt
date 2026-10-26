@@ -1,5 +1,14 @@
 cmake_minimum_required(VERSION 3.16)
-project(ethercat-weigh VERSION 0.2.0 LANGUAGES C CXX)
+
+# Version: einzige Quelle ist PKG_VERSION im OpenWrt-Makefile. Beim Paketbau übergibt das
+# Makefile sie als EW_PKG_VERSION (das Makefile liegt dann nicht im Build-Verzeichnis).
+set(EW_PKG_MAKEFILE ${CMAKE_CURRENT_SOURCE_DIR}/openwrt/ethercat-weigh/Makefile)
+if(NOT EW_PKG_VERSION)
+  file(STRINGS ${EW_PKG_MAKEFILE} EW_PKG_VERSION_LINE REGEX "^PKG_VERSION:=")
+  string(REGEX REPLACE "^PKG_VERSION:=" "" EW_PKG_VERSION "${EW_PKG_VERSION_LINE}")
+  set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${EW_PKG_MAKEFILE})
+endif()
+project(ethercat-weigh VERSION ${EW_PKG_VERSION} LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)

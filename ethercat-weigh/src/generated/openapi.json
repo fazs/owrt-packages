@@ -281,7 +281,7 @@
   "info": {
     "description": "REST-API von ethercat-weigh. Ereignisse (sample, measurement, config, ...) kommen über den WebSocket /ws; die erste Nachricht nach dem Verbindungsaufbau ist {\"type\": \"init\", \"snapshot\", \"config\"}.",
     "title": "ethercat-weigh",
-    "version": "0.2.0"
+    "version": "0.2.1"
   },
   "openapi": "3.1.0",
   "paths": {

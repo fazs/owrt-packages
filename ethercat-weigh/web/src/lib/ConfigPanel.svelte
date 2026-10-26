@@ -39,7 +39,6 @@
     {
       key: 'measurement',
       title: 'Messung',
-      hint: 'Massen in Gramm. Wirkt sofort.',
       fields: [
         { k: 'min_load', l: 'Mindestlast [g]', t: 'num', h: 'Ab diesem Wert gilt die Waage als belastet.' },
         { k: 'zero_threshold', l: 'Nullschwelle [g]', t: 'num', h: 'Darunter gilt die Waage als entlastet; neue Messung freigegeben.' },
@@ -52,7 +51,6 @@
     {
       key: 'statistics',
       title: 'Statistik',
-      hint: 'Wirkt sofort.',
       fields: [
         { k: 'rolling_window', l: 'Gleitendes Fenster [Messungen]', t: 'int' },
         { k: 'history_size', l: 'Gehaltene Messungen', t: 'int' },
@@ -384,7 +382,7 @@
   {#if draft}
     <form onsubmit={save}>
       <header>
-        <h2 id="cfg-title">Parameter</h2>
+        <h2 id="cfg-title">Einstellungen</h2>
         <button type="button" onclick={() => (open = false)}>Schließen</button>
       </header>
 
