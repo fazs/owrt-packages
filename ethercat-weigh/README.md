@@ -49,26 +49,33 @@ Beim Übergang PRE-OP → SAFE-OP setzt der Master:
 
 | Objekt | Inhalt |
 |---|---|
-| `0x1C12` (SM2) | `0x1600` RMB Control (2 Byte) |
-| `0x1C13` (SM3) | `0x1A00` RMB Status (2 Byte), `0x1A02` RMB Value (Real) (4 Byte) |
-| `0x8000` | CoE-Parameter aus `device` (wenn `write_on_start`) |
+| `0x1C12` (SM2) | `0x1600` RMB Control (2 Byte); zusätzlich `0x1601` RMB Filter frequency, wenn `0x8000:11` oder `:12` = 11 (PDO Filter frequency, ab Revision 0x0015) |
+| `0x1C13` (SM3) | `0x1A00` RMB Status (2 Byte) und je nach `device.pdo_variant` `0x1A02` RMB Value (Real) (`real`) bzw. `0x1A01` RMB Value (INT32) (`int32`, experimentell) |
+| `0x8000`, `0x8010`, `0x8020` | alle schreibbaren Klemmenparameter laut Gerätebeschreibung (wenn `write_on_start`), wie eine Startup-Liste in TwinCAT |
 
 Die Bitlage der Einträge wird nicht fest codiert, sondern nach Erreichen von SAFE-OP aus den gelesenen Mappings (`0x1C13`/`0x1C12` → `0x1Axx`/`0x16xx`) berechnet.
 
 Ausgewertete Statusbits: `0x6000:02` Overrange, `:04` Data invalid, `:07` Error, `:08` Calibration in progress, `:09` Steady state.
 Sync error und TxPDO Toggle liegen ab Revision 0x0015 in `0x6000:0E`/`:10`, davor laut ESI in `0x1C32:20`/`0x1800:09`; beide Varianten werden erkannt.
-Die Steuerbits `0x7000` werden nicht gesetzt (außer per Debug-Dialog); Tara erfolgt in der Anwendung.
+Zyklisch aus der Konfiguration gesetzt: `0x7000:04` Sample mode (`device.sample_mode`), `0x7000:02` Disable calibration (`device.disable_calibration`) und `0x7000:11` Filter frequency in 0,1 Hz (`device.filter_frequency`, nur mit `0x1601`). Die übrigen Steuerbits setzt nur der Debug-Dialog; Tara erfolgt in der Anwendung oder über die Kommandos der Klemme.
 
-Referenz für PDOs, Objektverzeichnis und Wertebereiche: `misc/Beckhoff-ESI/Beckhoff EL33xx.xml`.
+Die Revision der Klemme kommt aus der SII; eine Revision, die die Gerätebeschreibung nicht kennt, wird gemeldet und wie die neueste behandelt.
+
+Referenz für PDOs, Objektverzeichnis und Wertebereiche: die Gerätebeschreibung `src/generated/el3356_0010.json` (aus `esi/Beckhoff EL3356-0010.xml` und `scripts/esi_supplement.el3356_0010.json`, siehe `scripts/esi_gen.py`).
+
+### Klemmenparameter in der Konfiguration
+
+`device` enthält typisierte Felder für die Parameter, die Kennlinie, Simulation und Kalibrierung nutzen (`rated_output_mv_v`, `nominal_load`, …; Zuordnung über `config_key` der Gerätebeschreibung). Alle übrigen schreibbaren Parameter stehen in `device.coe` als CoE-Rohwert mit Adresse als Schlüssel, z. B. `{"0x8000:13": 50}` (Dynamic filter change time, 50 · 0,01 s); nicht aufgeführte erhalten den Default der ESI. Die Validierung prüft Datentyp, Grenzen und Aufzählungen laut Gerätebeschreibung und lehnt Einträge ab, die nicht geschrieben werden dürfen (`never_write`, z. B. `0x8000:22` Tara und die Herstellerkalibrierung `0x801F`/`0x802F`).
 
 ### Debug-Dialog
 
 Schaltfläche *Debug* in der Kopfzeile:
 
 - **Prozessdaten (PDO):** alle PDOs der Klemme (`0x1600`–`0x1607`, `0x1A00`–`0x1A07`, beim Hochlauf per SDO eingelesen, Namen per SDO-Information bzw. aus der ESI) mit Zuordnung, Bitlage und Live-Wert aus dem Prozessabbild. Zugeordnete Steuerbits `0x7000` werden im Prozessabbild übersteuert, bis sie freigegeben werden oder der Dialog geschlossen wird; nicht zugeordnete Einträge werden per SDO gelesen/geschrieben.
+- **Kommandos und Diagnose:** Kommandos der Gerätebeschreibung (Tara temporär/permanent, Tara Reset, Nullabgleich, Kalibrierung, Werkseinstellungen), jeweils mit Bestätigung; Diagnose `0x9000:11` mV/V, `0xA000` Diag-Bits und ADC-Rohwerte `0x801E`/`0x802E` per SDO auf Anfrage.
 - **Initialisierungssequenz:** die SDO-Schreibliste des PO2SO-Hooks (`el3356::init_sequence`) mit Sollwerten aus der Konfiguration; einzeln oder vollständig lesen/senden. `0x1C12`/`0x1C13` sind nur in PRE-OP beschreibbar; *Neu initialisieren* durchläuft INIT → OP mit der gespeicherten Sequenz.
 
-Auswahllisten für Bool-Objekte, Filtereinstellungen (`0x8000:11`/`:12`), Sample mode (`0x7000:04`), PDO-Zuordnung und Kommando `0xFB00:01`.
+Auswahllisten für Bool-Objekte, Aufzählungen und Werte laut Gerätebeschreibung (z. B. `0x8000:11`/`:12`, `0x7000:04`), PDO-Zuordnung und Kommando `0xFB00:01`.
 
 ## Einheiten
 
@@ -129,7 +136,7 @@ Statistik (nur RAM): Anzahl, Mittelwert, Standardabweichung (n−1), Minimum, Ma
 | Abschnitt | Wirkung bei Änderung über das Webinterface |
 |---|---|
 | `measurement`, `statistics`, `ui`, `calibration` | sofort (während einer Kalibrierung gesperrt) |
-| `device` | sofort, per SDO an die Klemme |
+| `device` | sofort, per SDO an die Klemme; `pdo_variant` und die Zuordnung von `0x1601` initialisieren die Klemme neu |
 | `ethercat`, `http` | nach Neustart des Dienstes |
 
 ## REST-API und WebSocket
@@ -144,12 +151,15 @@ Statistik (nur RAM): Anzahl, Mittelwert, Standardabweichung (n−1), Minimum, Ma
 | POST | `/api/calibration` | Kalibrierung, Body `{"action": …}` (siehe unten) |
 | POST | `/api/sim/load` | Nur Simulation: `{"grams": 25}` bzw. `{"grams": null}` für das automatische Profil |
 | POST | `/api/statistics/reset` | Statistik und Messungen löschen |
+| GET | `/api/device/description` | Gerätebeschreibung der Klemme (aus der ESI erzeugt) |
+| POST | `/api/device/command` | Kommando der Gerätebeschreibung starten: `{"id": "tare_temporary"}`; Abschluss als WebSocket-Ereignis `device_command` |
+| GET | `/api/device/diag` | Diagnose per SDO: `0x9000:11`, `0xA000:11`–`:18`, `0x801E:01`, `0x802E:01` |
 | GET | `/api/debug/pdos` | PDO-Katalog mit Zuordnung, Bitlage, Werten, Übersteuerungen und Prozessabbild (Hex) |
 | POST | `/api/debug/override` | Steuerbit übersteuern: `{"sub": 5, "value": true}`, aufheben mit `"value": null`, alle: `{"clear": true}` |
 | POST | `/api/debug/sdo` | `{"op": "read"\|"write", "index", "sub", "type": "bool\|u8\|u16\|u32\|u64\|i8\|i16\|i32\|f32", "value"}` |
 | GET | `/api/debug/init` | Initialisierungssequenz mit Sollwerten |
 | POST | `/api/debug/reinit` | Prozessdatenquelle schließen und neu initialisieren |
-| WS | `/ws` | `hello`, `sample` (mit `ui.rate_hz`), `measurement`, `statistics_reset`, `config`, `backend`, `device_config`, `calibration` |
+| WS | `/ws` | `hello`, `sample` (mit `ui.rate_hz`), `measurement`, `statistics_reset`, `config`, `backend`, `device_config`, `device_command`, `calibration` |
 
 Aktionen für `/api/calibration`:
 

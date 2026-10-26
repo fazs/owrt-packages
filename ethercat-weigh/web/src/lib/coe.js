@@ -161,17 +161,21 @@ export function settingEntries(desc) {
 export function entryUnit(e) {
   if (e.convert?.unit) return e.convert.unit;
   if (!e.unit?.unit) return '';
-  const exp = e.unit.exp;
-  if (exp === 0) return e.unit.unit;
-  return SI_PREFIX[exp] ? SI_PREFIX[exp] + e.unit.unit : `${DECIMAL_BASE}^${exp} ${e.unit.unit}`;
+  const prefix = SI_PREFIX[e.unit.exp];
+  return prefix ? prefix + e.unit.unit : e.unit.unit;
 }
 
 /**
- * Umrechnungsfaktor Rohwert -> Anzeige laut TwinCAT-Dialog (ConvertValue).
+ * Umrechnungsfaktor Rohwert -> Anzeige: ConvertValue des TwinCAT-Dialogs, sonst der Zehnerexponent
+ * der ESI-Einheit, wenn er keinen SI-Vorsatz hat (z. B. 0x7000:11 in 0,1 Hz -> Anzeige in Hz).
  * @param {object} e Eintrag
  * @returns {number} Faktor, 1 ohne Umrechnung
  */
-export const entryFactor = (e) => e.convert?.factor ?? 1;
+export function entryFactor(e) {
+  if (e.convert) return e.convert.factor ?? 1;
+  const exp = e.unit?.exp ?? 0;
+  return exp && !SI_PREFIX[exp] ? DECIMAL_BASE ** exp : 1;
+}
 
 /**
  * JSON-Wert (bool/Zahl) als Zahl für Auswahllisten.

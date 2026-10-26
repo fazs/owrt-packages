@@ -13,7 +13,9 @@ namespace ew {
  *
  * - Sensor: Brückensignal [mV/V] = zero + Masse / Kapazität * rated + Rauschen (siehe SimSensor)
  * - Klemme: Value = ((Signal - Zero balance) / Rated output * Nominal load * Gain - Tara) * Scale factor
- * - Kommandos 0xFB00:01: 0x0101 Nullabgleich, 0x0102 Kalibrierung mit Reference load
+ * - Kommandos 0xFB00:01: 0x0101 Nullabgleich, 0x0102 Kalibrierung mit Reference load,
+ *   0x0001/0x0002 Tara; 0x1011:01 "load" setzt Gain und Tara zurück
+ * - Diagnose: 0x9000:11 = Brückensignal, 0xA000 ohne Meldungen
  * - Lastprofil (zyklisch): leer -> Last aufgelegt (gedämpftes Einschwingen) -> halten -> entlasten,
  *   oder feste Masse über set_sim_load()
  */
@@ -72,6 +74,7 @@ public:
     [[nodiscard]] const SimSensor& sensor() const { return sensor_; }
 
 private:
+    void build_image(const DeviceConfig& dc);
     double mass_kg(double t);
     double signal_mvv(double mass);
 
@@ -96,7 +99,7 @@ private:
     /// Übrige Objekte: gespeicherte SDO-Daten (Schlüssel siehe od_key())
     std::map<uint32_t, std::vector<uint8_t>> od_;
 
-    // Prozessabbild gemäß Standard-Zuordnung (el3356::rx_assignment/tx_assignment)
+    // Prozessabbild gemäß Zuordnung aus der Konfiguration (el3356::pdo_assignment)
     std::vector<el3356::PdoInfo> pdos_;  ///< PDO-Katalog
     el3356::InputLayout in_;             ///< Lage der Eingänge
     el3356::OutputLayout out_;           ///< Lage der Steuerbits

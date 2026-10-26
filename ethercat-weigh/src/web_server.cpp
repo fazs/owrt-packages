@@ -217,6 +217,23 @@ void run_web_server(Acquisition& acq, const HttpConfig& http) {
         return result(acq.set_sim_load(g));
     });
 
+    // Kommando der Gerätebeschreibung: {"id": "<commands[].id>"}; Abschluss als WebSocket-Ereignis
+    CROW_ROUTE(app, "/api/device/command").methods(crow::HTTPMethod::Post)([&](const crow::request& req) {
+        std::string id;
+        try {
+            id = nlohmann::json::parse(req.body).at("id").get<std::string>();
+        } catch (const std::exception& ex) {
+            return json_response(kHttpBadRequest, {{"ok", false}, {"error", ex.what()}});
+        }
+        return result(acq.device_command(id));
+    });
+
+    // Diagnose der Klemme (SDO, nur auf Anfrage)
+    CROW_ROUTE(app, "/api/device/diag")([&] {
+        const auto j = acq.device_diagnostics();
+        return json_response(j.value("ok", false) ? kHttpOk : kHttpConflict, j);
+    });
+
     // --- Debug (PDOs, Initialisierungssequenz) -----------------------------------
     CROW_ROUTE(app, "/api/debug/pdos")([&] {
         const auto j = acq.debug_pdos();

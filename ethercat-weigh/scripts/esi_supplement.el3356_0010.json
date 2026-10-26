@@ -65,24 +65,36 @@
    "never_write": "nur über Kommando restore_defaults",
    "source": "Projektentscheidung"
   },
-  "0x7000:11": {
-   "min": 1,
-   "max": 2000,
-   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.5 Ausgangsdaten; ESI SettingsTab, OutputField 'Filterfrequenz'"
-  },
-  "0x7000:04": {
-   "values": [
-    {
-     "value": 0,
-     "text": "10,5 kHz High precision"
-    },
-    {
-     "value": 1,
-     "text": "105 kHz Low latency"
-    }
-   ],
-   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.5 Ausgangsdaten (Sample mode); Kap. 4.2.7 Wandlungsmodus"
-  },
+  "0x7000:11": [
+   {
+    "config_key": "filter_frequency",
+    "source": "src/config.hpp DeviceConfig"
+   },
+   {
+    "min": 1,
+    "max": 2000,
+    "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.5 Ausgangsdaten; ESI SettingsTab, OutputField 'Filterfrequenz'"
+   }
+  ],
+  "0x7000:04": [
+   {
+    "config_key": "sample_mode",
+    "source": "src/config.hpp DeviceConfig"
+   },
+   {
+    "values": [
+     {
+      "value": 0,
+      "text": "10,5 kHz High precision"
+     },
+     {
+      "value": 1,
+      "text": "105 kHz Low latency"
+     }
+    ],
+    "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.5 Ausgangsdaten (Sample mode); Kap. 4.2.7 Wandlungsmodus"
+   }
+  ],
   "0xFB00:02": {
    "values": [
     {
@@ -135,6 +147,10 @@
   "0x802E:01": {
    "description_de": "ADC-Rohwert",
    "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.6 Informations-/Diagnostikdaten"
+  },
+  "0x7000:02": {
+   "config_key": "disable_calibration",
+   "source": "src/config.hpp DeviceConfig"
   }
  },
  "commands": [

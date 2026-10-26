@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "config.hpp"
+#include "device_commands.hpp"
 #include "device_description.hpp"
 #include "el3356.hpp"
 #include "measurement.hpp"
@@ -441,7 +442,8 @@ TEST(device_settings_from_description) {
     // Typisierte Felder auf die ESI-Defaults setzen: Schreibliste = Init-Block der Variante REAL
     nlohmann::json typed = ew::device_json(ew::DeviceConfig{});
     for (const auto& e : d.entries())
-        if (e.raw.contains("config_key")) typed[e.raw.at("config_key").get<std::string>()] = e.raw.at("default");
+        if (e.raw.contains("config_key") && e.raw.contains("default"))
+            typed[e.raw.at("config_key").get<std::string>()] = e.raw.at("default");
     const ew::Config cfg = ew::config_from_json({{"device", typed}});
     CHECK(cfg.validate().empty());
     const nlohmann::json* variant = nullptr;
@@ -490,8 +492,9 @@ TEST(el3356_debug_catalog_and_init_sequence) {
     constexpr uint8_t kSubCtrlInvalid = kSubCtrlTare + 1U;  // erster nicht belegter Subindex
     constexpr size_t kAssignFrame = 2U;  // je Zuordnung: Anzahl löschen + Anzahl setzen
 
+    const auto assign = pdo_assignment(ew::DeviceConfig{});
     auto pdos = known_pdos();
-    locate_pdos(pdos, rx_assignment(), tx_assignment());
+    locate_pdos(pdos, assign.rx, assign.tx);
     const std::vector<uint16_t> all = {kPdoControl,       kPdoFilterFrequency, kPdoStatus,        kPdoValueInt,
                                        kPdoValueReal,     kPdoTimestamp,       kPdoAiStandardCh1, kPdoAiCompactCh1,
                                        kPdoAiStandardCh2, kPdoAiCompactCh2};
@@ -550,12 +553,12 @@ TEST(el3356_debug_catalog_and_init_sequence) {
     CHECK(control_bit(c, kSubCtrlTare) == &c.tare && control_bit(c, kSubCtrlInvalid) == nullptr);
 
     ew::DeviceConfig dc;
-    const size_t rx_len = rx_assignment().size() + kAssignFrame;
-    const size_t tx_len = tx_assignment().size() + kAssignFrame;
+    const size_t rx_len = assign.rx.size() + kAssignFrame;
+    const size_t tx_len = assign.tx.size() + kAssignFrame;
     const auto seq = init_sequence(dc);
     CHECK(seq.size() == rx_len + tx_len + settings_writes(dc).size());
     CHECK(seq.front().index == kSm2Assign && seq.front().sub == kSubCount && seq.front().pre_op_only);
-    const auto pos = std::find(tx_assignment().begin(), tx_assignment().end(), kPdoValueReal) - tx_assignment().begin();
+    const auto pos = std::find(assign.tx.begin(), assign.tx.end(), kPdoValueReal) - assign.tx.begin();
     const auto real_assign = std::find_if(seq.begin(), seq.end(), [&](const SdoWrite& w) {
         return w.index == kSm3Assign && w.sub == kSubFirstEntry + pos;
     });
@@ -606,6 +609,116 @@ TEST(device_description_el3356) {
         const auto* dp = d.pdo(p.index);
         CHECK(dp && p.excludes == dp->exclude && p.rx == dp->rx);
     }
+}
+
+TEST(pdo_assignment_variants) {
+    using namespace ew::el3356;
+    constexpr uint32_t kRevBefore1601 = 0x0014000AU;  ///< letzte Revision ohne 0x1601
+    constexpr uint16_t kFrequency = 500U;             ///< 50 Hz in 0,1 Hz
+    constexpr uint16_t kFrequencyTooHigh = 2001U;     ///< oberhalb des Wertebereichs 1..2000
+    constexpr int32_t kValueInt = -1234;
+
+    ew::DeviceConfig dc;
+    auto a = pdo_assignment(dc);
+    CHECK(a.rx == std::vector<uint16_t>{kPdoControl});
+    CHECK((a.tx == std::vector<uint16_t>{kPdoStatus, kPdoValueReal}));
+    dc.pdo_variant = kVariantInt32;
+    a = pdo_assignment(dc);
+    CHECK((a.tx == std::vector<uint16_t>{kPdoStatus, kPdoValueInt}));
+    CHECK(check_assignment(a).empty());
+    CHECK(!check_assignment({{kPdoControl}, {kPdoStatus, kPdoValueInt, kPdoValueReal}}).empty());
+
+    // Filter 11 (PDO Filter frequency): 0x1601 zusätzlich, ab Revision 0x0015
+    dc.mode0_filter_settings = kFilterPdoFrequency;
+    a = pdo_assignment(dc);
+    CHECK((a.rx == std::vector<uint16_t>{kPdoControl, kPdoFilterFrequency}));
+    CHECK(pdo_assignment(dc, kRevBefore1601).rx == std::vector<uint16_t>{kPdoControl});
+    ew::Config c;
+    c.device = dc;
+    CHECK(!c.validate().empty());  // filter_frequency 0 außerhalb 1..2000
+    c.device.filter_frequency = kFrequency;
+    CHECK(c.validate().empty());
+    c.device.filter_frequency = kFrequencyTooHigh;
+    CHECK(!c.validate().empty());
+    c.device.filter_frequency = kFrequency;
+    c.device.pdo_variant = "x";
+    CHECK(!c.validate().empty());
+
+    // Layout: INT32-Wert und Filterfrequenz im Prozessabbild
+    ew::Config a_cfg, b_cfg;
+    b_cfg.device = dc;
+    CHECK(ew::pdo_config_changed(a_cfg, b_cfg) && !ew::device_config_changed(b_cfg, [&] {
+        auto x = b_cfg;
+        x.device.sample_mode = !x.device.sample_mode;
+        return x;
+    }()));
+    auto pdos = known_pdos();
+    locate_pdos(pdos, a.rx, a.tx);
+    std::vector<std::vector<MapEntry>> rx, tx;
+    for (uint16_t idx : a.rx)
+        for (const auto& p : pdos)
+            if (p.index == idx) {
+                rx.emplace_back();
+                for (const auto& e : p.entries) rx.back().push_back(e.map);
+            }
+    for (uint16_t idx : a.tx)
+        for (const auto& p : pdos)
+            if (p.index == idx) {
+                tx.emplace_back();
+                for (const auto& e : p.entries) tx.back().push_back(e.map);
+            }
+    const auto il = layout_inputs(tx);
+    CHECK(il.value_int.present && !il.value_real.present);
+    std::vector<uint8_t> img(bytes_for_bits(il.value_int.bit_offset + kBitsDint), 0U);
+    encode_inputs(img.data(), il, ew::El3356Status{}, static_cast<float>(kValueInt));
+    CHECK(decode_measurement(img.data(), il) == kValueInt);
+    const auto ol = layout_outputs(rx);
+    CHECK(ol.filter_frequency.present && ol.filter_frequency.bit_len == kBitsUint);
+    std::vector<uint8_t> out(bytes_for_bits(ol.filter_frequency.bit_offset + kBitsUint), 0U);
+    ew::El3356Control ctrl;
+    ctrl.filter_frequency = kFrequency;
+    encode_control(out.data(), ol, ctrl);
+    uint16_t back = 0U;
+    std::memcpy(&back, out.data() + ol.filter_frequency.bit_offset / kBitsPerByte, sizeof back);
+    CHECK(back == kFrequency);
+}
+
+TEST(device_commands_and_diagnostics) {
+    constexpr double kStepS = 0.01;      ///< Zeitschritt der Statusabfragen [s]
+    constexpr int kMaxSteps = 100;       ///< > SimBackend::kCmdBusyReads
+    constexpr double kTareTolRel = 1e-3; ///< Restwert nach Tara (Anteil der Nennlast · Scale factor)
+    static_assert(kMaxSteps > ew::SimBackend::kCmdBusyReads, "Statusabfragen bis zum Abschluss");
+
+    ew::SimBackend sim;
+    ew::Config cfg;
+    std::string err;
+    CHECK(sim.open(cfg, err));
+    ew::Sample s;
+    sim.cycle(0.0, ew::El3356Control{}, s);  // Lastprofil beginnt unbelastet: Tara auf den Nullpunkt
+
+    ew::DeviceCommandRunner r;
+    bool finished = false;
+    CHECK(!r.start("unbekannt", sim, 0.0, finished).ok);
+    CHECK(r.start("tare_temporary", sim, 0.0, finished).ok && !finished && r.active());
+    CHECK(!r.start("tare_temporary", sim, 0.0, finished).ok);  // läuft noch
+    std::optional<ew::CalResult> done;
+    double t = 0.0;
+    for (int i = 0; i < kMaxSteps && !done; ++i) done = r.step(sim, t += kStepS);
+    CHECK(done && done->ok && !r.active());
+    sim.set_sim_load(0.0);
+    sim.cycle(t, ew::El3356Control{}, s);
+    const double tol = kTareTolRel * cfg.device.nominal_load * cfg.device.scale_factor;
+    CHECK(std::fabs(s.raw) < tol);
+
+    // Tara Reset (ESI, CmdObjectButton) schreibt 0x8000:22 ohne Statusabfrage
+    std::string reset_id;
+    for (const auto& c : ew::DeviceDescription::el3356_0010().json().at("commands"))
+        if (c.at("writes").size() == 1U && c.at("writes").at(0).at("obj") == "0x8000:22") reset_id = c.at("id");
+    CHECK(!reset_id.empty() && r.start(reset_id, sim, t, finished).ok && finished && !r.active());
+
+    const auto diag = ew::read_diagnostics(sim);
+    CHECK(diag.at("ok") == true && diag.at("items").size() > 1U);
+    CHECK(diag.at("items").at(0).at("key") == "0x9000:11" && diag.at("items").at(0).at("value").is_number());
 }
 
 /// @name Simulation

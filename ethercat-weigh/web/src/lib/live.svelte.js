@@ -212,6 +212,10 @@ function handle(msg) {
     case 'calibration':
       live.calibration = msg.calibration;
       break;
+    case 'device_command':
+      if (msg.ok) notify('ok', `Kommando ${msg.id} ausgeführt`);
+      else notify('error', `Kommando ${msg.id ?? ''} fehlgeschlagen: ${msg.error}`);
+      break;
     case 'device_config':
       if (msg.ok) notify('ok', 'Klemmenparameter übertragen');
       else notify('error', `Klemmenparameter nicht übertragen: ${msg.error}`);
@@ -357,6 +361,8 @@ export const debugApi = {
   sdo: (body) => post('/api/debug/sdo', body),
   override: (body) => post('/api/debug/override', body),
   reinit: () => post('/api/debug/reinit'),
+  command: (id) => post('/api/device/command', { id }),
+  diag: () => getJson('/api/device/diag'),
 };
 
 /**

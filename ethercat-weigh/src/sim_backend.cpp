@@ -79,31 +79,43 @@ SimBackend::SimSensor SimBackend::sensor_for(const Config& cfg) {
 }
 
 /**
- * @brief Baut PDO-Katalog und Prozessabbild gemäß Standard-Zuordnung auf;
+ * @brief Baut PDO-Katalog und Prozessabbild gemäß Default-Zuordnung auf;
  *        Sensor und Objektverzeichnis aus der Default-Konfiguration.
  * @param seed Startwert des Zufallsgenerators (reproduzierbare Tests)
  */
 SimBackend::SimBackend(unsigned seed) : rng_(seed), sensor_(sensor_for(Config{})) {
+    build_image(DeviceConfig{});
+    std::string unused;
+    write_device_config(DeviceConfig{}, unused);
+}
+
+/**
+ * @brief Baut PDO-Katalog, Lage der Ein- und Ausgänge und Prozessabbild auf.
+ * @param dc Klemmenparameter (Variante, Filter; siehe el3356::pdo_assignment)
+ */
+void SimBackend::build_image(const DeviceConfig& dc) {
     using namespace el3356;
+    const auto a = pdo_assignment(dc);
     pdos_ = known_pdos();
-    locate_pdos(pdos_, rx_assignment(), tx_assignment());
+    locate_pdos(pdos_, a.rx, a.tx);
     std::vector<std::vector<MapEntry>> rx, tx;
     uint32_t rx_bits = 0U, tx_bits = 0U;
-    for (const auto& p : pdos_) {
-        if (!p.assigned) continue;
-        std::vector<MapEntry> m;
-        for (const auto& e : p.entries) {
-            m.push_back(e.map);
-            (p.rx ? rx_bits : tx_bits) += e.map.bits;
-        }
-        (p.rx ? rx : tx).push_back(std::move(m));
-    }
+    // Mappings in Zuordnungsreihenfolge (wie 0x1C12/0x1C13)
+    for (bool is_rx : {true, false})
+        for (uint16_t idx : is_rx ? a.rx : a.tx)
+            for (const auto& p : pdos_) {
+                if (p.index != idx || p.rx != is_rx) continue;
+                std::vector<MapEntry> m;
+                for (const auto& e : p.entries) {
+                    m.push_back(e.map);
+                    (is_rx ? rx_bits : tx_bits) += e.map.bits;
+                }
+                (is_rx ? rx : tx).push_back(std::move(m));
+            }
     in_ = layout_inputs(tx);
     out_ = layout_outputs(rx);
     img_in_.assign(bytes_for_bits(tx_bits), 0U);
     img_out_.assign(bytes_for_bits(rx_bits), 0U);
-    std::string unused;
-    write_device_config(DeviceConfig{}, unused);
 }
 
 /**
@@ -116,6 +128,7 @@ bool SimBackend::open(const Config& cfg, std::string& err) {
     sensor_ = sensor_for(cfg);
     phase_start_ = 0.0;
     target_ = load_dist_(rng_) * sensor_.capacity_kg;
+    build_image(cfg.device);
     // Wirkung des PO2SO-Hooks nachbilden
     for (const auto& w : el3356::init_sequence(cfg.device)) od_[od_key(w.index, w.sub)] = w.data;
     return write_device_config(cfg.device, err);
@@ -239,12 +252,20 @@ bool SimBackend::sdo_write(uint16_t index, uint8_t sub, const std::vector<uint8_
             cmd_status_ = kCmdStatusDone;
             return true;
         }
-        if (cmd_ != kCmdZeroBalance && cmd_ != kCmdCalibration) {
+        if (cmd_ != kCmdZeroBalance && cmd_ != kCmdCalibration && cmd_ != kCmdTareTemporary &&
+            cmd_ != kCmdTarePermanent) {
             cmd_status_ = kCmdStatusUnknown;
             return true;
         }
         cmd_status_ = kCmdStatusBusy;
         cmd_busy_reads_ = kCmdBusyReads;
+        return true;
+    }
+    if (index == kObjRestore && sub == kSubRestoreAll) {
+        if (decode_value(DType::U32, d) == kRestoreSignature) {
+            gain_ = 1.0F;
+            tara_ = 0.0F;
+        }
         return true;
     }
     if (index == kObjInputs || is_pdo_mapping(index)) {
@@ -275,6 +296,9 @@ bool SimBackend::sdo_read(uint16_t index, uint8_t sub, size_t, std::vector<uint8
             } else if (cmd_ == kCmdCalibration) {
                 const double span = last_signal_ - zero_bal_;
                 rated_ = static_cast<float>(span * nominal_ / reference_);
+            } else if (cmd_ == kCmdTareTemporary || cmd_ == kCmdTarePermanent) {
+                // Tara so, dass der aktuelle Wert 0 ergibt
+                tara_ = static_cast<float>((last_signal_ - zero_bal_) / rated_ * nominal_ * gain_);
             }
             cmd_status_ = kCmdStatusDone;
         }
@@ -293,6 +317,14 @@ bool SimBackend::sdo_read(uint16_t index, uint8_t sub, size_t, std::vector<uint8
         case kSubFilterMode0: d = le_u16(filter_); return true;
         default: break;
         }
+    }
+    if (index == kObjInfo && sub == kSubInfoMvV) {
+        d = le_f32(static_cast<float>(last_signal_));
+        return true;
+    }
+    if (index == kObjDiag && sub > kSubCount) {
+        d = {0U};  // keine Diagnose in der Simulation
+        return true;
     }
     // PDO-Mapping und Eingangsobjekte aus dem Katalog bzw. dem Prozessabbild
     for (const auto& p : pdos_) {

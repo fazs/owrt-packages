@@ -623,12 +623,15 @@ def parse_addr(key: str) -> tuple[int, int | None]:
 def apply_supplement(desc: dict, sup: dict, obj_by_index: dict):
     """Führt die Zusatzdatei in die Beschreibung ein.
 
-    - entries: {"0xIIII:SS" oder "0xIIII": {Felder..., "source"}}; Felder werden in den Eintrag
-      (bzw. alle Einträge des Objekts) übernommen und unter "supplement" aufgeführt.
+    - entries: {"0xIIII:SS" oder "0xIIII": {Felder..., "source"} oder Liste solcher Objekte (je
+      Quelle eines)}; Felder werden in den Eintrag (bzw. alle Einträge des Objekts) übernommen
+      und unter "supplement" aufgeführt.
     - commands: werden mit origin "supplement" angehängt.
     Vorhandene ESI-Felder dürfen nicht überschrieben werden.
     """
-    for key, fields in sorted(sup.get('entries', {}).items()):
+    items = [(k, f) for k, v in sorted(sup.get('entries', {}).items())
+             for f in (v if isinstance(v, list) else [v])]
+    for key, fields in items:
         if 'source' not in fields:
             raise EsiError(f'Zusatzdatei: {key} ohne source')
         idx, sub = parse_addr(key)

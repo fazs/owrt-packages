@@ -16,6 +16,51 @@
   let edits = $state({}); // objKey -> Eingabe (Zahl bei Auswahlliste, sonst Text)
   let busy = $state({}); // objKey bzw. 'init:<i>' -> true
 
+  // --- Kommandos und Diagnose der Klemme
+  let diag = $state(null); // {items: [...]}
+  let diagError = $state('');
+  let armed = $state(null); // Kommando, das auf Bestätigung wartet
+  const commands = $derived(live.description?.commands ?? []);
+
+  /**
+   * Kommando auslösen; der erste Klick fordert die Bestätigung an, der zweite führt aus.
+   * @param {{id: string}} c Kommando der Gerätebeschreibung
+   */
+  async function command(c) {
+    if (armed !== c.id) {
+      armed = c.id;
+      return;
+    }
+    armed = null;
+    await run(`cmd:${c.id}`, async () => {
+      try {
+        await debugApi.command(c.id);
+        notify('ok', `Kommando ${c.id} gestartet`);
+      } catch (e) {
+        notify('error', `Kommando ${c.id}: ${e.message}`);
+      }
+    });
+  }
+
+  /** Liest die Diagnoseeinträge der Klemme. */
+  async function loadDiag() {
+    await run('diag', async () => {
+      try {
+        diag = await debugApi.diag();
+        diagError = '';
+      } catch (e) {
+        diagError = e.message;
+      }
+    });
+  }
+
+  /**
+   * Schreibzugriffe eines Kommandos als Text.
+   * @param {{writes: Array<{obj: string, data: string}>}} c Kommando
+   * @returns {string} z. B. "0xFB00:01 ← 01 00"
+   */
+  const writesText = (c) => c.writes.map((w) => `${w.obj} ← ${w.data.match(/../g).join(' ')}`).join(', ');
+
   // --- Initialisierungssequenz
   let steps = $state([]); // {index, sub, name, type, value, pre_op_only, target, actual, error}
   let seqBusy = $state(false);
@@ -301,6 +346,9 @@
         <button role="tab" aria-selected={tab === 'init'} class:on={tab === 'init'} onclick={() => (tab = 'init')}
           >Initialisierungssequenz</button
         >
+        <button role="tab" aria-selected={tab === 'device'} class:on={tab === 'device'} onclick={() => (tab = 'device')}
+          >Kommandos und Diagnose</button
+        >
       </div>
       <button type="button" onclick={() => (open = false)}>Schließen</button>
     </header>
@@ -403,6 +451,69 @@
             </dl>
           </section>
         {/if}
+      {:else if tab === 'device'}
+        <p class="hint muted">
+          Kommandos laut Gerätebeschreibung (ESI und Beckhoff-Dokumentation). Jedes Kommando muss mit einem zweiten
+          Klick bestätigt werden; Tara permanent, Nullabgleich, Kalibrierung und Werkseinstellungen schreiben in das
+          EEPROM der Klemme. Der Abschluss erscheint als Hinweis.
+        </p>
+        <div class="scroll">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">Kommando</th>
+                <th scope="col">Schreibzugriffe</th>
+                <th scope="col">Quelle</th>
+                <th scope="col"><span class="sr">Aktion</span></th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each commands as c (c.id)}
+                <tr>
+                  <td>{c.label_de ?? c.id} <small class="muted">({c.id})</small></td>
+                  <td><code>{writesText(c)}</code></td>
+                  <td><small class="muted">{c.origin === 'esi' ? 'ESI' : c.source}</small></td>
+                  <td class="act">
+                    <button class:primary={armed === c.id} disabled={busy[`cmd:${c.id}`]} onclick={() => command(c)}
+                      >{armed === c.id ? 'Bestätigen' : 'Ausführen'}</button
+                    >
+                    {#if armed === c.id}<button onclick={() => (armed = null)}>Abbrechen</button>{/if}
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+        <section class="diag">
+          <h3>Diagnose <button disabled={busy.diag} onclick={loadDiag}>Lesen</button></h3>
+          {#if diagError}<p class="err" role="alert">{diagError}</p>{/if}
+          {#if diag}
+            <div class="scroll">
+              <table>
+                <thead>
+                  <tr>
+                    <th scope="col">Objekt</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Bedeutung</th>
+                    <th scope="col">Wert</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {#each diag.items as it (it.key)}
+                    <tr>
+                      <td><code>{it.key}</code></td>
+                      <td>{it.name ?? '–'}</td>
+                      <td>{it.description || '–'}</td>
+                      <td class="val">
+                        {#if it.error}<span class="err">{it.error}</span>{:else}{formatValue(it.value, it.type, enumFor(0, 0, it.type))}{/if}
+                      </td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          {/if}
+        </section>
       {:else}
         <p class="hint muted">
           Sequenz des Übergangs PRE-OP → SAFE-OP mit den Werten der gespeicherten Konfiguration. Sollwerte können vor
@@ -569,6 +680,9 @@
   .tag.ok {
     color: var(--accent);
     border-color: var(--accent);
+  }
+  .diag {
+    margin-top: 1rem;
   }
   .scroll {
     overflow-x: auto;

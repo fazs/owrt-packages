@@ -70,7 +70,8 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(EthercatConfig,
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(DeviceConfig,
     write_on_start, mode0_enable_filter, mode0_enable_averager, mode0_filter_settings,
     rated_output_mv_v, nominal_load, zero_balance, gravity_of_earth, scale_factor,
-    reference_load, steady_state_window, steady_state_tolerance, calibration_interval, coe)
+    reference_load, steady_state_window, steady_state_tolerance, calibration_interval, coe,
+    pdo_variant, sample_mode, disable_calibration, filter_frequency)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(MeasurementConfig,
     min_load, zero_threshold, stable_time_ms, tolerance, sigma_max, use_device_steady_state)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(StatisticsConfig, rolling_window, history_size)
@@ -279,13 +280,34 @@ bool requires_restart(const Config& a, const Config& b) {
 }
 
 /**
- * @brief Prüft, ob sich die Klemmenparameter (0x8000) geändert haben.
+ * @brief Prüft, ob sich die per SDO geschriebenen Klemmenparameter geändert haben.
+ *
+ * Zyklische Ausgänge (sample_mode, disable_calibration, filter_frequency) und die
+ * Prozessdaten-Variante zählen nicht dazu.
+ *
  * @param a bisherige Konfiguration
  * @param b neue Konfiguration
  * @return true, wenn device neu in die Klemme geschrieben werden muss
  */
 bool device_config_changed(const Config& a, const Config& b) {
-    return nlohmann::json(a.device) != nlohmann::json(b.device);
+    auto sdo_part = [](const DeviceConfig& d) {
+        nlohmann::json j = d;
+        for (const char* k : {"pdo_variant", "sample_mode", "disable_calibration", "filter_frequency"}) j.erase(k);
+        return j;
+    };
+    return sdo_part(a.device) != sdo_part(b.device);
+}
+
+/**
+ * @brief Prüft, ob sich die PDO-Zuordnung (0x1C12/0x1C13) ändert.
+ * @param a bisherige Konfiguration
+ * @param b neue Konfiguration
+ * @return true, wenn die Klemme neu initialisiert werden muss
+ */
+bool pdo_config_changed(const Config& a, const Config& b) {
+    const auto pa = el3356::pdo_assignment(a.device);
+    const auto pb = el3356::pdo_assignment(b.device);
+    return pa.rx != pb.rx || pa.tx != pb.tx;
 }
 
 } // namespace ew

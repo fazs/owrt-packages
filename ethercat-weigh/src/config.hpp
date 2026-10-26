@@ -43,6 +43,12 @@ struct DeviceConfig {
     /// Übrige schreibbare Klemmenparameter (0x8000, 0x8010, 0x8020) als CoE-Rohwert, Schlüssel
     /// "0xIIII:SS"; nicht aufgeführte Einträge erhalten beim Schreiben den Default der ESI
     std::map<std::string, double> coe;
+    /// Prozessdaten: "real" (Standard (REAL), 0x1A02) oder "int32" (Standard (INT32), 0x1A01,
+    /// experimentell); eine Änderung initialisiert die Klemme neu
+    std::string pdo_variant = "real";
+    bool sample_mode = false;          ///< 0x7000:04 Sample mode (zyklischer Ausgang)
+    bool disable_calibration = false;  ///< 0x7000:02 Disable calibration (zyklischer Ausgang)
+    uint16_t filter_frequency = 0;     ///< 0x7000:11 Filter frequency [0,1 Hz], wirksam bei Filter 11
 };
 
 /// Stützpunkt der Kennlinie (Kalibrierung in der Anwendung).
@@ -125,5 +131,6 @@ std::vector<std::string> validate_points(const std::vector<CalPoint>& pts);
 
 bool requires_restart(const Config& a, const Config& b);
 bool device_config_changed(const Config& a, const Config& b);
+bool pdo_config_changed(const Config& a, const Config& b);
 
 } // namespace ew

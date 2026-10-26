@@ -111,8 +111,15 @@
     },
   ];
 
-  /** Variante der Prozessdaten (AlternativeSmMapping), die diese Anwendung zuordnet. */
-  const CURRENT_VARIANT = 'Standard (REAL)';
+  /** ESI-Name der Prozessdaten-Variante (AlternativeSmMapping) je device.pdo_variant. */
+  const VARIANT_NAMES = { real: 'Standard (REAL)', int32: 'Standard (INT32)' };
+  /** Auswahl der Prozessdaten-Variante. */
+  const VARIANT_OPTIONS = [
+    ['real', 'Value (Real), 0x1A02'],
+    ['int32', 'Value (INT32), 0x1A01 – experimentell'],
+  ];
+  /** Ausgänge 0x7000, die aus der Konfiguration zyklisch geschrieben werden. */
+  const OUTPUT_KEYS = ['0x7000:04', '0x7000:02', '0x7000:11'];
   /** Zusätzliche Bedingungen je Klemmenparameter (Abhängigkeiten der Anwendung). */
   const EXTRA_DEPS = { '0x8000:29': [STEADY_ON], '0x8000:2A': [STEADY_ON] };
   /**
@@ -167,7 +174,7 @@
     return {
       ok: () =>
         conds.some((c) =>
-          c.variant ? c.variant === CURRENT_VARIANT : Number(deviceValue(descEntry(live.description, c.obj))) === Number(c.eq),
+          c.variant ? c.variant === VARIANT_NAMES[draft.device.pdo_variant] : Number(deviceValue(descEntry(live.description, c.obj))) === Number(c.eq),
         ),
       h: texts.length ? `Nur wirksam bei ${texts.join(' oder ')}.` : 'In der aktuellen Prozessdaten-Variante unwirksam.',
     };
@@ -176,14 +183,15 @@
   /**
    * Felddefinition eines Klemmenparameters.
    * @param {object} e Eintrag der Gerätebeschreibung
+   * @param {boolean} [onStart=true] nur bei „Beim Start schreiben“ beim Start übertragen (SDO)
    * @returns {object} Feld (k, l, t, o, h, tip, dep, entry)
    */
-  function deviceField(e) {
+  function deviceField(e, onStart = true) {
     const unit = entryUnit(e);
     const opts = entryOptions(live.description, e);
-    const t = e.type === 'bool' ? 'bool' : opts ? 'select' : e.type === 'f32' || entryFactor(e) !== 1 ? 'num' : 'int';
-    const def = e.default === undefined ? '' : ` · Default ${typeof e.default === 'boolean' ? (e.default ? 'TRUE' : 'FALSE') : Number((e.default * entryFactor(e)).toPrecision(F32_DIGITS)).toLocaleString('de-DE')}`;
-    const dep = [ON_START, ...(EXTRA_DEPS[e.key] ?? [])];
+    const t = opts ? 'select' : e.type === 'bool' ? 'bool' : e.type === 'f32' || entryFactor(e) !== 1 ? 'num' : 'int';
+    const def = e.default === undefined ? '' : ` · Default ${typeof e.default === 'boolean' ? (e.default ? 'TRUE' : 'FALSE') : Number((e.default * entryFactor(e)).toPrecision(F32_DIGITS)).toLocaleString('de-DE', { maximumFractionDigits: F32_DIGITS })}`;
+    const dep = [...(onStart ? [ON_START] : []), ...(EXTRA_DEPS[e.key] ?? [])];
     const en = enableDep(e);
     if (en) dep.push(en);
     return {
@@ -218,7 +226,18 @@
         },
       ],
     };
-    const out = [head];
+    const outputs = OUTPUT_KEYS.map((k) => descEntry(live.description, k)).filter(Boolean);
+    const pdo = {
+      id: 'device-pdo',
+      key: 'device',
+      title: 'Klemme: Prozessdaten',
+      hint: 'Eine andere Variante initialisiert die Klemme neu. Die Ausgänge 0x7000 werden zyklisch geschrieben.',
+      fields: [
+        { k: 'pdo_variant', l: 'Messwert', t: 'select', o: VARIANT_OPTIONS },
+        ...outputs.map((e) => deviceField(e, false)),
+      ],
+    };
+    const out = live.description ? [head, pdo] : [head];
     for (const g of DEVICE_LAYOUT) {
       const list = g.keys
         ? g.keys.map((k) => entries.find((e) => e.key === k)).filter(Boolean)
@@ -277,7 +296,8 @@
    */
   function setField(g, f, raw) {
     if (f.t === 'bool' || f.t === 'text' || f.t === 'hide') assign(g, f, raw);
-    else if (f.t === 'select') assign(g, f, typeof f.o[0][0] === 'number' ? Number(raw) : raw);
+    else if (f.t === 'select')
+      assign(g, f, f.entry?.type === 'bool' && f.entry.config_key ? raw === '1' : typeof f.o[0][0] === 'number' ? Number(raw) : raw);
     else {
       texts[`${g}.${f.k}`] = raw;
       const t = raw.trim().replace(',', '.');
@@ -417,7 +437,7 @@
                 <label class="field" class:inactive={unmet(f).length > 0} title={f.tip}>
                   <span>{f.l}</span>
                   <select
-                    value={fieldValue(g.key, f)}
+                    value={typeof fieldValue(g.key, f) === 'boolean' ? Number(fieldValue(g.key, f)) : fieldValue(g.key, f)}
                     onchange={(e) => setField(g.key, f, e.currentTarget.value)}
                   >
                     {#each f.o as [v, label] (v)}

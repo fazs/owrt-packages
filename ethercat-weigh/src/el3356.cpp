@@ -5,6 +5,7 @@
 #include <cfloat>
 #include <cstdio>
 #include <limits>
+#include <map>
 #include <string_view>
 
 #include "device_description.hpp"
@@ -344,6 +345,7 @@ InputLayout layout_inputs(const std::vector<std::vector<MapEntry>>& pdos) {
         case kSubInSteadyState: l.steady_state = loc; break;
         case kSubInSyncError: l.sync_error = loc; break;
         case kSubInToggle: l.toggle = loc; break;
+        case kSubInValue: l.value_int = loc; break;
         case kSubInValueReal: l.value_real = loc; break;
         default: break;
         }
@@ -367,6 +369,7 @@ OutputLayout layout_outputs(const std::vector<std::vector<MapEntry>>& pdos) {
         case kSubCtrlInputFreeze: l.input_freeze = loc; break;
         case kSubCtrlSampleMode: l.sample_mode = loc; break;
         case kSubCtrlTare: l.tare = loc; break;
+        case kSubCtrlFilterFrequency: l.filter_frequency = loc; break;
         default: break;
         }
     });
@@ -407,6 +410,19 @@ float decode_value_real(const uint8_t* img, const InputLayout& l) {
 }
 
 /**
+ * @brief Messwert der Klemme: Value (Real) 0x6000:12, sonst Value (INT32) 0x6000:11.
+ * @param img Eingangsabbild des Slaves
+ * @param l Lage der Einträge
+ * @return Wert, 0 wenn keiner byteweise mit 32 Bit gemappt ist
+ */
+double decode_measurement(const uint8_t* img, const InputLayout& l) {
+    if (l.value_real.present) return decode_value_real(img, l);
+    if (!l.value_int.present || l.value_int.bit_len != kBitsDint || (l.value_int.bit_offset % kBitsPerByte) != 0U)
+        return 0.0;
+    return from_raw(DType::I32, get_bits(img, l.value_int.bit_offset, kBitsDint));
+}
+
+/**
  * @brief Schreibt die Steuerbits in das Ausgangsabbild.
  * @param img Ausgangsabbild des Slaves
  * @param l Lage der Steuerbits
@@ -418,14 +434,16 @@ void encode_control(uint8_t* img, const OutputLayout& l, const El3356Control& c)
     set_bit(img, l.input_freeze, c.input_freeze);
     set_bit(img, l.sample_mode, c.sample_mode);
     set_bit(img, l.tare, c.tare);
+    if (l.filter_frequency.present)
+        set_bits(img, l.filter_frequency.bit_offset, l.filter_frequency.bit_len, c.filter_frequency);
 }
 
 /**
- * @brief Schreibt Statusbits und Value (Real) in ein Eingangsabbild (Simulation).
+ * @brief Schreibt Statusbits und Messwert in ein Eingangsabbild (Simulation).
  * @param img Eingangsabbild
  * @param l Lage der Einträge
  * @param s Statusbits
- * @param value_real Value (Real)
+ * @param value_real Messwert; Value (INT32) gerundet
  */
 void encode_inputs(uint8_t* img, const InputLayout& l, const El3356Status& s, float value_real) {
     set_bit(img, l.overrange, s.overrange);
@@ -437,6 +455,8 @@ void encode_inputs(uint8_t* img, const InputLayout& l, const El3356Status& s, fl
     set_bit(img, l.toggle, s.txpdo_toggle);
     if (l.value_real.present && l.value_real.bit_len == kBitsDint)
         set_bits(img, l.value_real.bit_offset, kBitsDint, to_raw(DType::F32, value_real));
+    if (l.value_int.present && l.value_int.bit_len == kBitsDint)
+        set_bits(img, l.value_int.bit_offset, kBitsDint, to_raw(DType::I32, value_real));
 }
 
 /**
@@ -566,6 +586,7 @@ constexpr uint16_t kObjConfigFirst = 0x8000U;  ///< erstes Konfigurationsobjekt
 constexpr uint16_t kObjConfigLast = 0x8FFFU;   ///< letztes Konfigurationsobjekt
 /// @}
 constexpr size_t kNumTextLen = 32U;  ///< Puffer für eine formatierte Zahl
+constexpr int kHexBase = 16;         ///< Basis der Adressen "0xIIII" der Gerätebeschreibung
 
 /**
  * @brief Adresse als "0xIIII:SS" (Schlüssel in DeviceConfig::coe und der Gerätebeschreibung).
@@ -731,6 +752,16 @@ std::vector<std::string> validate_device(const DeviceConfig& dc) {
             errs.push_back(field + " (" + e->name + "): über device." +
                            e->raw.at("config_key").get<std::string>() + " einstellen");
     }
+    if (variant_name(dc.pdo_variant) == nullptr)
+        errs.push_back("device.pdo_variant: '" + std::string(kVariantReal) + "' oder '" + kVariantInt32 + "'");
+    else
+        for (auto& m : check_assignment(pdo_assignment(dc))) errs.push_back("device.pdo_variant: " + m);
+    const auto a = pdo_assignment(dc);
+    if (std::find(a.rx.begin(), a.rx.end(), kPdoFilterFrequency) != a.rx.end())
+        if (const auto* ff = d.entry(kObjControl, kSubCtrlFilterFrequency)) {
+            const auto err = check_value(*ff, DType::U16, dc.filter_frequency);
+            if (!err.empty()) errs.push_back("device.filter_frequency (0x7000:11 " + ff->name + "): " + err);
+        }
     for (const auto& s : device_settings(dc)) {
         if (!s.configured) continue;
         const auto err = check_value(*d.entry(s.index, s.sub), s.type, s.value);
@@ -752,16 +783,82 @@ std::vector<SdoWrite> settings_writes(const DeviceConfig& dc, uint32_t revision)
     return out;
 }
 
-/// @brief Feste RxPDO-Zuordnung dieser Anwendung (0x1C12): RMB Control.
-const std::vector<uint16_t>& rx_assignment() {
-    static const std::vector<uint16_t> a = {kPdoControl};
+/**
+ * @brief ESI-Name der Prozessdaten-Variante.
+ * @param variant DeviceConfig::pdo_variant
+ * @return Name der AlternativeSmMapping, nullptr bei unbekannter Variante
+ */
+const char* variant_name(const std::string& variant) {
+    if (variant == kVariantReal) return kVariantRealName;
+    if (variant == kVariantInt32) return kVariantInt32Name;
+    return nullptr;
+}
+
+/**
+ * @brief PDO-Zuordnung laut Gerätebeschreibung.
+ *
+ * Grundlage ist die Variante (AlternativeSmMapping); PDOs aus pdo_rules (0x1601 bei Filter
+ * „PDO Filter frequency“) kommen hinzu, wenn eine Bedingung erfüllt ist. PDOs, die in der
+ * Revision fehlen, entfallen.
+ *
+ * @param dc Klemmenparameter (Variante, Filtereinstellungen)
+ * @param revision Revision der Klemme, 0 = neueste der Beschreibung
+ * @return Zuordnung; leer bei unbekannter Variante
+ */
+PdoAssignment pdo_assignment(const DeviceConfig& dc, uint32_t revision) {
+    const auto& d = DeviceDescription::el3356_0010();
+    PdoAssignment a;
+    const char* name = variant_name(dc.pdo_variant);
+    if (name == nullptr) return a;
+    auto add = [&](std::vector<uint16_t>& list, const nlohmann::json& idx) {
+        const auto pdo = static_cast<uint16_t>(std::stoul(idx.get<std::string>(), nullptr, kHexBase));
+        const auto* p = d.pdo(pdo);
+        if (p != nullptr && d.layout(*p, revision) != nullptr &&
+            std::find(list.begin(), list.end(), pdo) == list.end())
+            list.push_back(pdo);
+    };
+    for (const auto& v : d.json().at("variants")) {
+        if (v.at("name") != name) continue;
+        for (const auto& i : v.value("sm2", nlohmann::json::array())) add(a.rx, i);
+        for (const auto& i : v.value("sm3", nlohmann::json::array())) add(a.tx, i);
+    }
+    std::map<std::string, double> values;
+    for (const auto& s : device_settings(dc, revision)) values[obj_key(s.index, s.sub)] = s.value;
+    for (const auto& rule : d.json().at("pdo_rules")) {
+        const bool on = std::any_of(rule.at("if_any").begin(), rule.at("if_any").end(), [&](const nlohmann::json& c) {
+            const auto it = values.find(c.at("obj").get<std::string>());
+            return it != values.end() && it->second == json_number(c.at("eq"));
+        });
+        if (!on) continue;
+        const auto* p = d.pdo(static_cast<uint16_t>(std::stoul(rule.at("pdo").get<std::string>(), nullptr, kHexBase)));
+        if (p != nullptr) add(p->rx ? a.rx : a.tx, rule.at("pdo"));
+    }
     return a;
 }
 
-/// @brief Feste TxPDO-Zuordnung dieser Anwendung (0x1C13): RMB Status, RMB Value (Real).
-const std::vector<uint16_t>& tx_assignment() {
-    static const std::vector<uint16_t> a = {kPdoStatus, kPdoValueReal};
-    return a;
+/**
+ * @brief Prüft eine Zuordnung gegen die Exclude-Listen und die Revision der Gerätebeschreibung.
+ * @param a Zuordnung
+ * @param revision Revision der Klemme, 0 = neueste der Beschreibung
+ * @return Fehlermeldungen; leer = gültig
+ */
+std::vector<std::string> check_assignment(const PdoAssignment& a, uint32_t revision) {
+    const auto& d = DeviceDescription::el3356_0010();
+    std::vector<std::string> errs;
+    std::vector<uint16_t> all = a.rx;
+    all.insert(all.end(), a.tx.begin(), a.tx.end());
+    if (a.tx.empty()) errs.emplace_back("keine TxPDOs zugeordnet");
+    for (uint16_t idx : all) {
+        const auto* p = d.pdo(idx);
+        if (p == nullptr || d.layout(*p, revision) == nullptr) {
+            errs.push_back(known_pdo_name(idx) + ": in der Revision nicht vorhanden");
+            continue;
+        }
+        for (uint16_t other : all)
+            if (other > idx && std::find(p->exclude.begin(), p->exclude.end(), other) != p->exclude.end())
+                errs.push_back(p->name + " und " + known_pdo_name(other) + " schließen sich aus (ESI Exclude)");
+    }
+    return errs;
 }
 
 /**
@@ -785,14 +882,16 @@ std::vector<SdoWrite> assign_writes(uint16_t sm_obj, const std::vector<uint16_t>
 
 /**
  * @brief Vollständige Sequenz des Übergangs PRE-OP -> SAFE-OP.
- * @param dc Klemmenparameter; 0x8000 nur bei write_on_start
+ * @param dc Klemmenparameter (Variante, Filter); 0x8000.. nur bei write_on_start
+ * @param revision Revision der Klemme, 0 = neueste der Beschreibung
  * @return PDO-Zuordnung 0x1C12/0x1C13, danach ggf. 0x8000
  */
-std::vector<SdoWrite> init_sequence(const DeviceConfig& dc) {
-    auto seq = assign_writes(kSm2Assign, rx_assignment());
-    for (auto& w : assign_writes(kSm3Assign, tx_assignment())) seq.push_back(std::move(w));
+std::vector<SdoWrite> init_sequence(const DeviceConfig& dc, uint32_t revision) {
+    const auto a = pdo_assignment(dc, revision);
+    auto seq = assign_writes(kSm2Assign, a.rx);
+    for (auto& w : assign_writes(kSm3Assign, a.tx)) seq.push_back(std::move(w));
     if (dc.write_on_start)
-        for (auto& w : settings_writes(dc)) seq.push_back(std::move(w));
+        for (auto& w : settings_writes(dc, revision)) seq.push_back(std::move(w));
     return seq;
 }
 

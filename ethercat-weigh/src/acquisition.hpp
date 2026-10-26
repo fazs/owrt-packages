@@ -17,6 +17,7 @@
 #include "calibration.hpp"
 #include "calibration_controller.hpp"
 #include "config.hpp"
+#include "device_commands.hpp"
 #include "io_backend.hpp"
 #include "measurement.hpp"
 #include "statistics.hpp"
@@ -80,6 +81,11 @@ namespace ew {
 
         CalResult set_sim_load(std::optional<double> grams);
 
+        // Kommandos und Diagnose der Klemme (Gerätebeschreibung)
+        CalResult device_command(const std::string &id);
+
+        nlohmann::json device_diagnostics();
+
         // Debug (siehe README)
         nlohmann::json debug_pdos();
 
@@ -142,6 +148,7 @@ namespace ew {
         std::deque<Measurement> history_; ///< gehaltene Messungen
         Sample last_; ///< letztes Sample
         CalibrationController cal_; ///< nur im Acquisition-Thread verändert
+        DeviceCommandRunner cmd_; ///< Kommandos der Klemme, nur im Acquisition-Thread
         std::map<uint8_t, bool> ctrl_override_; ///< Debug: übersteuerte Steuerbits, nur im Acquisition-Thread
         nlohmann::json cal_json_; ///< letzter Kalibrierzustand für Snapshots
         std::string backend_state_ = "init"; ///< init | op | error

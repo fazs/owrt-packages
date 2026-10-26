@@ -260,11 +260,41 @@ namespace ew {
     }
 
     /**
+     * @brief Startet ein Kommando der Gerätebeschreibung (siehe README, /api/device/command).
+     *
+     * Der Abschluss wird als Ereignis {"type": "device_command", "id", "ok", "error"}
+     * veröffentlicht. Nicht während einer Kalibrierung.
+     *
+     * @param id Kennung laut Gerätebeschreibung
+     */
+    CalResult Acquisition::device_command(const std::string &id) {
+        return submit([this, id]() -> CalResult {
+            if (cal_.active()) return {false, "Kalibrierung aktiv: Kommando erst danach ausführen"};
+            bool finished = false;
+            const auto r = cmd_.start(id, *backend_, now_, finished);
+            if (r.ok) log_info("Kommando %s %s", id.c_str(), finished ? "ausgeführt" : "gestartet");
+            if (r.ok && finished) publish({{"type", "device_command"}, {"id", id}, {"ok", true}, {"error", ""}});
+            return r;
+        });
+    }
+
+    /**
+     * @brief Liest die Diagnoseeinträge der Klemme (SDO, nur auf Anfrage).
+     * @return siehe read_diagnostics()
+     */
+    nlohmann::json Acquisition::device_diagnostics() {
+        return submit_json([this] { return read_diagnostics(*backend_); });
+    }
+
+    /**
      * @brief Kalibrierkommando aus der REST-API (siehe README).
      * @param request {"action": ..., weitere Felder je Aktion}
      */
     CalResult Acquisition::calibration(const nlohmann::json &request) {
-        return submit([this, request]() { return handle_calibration(request, now_); }, kCalibrationTimeoutMs);
+        return submit([this, request]() -> CalResult {
+            if (cmd_.active()) return {false, "Kommando " + cmd_.id() + " läuft: Kalibrierung erst danach"};
+            return handle_calibration(request, now_);
+        }, kCalibrationTimeoutMs);
     }
 
     // --- Debug -------------------------------------------------------------------------
@@ -597,8 +627,8 @@ namespace ew {
     /**
      * @brief Übernimmt eine neue Konfiguration; mtx_ muss gehalten werden.
      *
-     * ethercat/http wirken erst nach Neustart. Ändert sich die Kennlinie, werden Tara und
-     * Stabilitätsfenster verworfen.
+     * ethercat/http wirken erst nach Neustart. Ändert sich die PDO-Zuordnung, wird die Klemme
+     * neu initialisiert. Ändert sich die Kennlinie, werden Tara und Stabilitätsfenster verworfen.
      *
      * @param next neue Konfiguration
      */
@@ -610,6 +640,8 @@ namespace ew {
         const bool restart = requires_restart(cfg_, next);
         restart_required_ = restart_required_ || restart;
         device_pending_ = device_pending_ || device_config_changed(cfg_, applied);
+        // Neue PDO-Zuordnung nur in PRE-OP: Klemme neu initialisieren
+        if (pdo_config_changed(cfg_, applied)) reinit_ = true;
         const bool char_changed =
                 nlohmann::json(cfg_)["calibration"] != nlohmann::json(applied)["calibration"] ||
                 cfg_.device.scale_factor != applied.device.scale_factor;
@@ -775,7 +807,7 @@ namespace ew {
                     std::string derr;
                     const bool ok = backend_->write_device_config(dc, derr);
                     if (!ok) log_error("CoE-Parameter: %s", derr.c_str());
-                    else log_info("CoE-Parameter 0x8000 geschrieben");
+                    else log_info("Klemmenparameter geschrieben");
                     publish({{"type", "device_config"}, {"ok", ok}, {"error", derr}});
                 }
 
@@ -784,6 +816,9 @@ namespace ew {
                 now_ = t;
 
                 El3356Control ctrl;
+                ctrl.sample_mode = c.device.sample_mode;
+                ctrl.disable_calibration = c.device.disable_calibration;
+                ctrl.filter_frequency = c.device.filter_frequency;
                 for (const auto &[sub, v]: ctrl_override_) *el3356::control_bit(ctrl, sub) = v;
                 Sample s;
                 backend_->cycle(t, ctrl, s);
@@ -791,6 +826,12 @@ namespace ew {
                 // Kalibrierablauf (SDO-Zugriffe ohne Lock)
                 const bool cal_was_active = cal_.active();
                 cal_.step(s, *backend_, c);
+                const std::string cmd_id = cmd_.id();
+                if (const auto cr = cmd_.step(*backend_, t)) {
+                    if (cr->ok) log_info("Kommando %s abgeschlossen", cmd_id.c_str());
+                    else log_error("Kommando %s: %s", cmd_id.c_str(), cr->error.c_str());
+                    publish({{"type", "device_command"}, {"id", cmd_id}, {"ok", cr->ok}, {"error", cr->error}});
+                }
                 nlohmann::json cal_j;
                 if (cal_was_active || cal_.active()) cal_j = cal_.to_json();
 

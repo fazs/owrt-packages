@@ -52,6 +52,7 @@ namespace ew {
         std::array<uint8_t, kIomapSize> iomap_{}; ///< Prozessabbild aller Slaves
         bool opened_ = false; ///< ec_init erfolgreich
         uint16_t slave_ = 0; ///< Slave-Nummer der EL3356, 0 = nicht gefunden
+        uint32_t revision_ = 0; ///< Revision für die Gerätebeschreibung, 0 = neueste (unbekannte Revision)
         int expected_wkc_ = 0; ///< erwarteter Working Counter
         uint32_t wkc_fail_count_ = 0; ///< aufeinanderfolgende WKC-Fehler
         uint32_t wkc_fault_cycles_ = EthercatConfig{}.wkc_fault_cycles; ///< WKC-Fehler bis Wiederanlauf

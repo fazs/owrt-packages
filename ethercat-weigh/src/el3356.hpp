@@ -1,10 +1,35 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <vector>
 
 #include "config.hpp"
-#include "sample.hpp"
+
+namespace ew {
+
+/// Statusbits aus TxPDO 0x1A00 "RMB Status" (Objekt 0x6000).
+struct El3356Status {
+    bool overrange = false;               ///< 0x6000:02 Overrange
+    bool data_invalid = false;            ///< 0x6000:04 Data invalid
+    bool error = false;                   ///< 0x6000:07 Error
+    bool calibration_in_progress = false; ///< 0x6000:08 Calibration in progress
+    bool steady_state = false;            ///< 0x6000:09 Steady state
+    bool sync_error = false;              ///< 0x6000:0E bzw. 0x1C32:20 Sync error
+    bool txpdo_toggle = false;            ///< 0x6000:10 bzw. 0x1800:09 TxPDO Toggle
+};
+
+/// Steuerbits aus RxPDO 0x1600 "RMB Control" (Objekt 0x7000).
+struct El3356Control {
+    bool start_calibration = false;   ///< 0x7000:01 Start calibration
+    bool disable_calibration = false; ///< 0x7000:02 Disable calibration
+    bool input_freeze = false;        ///< 0x7000:03 Input freeze
+    bool sample_mode = false;         ///< 0x7000:04 Sample mode
+    bool tare = false;                ///< 0x7000:05 Tara
+    uint16_t filter_frequency = 0;    ///< 0x7000:11 Filter frequency [0,1 Hz] (RxPDO 0x1601)
+};
+
+} // namespace ew
 
 /**
  * @brief Objektverzeichnis, PDO-Mapping und Initialisierungssequenz der EL3356-0010.
@@ -58,6 +83,9 @@ constexpr uint16_t kObjSettings = 0x8000U;    ///< RMB Settings
 constexpr uint16_t kObjSmOutParam = 0x1C32U;  ///< SM output parameter (Sync error bis Revision 0x0014)
 constexpr uint16_t kObjTxPdoPar = 0x1800U;    ///< RMB TxPDO-Par Status (Toggle bis Revision 0x0014)
 constexpr uint16_t kObjCommand = 0xFB00U;     ///< RMB Command
+constexpr uint16_t kObjInfo = 0x9000U;        ///< RMB Info data
+constexpr uint8_t kSubInfoMvV = 0x11U;        ///< 0x9000:11 mV/V
+constexpr uint16_t kObjDiag = 0xA000U;        ///< RMB Diag data
 /// @}
 
 /// @name Subindizes von 0x6000 (RMB Inputs)
@@ -127,9 +155,18 @@ constexpr uint8_t kSubCmdStatus = 0x02U;    ///< Status (USINT)
 constexpr uint8_t kSubCmdResponse = 0x03U;  ///< Response
 /// @}
 
+/// @name Restore default parameters (0x1011)
+/// @{
+constexpr uint16_t kObjRestore = 0x1011U;            ///< Restore default parameters
+constexpr uint8_t kSubRestoreAll = 0x01U;            ///< alle Backup-Objekte
+constexpr uint32_t kRestoreSignature = 0x64616F6CU;  ///< "load" (Doku Kap. 4.10.1)
+/// @}
+
 /// @name Kommandos für 0xFB00:01 und Status 0xFB00:02
 /// @{
 constexpr uint16_t kCmdNone = 0x0000U;         ///< kein Kommando
+constexpr uint16_t kCmdTareTemporary = 0x0001U;  ///< Tarierung, nicht im EEPROM (Doku Kap. 4.4.4)
+constexpr uint16_t kCmdTarePermanent = 0x0002U;  ///< Tarierung, im EEPROM (Doku Kap. 4.4.4)
 constexpr uint16_t kCmdZeroBalance = 0x0101U;  ///< 257: Nullabgleich
 constexpr uint16_t kCmdCalibration = 0x0102U;  ///< 258: Kalibrierung mit Reference load
 constexpr uint8_t kCmdStatusDone = 0U;         ///< 0xFB00:02 = 0: fertig ohne Fehler
@@ -194,6 +231,7 @@ struct InputLayout {
     EntryLoc steady_state;  ///< 0x6000:09
     EntryLoc sync_error;    ///< 0x6000:0E bzw. 0x1C32:20
     EntryLoc toggle;        ///< 0x6000:10 bzw. 0x1800:09
+    EntryLoc value_int;     ///< 0x6000:11 Value (INT32)
     EntryLoc value_real;    ///< 0x6000:12
 };
 
@@ -204,6 +242,7 @@ struct OutputLayout {
     EntryLoc input_freeze;         ///< 0x7000:03
     EntryLoc sample_mode;          ///< 0x7000:04
     EntryLoc tare;                 ///< 0x7000:05
+    EntryLoc filter_frequency;     ///< 0x7000:11 (RxPDO 0x1601)
 };
 
 /// Ein Mapping-Eintrag (UINT32 aus 0x1Axx/0x16xx: index<<16 | sub<<8 | bitlen).
@@ -222,6 +261,7 @@ OutputLayout layout_outputs(const std::vector<std::vector<MapEntry>>& pdos_in_or
 
 El3356Status decode_status(const uint8_t* img, const InputLayout& l);
 float decode_value_real(const uint8_t* img, const InputLayout& l);
+double decode_measurement(const uint8_t* img, const InputLayout& l);
 void encode_control(uint8_t* img, const OutputLayout& l, const El3356Control& c);
 void encode_inputs(uint8_t* img, const InputLayout& l, const El3356Status& s, float value_real);
 bool* control_bit(El3356Control& c, uint8_t sub);
@@ -282,10 +322,24 @@ std::vector<DeviceSetting> device_settings(const DeviceConfig& dc, uint32_t revi
 std::vector<std::string> validate_device(const DeviceConfig& dc);
 std::vector<SdoWrite> settings_writes(const DeviceConfig& dc, uint32_t revision = 0U);
 
-const std::vector<uint16_t>& rx_assignment();
-const std::vector<uint16_t>& tx_assignment();
+/// @name Prozessdaten-Varianten (DeviceConfig::pdo_variant -> AlternativeSmMapping der ESI)
+/// @{
+constexpr const char* kVariantReal = "real";             ///< Standard (REAL): 0x1A02
+constexpr const char* kVariantInt32 = "int32";           ///< Standard (INT32): 0x1A01
+constexpr const char* kVariantRealName = "Standard (REAL)";    ///< Name in der ESI
+constexpr const char* kVariantInt32Name = "Standard (INT32)";  ///< Name in der ESI
+/// @}
+
+/// PDO-Zuordnung der Sync-Manager.
+struct PdoAssignment {
+    std::vector<uint16_t> rx;  ///< 0x1C12 (SM2)
+    std::vector<uint16_t> tx;  ///< 0x1C13 (SM3)
+};
+const char* variant_name(const std::string& variant);
+PdoAssignment pdo_assignment(const DeviceConfig& dc, uint32_t revision = 0U);
+std::vector<std::string> check_assignment(const PdoAssignment& a, uint32_t revision = 0U);
 std::vector<SdoWrite> assign_writes(uint16_t sm_obj, const std::vector<uint16_t>& pdos);
-std::vector<SdoWrite> init_sequence(const DeviceConfig& dc);
+std::vector<SdoWrite> init_sequence(const DeviceConfig& dc, uint32_t revision = 0U);
 /// @}
 
 std::vector<uint8_t> le_u16(uint16_t v);

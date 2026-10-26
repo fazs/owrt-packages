@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(ethercat-weigh VERSION 0.1.0 LANGUAGES C CXX)
+project(ethercat-weigh VERSION 0.2.0 LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -58,6 +58,7 @@ add_library(ew_core STATIC
   src/calibration.cpp
   src/calibration_controller.cpp
   src/config.cpp
+  src/device_commands.cpp
   src/device_description.cpp
   ${CMAKE_CURRENT_BINARY_DIR}/generated/device_description_data.cpp
   src/el3356.cpp

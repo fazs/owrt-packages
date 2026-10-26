@@ -1,9 +1,11 @@
 #include "ethercat_backend.hpp"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 #include <memory>
 
+#include "device_description.hpp"
 #include "ethercat.h"
 #include "log.hpp"
 
@@ -13,6 +15,8 @@ namespace {
 
 /// Kontext für den PRE-OP -> SAFE-OP Hook (SOEM ruft eine freie Funktion auf)
 const Config* g_cfg = nullptr;
+/// Revision der Klemme für die Gerätebeschreibung (0 = neueste), für den PO2SO-Hook
+uint32_t g_revision = 0U;
 
 constexpr uint16_t kStateMask = 0x0FU;     ///< Zustandsbits ohne EC_STATE_ERROR (ETG.1000.6 AL-Status)
 constexpr int kSafeOpTimeoutFactor = 4;    ///< Wartezeit auf SAFE-OP: Vielfaches von EC_TIMEOUTSTATE
@@ -42,14 +46,15 @@ bool sdo_read_v(uint16_t slave, uint16_t idx, uint8_t sub, T& v) {
 }
 
 /**
- * @brief Schreibt die Parameter 0x8000; bricht beim ersten Fehler ab.
+ * @brief Schreibt die Klemmenparameter; bricht beim ersten Fehler ab.
  * @param slave Slave-Nummer
  * @param dc Klemmenparameter
+ * @param revision Revision für die Gerätebeschreibung, 0 = neueste
  * @param[out] err Fehlertext mit Objekt und Name
  * @return true bei Erfolg
  */
-bool write_settings(uint16_t slave, const DeviceConfig& dc, std::string& err) {
-    for (const auto& w : el3356::settings_writes(dc)) {
+bool write_settings(uint16_t slave, const DeviceConfig& dc, uint32_t revision, std::string& err) {
+    for (const auto& w : el3356::settings_writes(dc, revision)) {
         auto data = w.data;
         if (ec_SDOwrite(slave, w.index, w.sub, FALSE, static_cast<int>(data.size()), data.data(),
                         EC_TIMEOUTRXM) <= 0) {
@@ -75,7 +80,7 @@ bool write_settings(uint16_t slave, const DeviceConfig& dc, std::string& err) {
 int po2so_hook(uint16 slave) {
     if (!g_cfg) return 1;
     int failed = 0;
-    for (const auto& w : el3356::init_sequence(g_cfg->device)) {
+    for (const auto& w : el3356::init_sequence(g_cfg->device, g_revision)) {
         auto data = w.data;
         if (ec_SDOwrite(slave, w.index, w.sub, FALSE, static_cast<int>(data.size()), data.data(),
                         EC_TIMEOUTRXM) <= 0) {
@@ -84,7 +89,7 @@ int po2so_hook(uint16 slave) {
         }
     }
     if (failed == 0) log_info("Initialisierungssequenz geschrieben (PDO-Zuordnung%s)",
-                              g_cfg->device.write_on_start ? ", 0x8000" : "");
+                              g_cfg->device.write_on_start ? ", Klemmenparameter" : "");
     return 1;
 }
 
@@ -258,6 +263,15 @@ bool EthercatBackend::open(const Config& cfg, std::string& err) {
         err = "Slave '" + cfg.ethercat.slave_name + "' nicht gefunden";
         return false;
     }
+    // Revision aus der SII; nicht in der Gerätebeschreibung enthaltene: neueste verwenden
+    const auto& desc = DeviceDescription::el3356_0010();
+    const uint32_t rev = ec_slave[slave_].eep_rev;
+    const auto& revs = desc.revisions();
+    revision_ = std::find(revs.begin(), revs.end(), rev) != revs.end() ? rev : 0U;
+    if (revision_ == 0U)
+        log_warn("Revision 0x%08X nicht in der Gerätebeschreibung (bis 0x%08X); verwende deren neueste", rev,
+                 desc.newest_revision());
+    g_revision = revision_;
     ec_slave[slave_].PO2SOconfig = &po2so_hook;
 
     const int used = ec_config_map(iomap_.data());
@@ -315,13 +329,13 @@ bool EthercatBackend::read_layout(std::string& err) {
     out_ = el3356::layout_outputs(out);
     const uint32_t ib = ec_slave[slave_].Istartbit, ob = ec_slave[slave_].Ostartbit;
     for (auto* l : {&in_.overrange, &in_.data_invalid, &in_.error, &in_.calibration,
-                    &in_.steady_state, &in_.sync_error, &in_.toggle, &in_.value_real})
+                    &in_.steady_state, &in_.sync_error, &in_.toggle, &in_.value_int, &in_.value_real})
         shift(*l, ib);
     for (auto* l : {&out_.start_calibration, &out_.disable_calibration, &out_.input_freeze,
-                    &out_.sample_mode, &out_.tare})
+                    &out_.sample_mode, &out_.tare, &out_.filter_frequency})
         shift(*l, ob);
-    if (!in_.value_real.present) {
-        err = "0x6000:12 Value (Real) ist nicht gemappt";
+    if (!in_.value_real.present && !in_.value_int.present) {
+        err = "Weder 0x6000:12 Value (Real) noch 0x6000:11 Value (INT32) ist gemappt";
         return false;
     }
     return true;
@@ -422,7 +436,7 @@ void EthercatBackend::cycle(double t, const El3356Control& ctrl, Sample& out) {
     }
     out.link_ok = link_ok_;
     out.status = el3356::decode_status(ec_slave[slave_].inputs, in_);
-    out.raw = el3356::decode_value_real(ec_slave[slave_].inputs, in_);
+    out.raw = el3356::decode_measurement(ec_slave[slave_].inputs, in_);
 }
 
 /**
@@ -478,7 +492,7 @@ bool EthercatBackend::write_device_config(const DeviceConfig& dc, std::string& e
         err = "EtherCAT nicht initialisiert";
         return false;
     }
-    if (!write_settings(slave_, dc, err)) return false;
+    if (!write_settings(slave_, dc, revision_, err)) return false;
     cfg_.device = dc;
     return true;
 }

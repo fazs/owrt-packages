@@ -2004,7 +2004,16 @@
      "label_de": "Disable calibration",
      "label_en": "Disable calibration",
      "tooltip_de": "RMB Control -> Disable calibration Boolscher Wert -> 0 oder 1 -> Schreiben mit rechtem Mausklick",
-     "tooltip_en": "RMB Control -> Disable calibration bool value -> 0 or 1 -> write with right click"
+     "tooltip_en": "RMB Control -> Disable calibration bool value -> 0 or 1 -> write with right click",
+     "config_key": "disable_calibration",
+     "supplement": [
+      {
+       "fields": [
+        "config_key"
+       ],
+       "source": "src/config.hpp DeviceConfig"
+      }
+     ]
     },
     {
      "sub": "0x03",
@@ -2035,6 +2044,21 @@
      "label_en": "Sample Mode",
      "tooltip_de": "RMB Control -> Sample Mode Boolscher Wert -> 0 oder 1 -> Schreiben mit rechtem Mausklick",
      "tooltip_en": "RMB Control -> Sample Mode bool value -> 0 or 1 -> write with right click",
+     "config_key": "sample_mode",
+     "supplement": [
+      {
+       "fields": [
+        "config_key"
+       ],
+       "source": "src/config.hpp DeviceConfig"
+      },
+      {
+       "fields": [
+        "values"
+       ],
+       "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.5 Ausgangsdaten (Sample mode); Kap. 4.2.7 Wandlungsmodus"
+      }
+     ],
      "values": [
       {
        "value": 0,
@@ -2043,14 +2067,6 @@
       {
        "value": 1,
        "text": "105 kHz Low latency"
-      }
-     ],
-     "supplement": [
-      {
-       "fields": [
-        "values"
-       ],
-       "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.5 Ausgangsdaten (Sample mode); Kap. 4.2.7 Wandlungsmodus"
       }
      ]
     },
@@ -2105,9 +2121,14 @@
        "eq": 11
       }
      ],
-     "min": 1,
-     "max": 2000,
+     "config_key": "filter_frequency",
      "supplement": [
+      {
+       "fields": [
+        "config_key"
+       ],
+       "source": "src/config.hpp DeviceConfig"
+      },
       {
        "fields": [
         "max",
@@ -2115,7 +2136,9 @@
        ],
        "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.5 Ausgangsdaten; ESI SettingsTab, OutputField 'Filterfrequenz'"
       }
-     ]
+     ],
+     "min": 1,
+     "max": 2000
     }
    ]
   },
