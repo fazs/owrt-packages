@@ -70,7 +70,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(EthercatConfig,
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(DeviceConfig,
     write_on_start, mode0_enable_filter, mode0_enable_averager, mode0_filter_settings,
     rated_output_mv_v, nominal_load, zero_balance, gravity_of_earth, scale_factor,
-    reference_load, steady_state_window, steady_state_tolerance, calibration_interval)
+    reference_load, steady_state_window, steady_state_tolerance, calibration_interval, coe)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(MeasurementConfig,
     min_load, zero_threshold, stable_time_ms, tolerance, sigma_max, use_device_steady_state)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(StatisticsConfig, rolling_window, history_size)
@@ -120,6 +120,15 @@ void from_json(const nlohmann::json& j, Config& c) {
 Config config_from_json(const nlohmann::json& j) {
     if (!j.is_object()) throw std::runtime_error("Config muss ein JSON-Objekt sein");
     return j.get<Config>();
+}
+
+/**
+ * @brief JSON-Darstellung der Klemmenparameter (Schlüssel wie in der Konfigurationsdatei).
+ * @param dc Klemmenparameter
+ * @return JSON-Objekt
+ */
+nlohmann::json device_json(const DeviceConfig& dc) {
+    return dc;
 }
 
 /**
@@ -174,8 +183,7 @@ std::vector<std::string> Config::validate() const {
     if (device.rated_output_mv_v == 0.0) e.emplace_back("device.rated_output_mv_v: != 0");
     if (device.gravity_of_earth <= 0.0) e.emplace_back("device.gravity_of_earth: > 0");
     if (device.scale_factor == 0.0) e.emplace_back("device.scale_factor: != 0");
-    if (device.mode0_filter_settings > el3356::kFilterPdoFrequency)
-        e.push_back(range_msg("device.mode0_filter_settings", 0.0, el3356::kFilterPdoFrequency));
+    for (auto& s : el3356::validate_device(device)) e.push_back(std::move(s));
 
     const auto& cal = calibration;
     if (cal.mode != "device" && cal.mode != "application")

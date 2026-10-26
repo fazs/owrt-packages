@@ -1,5 +1,6 @@
 /**
- * @file CoE-Objekte der EL3356: Adressformat, Wertebereiche (Enums) und Eingabe-Parsing.
+ * @file CoE-Objekte der EL3356: Adressformat, Auswahllisten und Einheiten aus der Gerätebeschreibung
+ * (/api/device/description, erzeugt aus der ESI) und Eingabe-Parsing.
  */
 
 /** Basis hexadezimaler Zahlen. */
@@ -23,10 +24,18 @@ export const OBJ_CONTROL = 0x7000;
 /** Subindex 0: Anzahl der Einträge. */
 const SUB_COUNT = 0;
 
-// --- Kommandos für 0xFB00:01 ---
+/** Request-Objekt der Kommandos (0xFB00:01). */
+const CMD_REQUEST_KEY = '0xFB00:01';
+/** 0xFB00:01 = 0: kein Kommando. */
 const CMD_NONE = 0x0000;
-const CMD_ZERO_BALANCE = 0x0101;
-const CMD_CALIBRATION = 0x0102;
+/** Erstes Konfigurationsobjekt (ETG.5001 Modular Device Profile). */
+const OBJ_CONFIG_FIRST = 0x8000;
+/** Letztes Konfigurationsobjekt (ETG.5001 Modular Device Profile). */
+const OBJ_CONFIG_LAST = 0x8fff;
+/** Zehnerexponenten mit SI-Vorsatz für Einheiten der ESI. */
+const SI_PREFIX = { '-3': 'm', '-6': 'µ', 3: 'k' };
+/** Zehnerpotenzen als Basis. */
+const DECIMAL_BASE = 10;
 
 /**
  * Zahl als Hex-Text mit Präfix 0x.
@@ -44,42 +53,65 @@ export const hex = (v, digits) => '0x' + Number(v).toString(HEX_RADIX).toUpperCa
 export const objKey = (index, sub) =>
   `${hex(index, INDEX_HEX_DIGITS)}:${Number(sub).toString(HEX_RADIX).toUpperCase().padStart(SUB_HEX_DIGITS, '0')}`;
 
-/** 0x8000:11/:12 Mode0/Mode1 filter settings (ESI: DT0800EN16/DT0801EN16). */
-export const FILTER_OPTIONS = [
-  [0, 'FIR 50 Hz'],
-  [1, 'FIR 60 Hz'],
-  [2, 'IIR1'],
-  [3, 'IIR2'],
-  [4, 'IIR3'],
-  [5, 'IIR4'],
-  [6, 'IIR5'],
-  [7, 'IIR6'],
-  [8, 'IIR7'],
-  [9, 'IIR8'],
-  [10, 'Dynamic IIR'],
-  [11, 'PDO Filter frequency (0x7000:11)'],
-];
-
 /** Auswahl für BOOL-Objekte. */
 const BOOL = [
   [0, 'FALSE'],
   [1, 'TRUE'],
 ];
 
-/** Feste Wertebereiche je Objekt; PDO-Zuordnung (0x1C12/0x1C13) ergibt sich aus dem Katalog. */
-const ENUMS = {
-  '0x7000:04': [
-    [0, 'Mode 0'],
-    [1, 'Mode 1'],
-  ],
-  '0x8000:11': FILTER_OPTIONS,
-  '0x8000:12': FILTER_OPTIONS,
-  '0xFB00:01': [
-    [CMD_NONE, `${hex(CMD_NONE, INDEX_HEX_DIGITS)} Kein Kommando`],
-    [CMD_ZERO_BALANCE, `${hex(CMD_ZERO_BALANCE, INDEX_HEX_DIGITS)} Nullabgleich`],
-    [CMD_CALIBRATION, `${hex(CMD_CALIBRATION, INDEX_HEX_DIGITS)} Kalibrierung mit Reference load`],
-  ],
-};
+/**
+ * Eintrag der Gerätebeschreibung.
+ * @param {object|null} desc Gerätebeschreibung (/api/device/description)
+ * @param {string} key Adresse "0xIIII:SS"
+ * @returns {object|null} Eintrag mit index (Zahl) oder null
+ */
+export function descEntry(desc, key) {
+  if (!desc) return null;
+  const [idx, sub] = key.split(':');
+  const obj = desc.objects.find((o) => o.index === idx);
+  const e = obj?.entries.find((x) => x.sub === `0x${sub}`);
+  return e ? { ...e, index: parseInt(idx, HEX_RADIX), subNum: parseInt(sub, HEX_RADIX), key } : null;
+}
+
+/**
+ * Hex-Text der Beschreibung ("0200", little endian) als Zahl.
+ * @param {string} data Bytes als Hex-Text
+ * @returns {number}
+ */
+function leHexValue(data) {
+  let v = 0;
+  for (let i = data.length - SUB_HEX_DIGITS; i >= 0; i -= SUB_HEX_DIGITS) v = v * (HEX_RADIX * HEX_RADIX) + parseInt(data.substr(i, SUB_HEX_DIGITS), HEX_RADIX);
+  return v;
+}
+
+/**
+ * Auswahlliste eines Eintrags laut Gerätebeschreibung (Aufzählung oder Werte der Zusatzdatei).
+ * @param {object|null} desc Gerätebeschreibung
+ * @param {object|null} e Eintrag
+ * @returns {Array<[number, string]>|null}
+ */
+export function entryOptions(desc, e) {
+  if (!desc || !e) return null;
+  if (e.enum) return desc.enums[e.enum].map((x) => [x.value, x.text]);
+  if (e.values) return e.values.map((x) => [x.value, x.text]);
+  return null;
+}
+
+/**
+ * Auswahlliste für das Kommando-Objekt 0xFB00:01 aus den Kommandos der Gerätebeschreibung.
+ * @param {object} desc Gerätebeschreibung
+ * @returns {Array<[number, string]>}
+ */
+function commandOptions(desc) {
+  const opts = [[CMD_NONE, `${hex(CMD_NONE, INDEX_HEX_DIGITS)} Kein Kommando`]];
+  for (const c of desc.commands) {
+    const w = c.writes.find((x) => x.obj === CMD_REQUEST_KEY);
+    if (!w) continue;
+    const v = leHexValue(w.data);
+    if (!opts.some(([o]) => o === v)) opts.push([v, `${hex(v, INDEX_HEX_DIGITS)} ${c.label_de ?? c.id}`]);
+  }
+  return opts;
+}
 
 /**
  * Auswahlliste für ein Objekt.
@@ -87,16 +119,59 @@ const ENUMS = {
  * @param {number} sub Subindex
  * @param {string} type Datentyp ("bool", "u16", ...)
  * @param {object[]} [pdos=[]] PDO-Katalog (für 0x1C12/0x1C13)
+ * @param {object|null} [desc=null] Gerätebeschreibung (Aufzählungen, Kommandos)
  * @returns {Array<[number, string]>|null} [Wert, Text]-Paare oder null (freie Eingabe)
  */
-export function enumFor(index, sub, type, pdos = []) {
+export function enumFor(index, sub, type, pdos = [], desc = null) {
   if ((index === OBJ_RX_ASSIGN || index === OBJ_TX_ASSIGN) && sub > SUB_COUNT) {
     const rx = index === OBJ_RX_ASSIGN;
     const opts = pdos.filter((p) => p.rx === rx).map((p) => [p.index, `${hex(p.index, INDEX_HEX_DIGITS)} ${p.name}`]);
     if (opts.length) return opts;
   }
-  return ENUMS[objKey(index, sub)] ?? (type === 'bool' ? BOOL : null);
+  const key = objKey(index, sub);
+  if (desc && key === CMD_REQUEST_KEY) return commandOptions(desc);
+  return entryOptions(desc, descEntry(desc, key)) ?? (type === 'bool' ? BOOL : null);
 }
+
+/**
+ * Schreibbare Klemmenparameter laut Gerätebeschreibung (wie el3356::device_settings im Backend).
+ * @param {object|null} desc Gerätebeschreibung
+ * @returns {object[]} Einträge (siehe descEntry) nach Index und Subindex
+ */
+export function settingEntries(desc) {
+  if (!desc) return [];
+  const out = [];
+  for (const o of desc.objects) {
+    const idx = parseInt(o.index, HEX_RADIX);
+    if (idx < OBJ_CONFIG_FIRST || idx > OBJ_CONFIG_LAST) continue;
+    for (const e of o.entries) {
+      const sub = parseInt(e.sub, HEX_RADIX);
+      if (sub === SUB_COUNT || e.access !== 'rw' || e.never_write || ['string', 'bytes'].includes(e.type)) continue;
+      out.push(descEntry(desc, objKey(idx, sub)));
+    }
+  }
+  return out;
+}
+
+/**
+ * Anzeigeeinheit eines Eintrags: Einheit des TwinCAT-Dialogs, sonst Einheit der ESI.
+ * @param {object} e Eintrag
+ * @returns {string} z. B. "s", "mV/V"; leer ohne Einheit
+ */
+export function entryUnit(e) {
+  if (e.convert?.unit) return e.convert.unit;
+  if (!e.unit?.unit) return '';
+  const exp = e.unit.exp;
+  if (exp === 0) return e.unit.unit;
+  return SI_PREFIX[exp] ? SI_PREFIX[exp] + e.unit.unit : `${DECIMAL_BASE}^${exp} ${e.unit.unit}`;
+}
+
+/**
+ * Umrechnungsfaktor Rohwert -> Anzeige laut TwinCAT-Dialog (ConvertValue).
+ * @param {object} e Eintrag
+ * @returns {number} Faktor, 1 ohne Umrechnung
+ */
+export const entryFactor = (e) => e.convert?.factor ?? 1;
 
 /**
  * JSON-Wert (bool/Zahl) als Zahl für Auswahllisten.

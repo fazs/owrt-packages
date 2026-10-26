@@ -25,6 +25,10 @@ Regeln für den Code und die zugrunde liegenden Standards: [CODING_GUIDELINES.md
 | `src/acquisition.*` | Zyklischer Thread: Prozessdaten → `MeasurementEngine` → `TemporaryStatistics`, Ereignisse als JSON |
 | `src/ethercat_backend.*` | SOEM-Master: Init bis OP, PDO-Zuordnung, Mapping-Auswertung, SDO, Wiederanlauf |
 | `src/el3356.*` | Objektindizes, PDO-Layout aus Mapping, Dekodierung Status/Value, CoE-Schreibliste 0x8000 |
+| `src/device_description.*` | Gerätebeschreibung (aus der ESI erzeugt): Objektverzeichnis, PDOs, Varianten, Kommandos |
+| `src/generated/` | Eingecheckte, erzeugte Dateien (`el3356_0010.json` aus `scripts/esi_gen.py`) |
+| `esi/` | Auszug der Beckhoff-ESI für die EL3356-0010 (Eingabe von `scripts/esi_gen.py`) |
+| `scripts/esi_gen.py` | Erzeugt die Gerätebeschreibung aus der Beckhoff-ESI und `scripts/esi_supplement.el3356_0010.json` |
 | `src/measurement.*` | State-Machine „gültige Messung“ |
 | `src/measurement_csv.*` | CSV-Format der Messungen (Export, Import für `--sim-csv`) |
 | `src/calibration.*` | Kennlinie Rohwert → Gramm (Klemme oder Stützpunkte der Anwendung) |
@@ -180,6 +184,15 @@ Mit `--sim-csv <datei>` (schließt `--sim` ein) übernimmt das Backend beim Star
 ```sh
 curl -o /tmp/messungen.csv "http://waage:8080/api/measurements.csv?unit=g"
 ./build/ethercat-weigh --sim-csv /tmp/messungen.csv -c /tmp/ew.json
+```
+
+Gerätebeschreibung neu erzeugen (nach einer neuen ESI oder Änderung der Zusatzdatei); `scripts/build_host.sh` prüft mit `--check`, ob die eingecheckte Datei aktuell ist. `esi/Beckhoff EL3356-0010.xml` ist der auf die EL3356-0010 gefilterte Auszug der Beckhoff-ESI `Beckhoff EL33xx.xml` (ohne Bilddaten):
+
+```sh
+python3 scripts/esi_regions.py "<Beckhoff-ESI>/Beckhoff EL33xx.xml" -o "esi/Beckhoff EL3356-0010.xml" \
+  --type EL3356-0010 --strip-images
+python3 scripts/esi_gen.py "esi/Beckhoff EL3356-0010.xml" --type EL3356-0010 \
+  --supplement scripts/esi_supplement.el3356_0010.json -o src/generated/el3356_0010.json
 ```
 
 Frontend-Entwicklung mit Hot Reload: `cd web && npm run dev` (Proxy auf `http://127.0.0.1:8080`, abweichend über `EW_BACKEND`).

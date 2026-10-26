@@ -1,6 +1,6 @@
 <script>
   import { live, saveConfig, notify } from './live.svelte.js';
-  import { FILTER_OPTIONS } from './coe.js';
+  import { settingEntries, entryOptions, entryUnit, entryFactor, descEntry, F32_DIGITS } from './coe.js';
   import { MEASUREMENT_COLUMNS } from './constants.js';
 
   /** @type {{open?: boolean}} Dialog geöffnet (bindbar) */
@@ -12,6 +12,8 @@
   let texts = $state({});
   let errors = $state([]);
   let saving = $state(false);
+  // aufgeklappte Gruppen (id -> true)
+  let expanded = $state({});
 
   const unitOptions = [
     ['mg', 'mg'],
@@ -24,15 +26,16 @@
   // an der Option selbst (off), damit er sich nicht an jedem Feld wiederholt.
   /** Bedingung: Klemmenparameter werden nur bei „Beim Start schreiben“ beim Start übertragen. */
   const ON_START = { p: 'device.write_on_start' };
-  /** Bedingung: Filtereinstellung nur bei aktivem Filter. */
-  const FILTER_ON = { p: 'device.mode0_enable_filter', h: 'Unwirksam, solange der Filter aus ist.' };
   /** Bedingung: Stillstandserkennung der Klemme nur relevant, wenn das Steady-state-Bit gefordert ist. */
   const STEADY_ON = {
     p: 'measurement.use_device_steady_state',
     h: 'Für die Messung unwirksam, solange das Steady-state-Bit nicht gefordert ist (Abschnitt Messung).',
   };
 
-  const groups = [
+  /** Platzhalter für die aus der Gerätebeschreibung erzeugten Gruppen des Abschnitts Klemme. */
+  const DEVICE_GROUPS_SLOT = { id: 'device-slot' };
+
+  const staticGroups = [
     {
       key: 'measurement',
       title: 'Messung',
@@ -82,31 +85,7 @@
         { k: 'stable_band_rel', l: 'Stillstandsband (Anteil Nennlast)', t: 'num', h: 'Kalibrierung in der Klemme; 0,0005 = 0,05 %.' },
       ],
     },
-    {
-      key: 'device',
-      title: 'Klemme EL3356 (CoE 0x8000)',
-      hint: 'Lastwerte in der Einheit der Klemme. Wird bei Änderung per SDO übertragen.',
-      fields: [
-        {
-          k: 'write_on_start',
-          l: 'Beim Start schreiben',
-          t: 'bool',
-          off: 'Die markierten Werte werden beim Start nicht geschrieben; die Klemme behält ihre gespeicherten Werte. Änderungen werden beim Speichern trotzdem übertragen.',
-        },
-        { k: 'rated_output_mv_v', l: 'Rated output [mV/V] (0x8000:23)', t: 'num', dep: [ON_START] },
-        { k: 'nominal_load', l: 'Nominal load (0x8000:24)', t: 'num', dep: [ON_START] },
-        { k: 'zero_balance', l: 'Zero balance [mV/V] (0x8000:25)', t: 'num', dep: [ON_START] },
-        { k: 'gravity_of_earth', l: 'Gravity of earth [m/s²] (0x8000:26)', t: 'num', dep: [ON_START] },
-        { k: 'scale_factor', l: 'Scale factor (0x8000:27)', t: 'num', dep: [ON_START] },
-        { k: 'reference_load', l: 'Reference load (0x8000:28)', t: 'num', dep: [ON_START] },
-        { k: 'mode0_enable_filter', l: 'Mode0 enable filter (0x8000:01)', t: 'bool', dep: [ON_START] },
-        { k: 'mode0_filter_settings', l: 'Mode0 filter settings (0x8000:11)', t: 'select', o: FILTER_OPTIONS, dep: [ON_START, FILTER_ON] },
-        { k: 'mode0_enable_averager', l: 'Mode0 enable averager (0x8000:03)', t: 'bool', dep: [ON_START] },
-        { k: 'steady_state_window', l: 'Steady state window [ms] (0x8000:29)', t: 'int', dep: [ON_START, STEADY_ON] },
-        { k: 'steady_state_tolerance', l: 'Steady state tolerance (0x8000:2A)', t: 'int', dep: [ON_START, STEADY_ON] },
-        { k: 'calibration_interval', l: 'Calibration interval (0x8000:31)', t: 'int', dep: [ON_START] },
-      ],
-    },
+    DEVICE_GROUPS_SLOT,
     {
       key: 'ethercat',
       title: 'EtherCAT',
@@ -132,10 +111,133 @@
     },
   ];
 
+  /** Variante der Prozessdaten (AlternativeSmMapping), die diese Anwendung zuordnet. */
+  const CURRENT_VARIANT = 'Standard (REAL)';
+  /** Zusätzliche Bedingungen je Klemmenparameter (Abhängigkeiten der Anwendung). */
+  const EXTRA_DEPS = { '0x8000:29': [STEADY_ON], '0x8000:2A': [STEADY_ON] };
+  /**
+   * Gruppen des Abschnitts Klemme in der Reihenfolge des TwinCAT-Dialogs; nicht aufgeführte
+   * Parameter landen in „Weitere“, Objekte in objs als eingeklappte Gruppe je Objekt.
+   */
+  const DEVICE_LAYOUT = [
+    {
+      id: 'device-filter',
+      title: 'Klemme: Filter',
+      keys: ['0x8000:01', '0x8000:03', '0x8000:11', '0x8000:02', '0x8000:04', '0x8000:12', '0x8000:13', '0x8000:14', '0x8000:05'],
+      hint: 'Modus 0/1 = Sample mode 10,5 kHz bzw. 105 kHz (0x7000:04).',
+    },
+    {
+      id: 'device-scale',
+      title: 'Klemme: Kennwerte',
+      keys: ['0x8000:23', '0x8000:24', '0x8000:25', '0x8000:26', '0x8000:27', '0x8000:28', '0x8000:21'],
+      hint: 'Lastwerte in der Einheit der Klemme.',
+    },
+    { id: 'device-steady', title: 'Klemme: Steady state', keys: ['0x8000:29', '0x8000:2A'] },
+    { id: 'device-cal', title: 'Klemme: Selbstkalibrierung', keys: ['0x8000:31', '0x8000:32'] },
+    { id: 'device-ai1', title: 'Klemme: AI-Kanal 1 (nur Spannungsmessung)', obj: 0x8010, collapsed: true },
+    { id: 'device-ai2', title: 'Klemme: AI-Kanal 2 (nur Spannungsmessung)', obj: 0x8020, collapsed: true },
+  ];
+
+  /**
+   * Wert eines Klemmenparameters im Entwurf: typisiertes Feld, sonst device.coe, sonst ESI-Default.
+   * @param {object} e Eintrag der Gerätebeschreibung
+   * @returns {number|boolean|null}
+   */
+  function deviceValue(e) {
+    if (e.config_key) return draft.device[e.config_key];
+    return draft.device.coe?.[e.key] ?? e.default ?? null;
+  }
+
+  /**
+   * Bedingung aus enable_if der Gerätebeschreibung (mindestens eine Teilbedingung erfüllt).
+   * @param {object} e Eintrag
+   * @returns {{ok: () => boolean, h: string}|null}
+   */
+  function enableDep(e) {
+    if (!e.enable_if?.length) return null;
+    const conds = e.enable_if;
+    const texts = conds
+      .filter((c) => c.obj)
+      .map((c) => {
+        const src = descEntry(live.description, c.obj);
+        const opt = entryOptions(live.description, src)?.find(([v]) => v === Number(c.eq));
+        const what = typeof c.eq === 'boolean' ? (c.eq ? 'aktiv' : 'aus') : (opt?.[1] ?? c.eq);
+        return `${src?.label_de ?? src?.name ?? c.obj} (${c.obj}) = ${what}`;
+      });
+    return {
+      ok: () =>
+        conds.some((c) =>
+          c.variant ? c.variant === CURRENT_VARIANT : Number(deviceValue(descEntry(live.description, c.obj))) === Number(c.eq),
+        ),
+      h: texts.length ? `Nur wirksam bei ${texts.join(' oder ')}.` : 'In der aktuellen Prozessdaten-Variante unwirksam.',
+    };
+  }
+
+  /**
+   * Felddefinition eines Klemmenparameters.
+   * @param {object} e Eintrag der Gerätebeschreibung
+   * @returns {object} Feld (k, l, t, o, h, tip, dep, entry)
+   */
+  function deviceField(e) {
+    const unit = entryUnit(e);
+    const opts = entryOptions(live.description, e);
+    const t = e.type === 'bool' ? 'bool' : opts ? 'select' : e.type === 'f32' || entryFactor(e) !== 1 ? 'num' : 'int';
+    const def = e.default === undefined ? '' : ` · Default ${typeof e.default === 'boolean' ? (e.default ? 'TRUE' : 'FALSE') : Number((e.default * entryFactor(e)).toPrecision(F32_DIGITS)).toLocaleString('de-DE')}`;
+    const dep = [ON_START, ...(EXTRA_DEPS[e.key] ?? [])];
+    const en = enableDep(e);
+    if (en) dep.push(en);
+    return {
+      k: e.config_key ?? e.key,
+      l: `${e.label_de ?? e.name}${unit ? ` [${unit}]` : ''}`,
+      t,
+      o: opts,
+      h: `${e.key} ${e.name}${def}`,
+      tip: e.tooltip_de,
+      dep,
+      entry: e,
+    };
+  }
+
+  /** Gruppen des Abschnitts Klemme aus der Gerätebeschreibung. */
+  const deviceGroups = $derived.by(() => {
+    const entries = settingEntries(live.description);
+    const used = new Set();
+    const head = {
+      id: 'device',
+      key: 'device',
+      title: 'Klemme EL3356',
+      hint: live.description
+        ? 'Parameter laut ESI. Wird bei Änderung per SDO übertragen; nicht gesetzte Parameter erhalten den Default der ESI.'
+        : 'Gerätebeschreibung nicht geladen.',
+      fields: [
+        {
+          k: 'write_on_start',
+          l: 'Beim Start schreiben',
+          t: 'bool',
+          off: 'Die markierten Werte werden beim Start nicht geschrieben; die Klemme behält ihre gespeicherten Werte. Änderungen werden beim Speichern trotzdem übertragen.',
+        },
+      ],
+    };
+    const out = [head];
+    for (const g of DEVICE_LAYOUT) {
+      const list = g.keys
+        ? g.keys.map((k) => entries.find((e) => e.key === k)).filter(Boolean)
+        : entries.filter((e) => e.index === g.obj);
+      list.forEach((e) => used.add(e.key));
+      if (list.length) out.push({ ...g, key: 'device', fields: list.map(deviceField) });
+    }
+    const rest = entries.filter((e) => !used.has(e.key));
+    if (rest.length) out.push({ id: 'device-rest', key: 'device', title: 'Klemme: Weitere', fields: rest.map(deviceField) });
+    return out;
+  });
+
+  const groups = $derived(staticGroups.flatMap((g) => (g === DEVICE_GROUPS_SLOT ? deviceGroups : [g])));
+
   $effect(() => {
     if (open && dialog && !dialog.open) {
       draft = structuredClone($state.snapshot(live.config));
       draft.ui.hidden_columns ??= [];
+      draft.device.coe ??= {};
       texts = {};
       errors = [];
       dialog.showModal();
@@ -145,46 +247,79 @@
   });
 
   /**
+   * Wert eines Felds im Entwurf (Klemmenparameter ohne typisiertes Feld: device.coe bzw. Default).
+   * @param {string} g Gruppe (Abschnitt der Konfiguration)
+   * @param {{k: string, entry?: object}} f Felddefinition
+   * @returns {any}
+   */
+  function fieldValue(g, f) {
+    return f.entry ? deviceValue(f.entry) : draft[g][f.k];
+  }
+
+  /**
+   * Schreibt einen Wert in den Entwurf; Klemmenparameter ohne typisiertes Feld als Zahl in device.coe.
+   * @param {string} g Gruppe
+   * @param {{k: string, entry?: object}} f Felddefinition
+   * @param {any} v Wert
+   */
+  function assign(g, f, v) {
+    if (f.entry && !f.entry.config_key) draft.device.coe[f.entry.key] = typeof v === 'boolean' ? Number(v) : v;
+    else draft[g][f.k] = v;
+  }
+
+  /**
    * Übernimmt eine Eingabe in den Entwurf; Zahlenfelder mit Komma oder Punkt,
    * ungültige Zahlen werden als null gespeichert (Validierung beim Speichern).
+   * Klemmenparameter mit Umrechnung (ConvertValue) werden als Rohwert gespeichert.
    * @param {string} g Gruppe (Abschnitt der Konfiguration)
-   * @param {{k: string, t: string, o?: Array}} f Felddefinition
+   * @param {{k: string, t: string, o?: Array, entry?: object}} f Felddefinition
    * @param {string|boolean|string[]} raw Eingabewert
    */
   function setField(g, f, raw) {
-    if (f.t === 'bool' || f.t === 'text' || f.t === 'hide') draft[g][f.k] = raw;
-    else if (f.t === 'select') draft[g][f.k] = typeof f.o[0][0] === 'number' ? Number(raw) : raw;
+    if (f.t === 'bool' || f.t === 'text' || f.t === 'hide') assign(g, f, raw);
+    else if (f.t === 'select') assign(g, f, typeof f.o[0][0] === 'number' ? Number(raw) : raw);
     else {
       texts[`${g}.${f.k}`] = raw;
       const t = raw.trim().replace(',', '.');
-      const v = t === '' ? NaN : Number(t);
-      draft[g][f.k] = Number.isFinite(v) && (f.t !== 'int' || Number.isInteger(v)) ? v : null;
+      let v = t === '' ? NaN : Number(t);
+      const factor = f.entry ? entryFactor(f.entry) : 1;
+      const integral = f.t === 'int' || (f.entry && f.entry.type !== 'f32');
+      if (Number.isFinite(v) && factor !== 1) {
+        const r = v / factor;
+        v = integral && Math.abs(r - Math.round(r)) < ROUND_EPS ? Math.round(r) : r;
+      }
+      assign(g, f, Number.isFinite(v) && (!integral || Number.isInteger(v)) ? v : null);
     }
   }
 
+  /** Toleranz beim Runden umgerechneter Ganzzahlen (z. B. 0,1 s / 0,01 s). */
+  const ROUND_EPS = 1e-9;
   const NUM_PATTERN = '\\s*-?(\\d+([.,]\\d*)?|[.,]\\d+)([eE][\\-+]?\\d+)?\\s*';
   const INT_PATTERN = '\\s*-?\\d+\\s*';
   /**
    * Anzeigetext eines Zahlenfelds: letzte Eingabe, sonst Wert mit Dezimalkomma.
    * Gleitkommafelder zeigen immer Nachkommastellen ("20,0"), damit Bruchteile erkennbar zulässig sind.
    * @param {string} g Gruppe
-   * @param {{k: string, t: string}} f Felddefinition
+   * @param {{k: string, t: string, entry?: object}} f Felddefinition
    * @returns {string}
    */
   function numText(g, f) {
     const typed = texts[`${g}.${f.k}`];
     if (typed !== undefined) return typed;
-    const s = String(draft[g][f.k] ?? '');
+    let v = fieldValue(g, f);
+    if (f.entry && v !== null && v !== undefined) v = Number((v * entryFactor(f.entry)).toPrecision(F32_DIGITS));
+    const s = String(v ?? '');
     return (f.t === 'num' && /^-?\d+$/.test(s) ? `${s}.0` : s).replace('.', ',');
   }
 
   /**
    * Bedingungen eines Felds, die im Entwurf nicht erfüllt sind.
-   * @param {{dep?: Array<{p: string, h: string}>}} f Felddefinition
-   * @returns {Array<{p: string, h: string}>}
+   * @param {{dep?: Array<{p?: string, ok?: () => boolean, h?: string}>}} f Felddefinition
+   * @returns {Array<{p?: string, h?: string}>}
    */
   function unmet(f) {
     return (f.dep ?? []).filter((d) => {
+      if (d.ok) return !d.ok();
       const [g, k] = d.p.split('.');
       return !draft[g][k];
     });
@@ -222,7 +357,7 @@
 </script>
 
 {#snippet notes(f)}
-  {#each unmet(f).filter((d) => d.h) as d (d.p)}<small class="dep">{d.h}</small>{/each}
+  {#each unmet(f).filter((d) => d.h) as d (d.h)}<small class="dep">{d.h}</small>{/each}
 {/snippet}
 
 <dialog bind:this={dialog} onclose={() => (open = false)} aria-labelledby="cfg-title">
@@ -240,19 +375,26 @@
       {/if}
 
       <div class="body">
-        {#each groups as g (g.key)}
-          <fieldset>
-            <legend>{g.title}</legend>
+        {#each groups as g (g.id ?? g.key)}
+          <fieldset class:collapsed={g.collapsed && !expanded[g.id]}>
+            <legend>
+              {#if g.collapsed}
+                <button type="button" class="toggle" onclick={() => (expanded[g.id] = !expanded[g.id])} aria-expanded={!!expanded[g.id]}>
+                  {expanded[g.id] ? '▾' : '▸'} {g.title}
+                </button>
+              {:else}{g.title}{/if}
+            </legend>
             {#if g.hint}<p class="hint muted">{g.hint}</p>{/if}
-            {#each g.fields as f (f.k)}
+            {#each g.collapsed && !expanded[g.id] ? [] : g.fields as f (f.k)}
               {#if f.t === 'bool'}
-                <label class="check" class:inactive={unmet(f).length > 0}>
+                <label class="check" class:inactive={unmet(f).length > 0} title={f.tip}>
                   <input
                     type="checkbox"
-                    checked={draft[g.key][f.k]}
+                    checked={!!fieldValue(g.key, f)}
                     onchange={(e) => setField(g.key, f, e.currentTarget.checked)}
                   />
                   <span>{f.l}</span>
+                  {#if f.h}<small class="muted">{f.h}</small>{/if}
                   {@render notes(f)}
                   {#if f.off && !draft[g.key][f.k]}<small class="dep">{f.off}</small>{/if}
                 </label>
@@ -272,10 +414,10 @@
                   {#if f.h}<small class="muted">{f.h}</small>{/if}
                 </fieldset>
               {:else if f.t === 'select'}
-                <label class="field" class:inactive={unmet(f).length > 0}>
+                <label class="field" class:inactive={unmet(f).length > 0} title={f.tip}>
                   <span>{f.l}</span>
                   <select
-                    value={draft[g.key][f.k]}
+                    value={fieldValue(g.key, f)}
                     onchange={(e) => setField(g.key, f, e.currentTarget.value)}
                   >
                     {#each f.o as [v, label] (v)}
@@ -286,7 +428,7 @@
                   {@render notes(f)}
                 </label>
               {:else}
-                <label class="field" class:inactive={unmet(f).length > 0}>
+                <label class="field" class:inactive={unmet(f).length > 0} title={f.tip}>
                   <span>{f.l}</span>
                   <input
                     type="text"
@@ -367,6 +509,18 @@
   fieldset:last-child {
     border-bottom: 0;
   }
+  fieldset.collapsed {
+    padding-bottom: 0.4rem;
+  }
+  .toggle {
+    font: inherit;
+    font-weight: inherit;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    cursor: pointer;
+  }
   /* zusammengehörige Checkboxen als Kasten */
   fieldset.checks {
     grid-column: 1 / -1;
@@ -433,7 +587,6 @@
     grid-column: 1 / -1;
   }
   input[type='text'],
-  input[type='number'],
   select {
     font: inherit;
     padding: 0.4rem 0.55rem;

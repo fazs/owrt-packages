@@ -69,7 +69,7 @@
    * @returns {number|string} Zahl bei Auswahlliste, sonst Text
    */
   function initialTarget(s) {
-    if (enumFor(s.index, s.sub, s.type, pdo?.pdos)) return asNum(s.value);
+    if (enumFor(s.index, s.sub, s.type, pdo?.pdos, live.description)) return asNum(s.value);
     return s.type === 'f32' ? String(Number(s.value.toPrecision(F32_DIGITS))) : String(asNum(s.value));
   }
 
@@ -228,7 +228,7 @@
    */
   async function sendStep(i) {
     const s = steps[i];
-    const opts = enumFor(s.index, s.sub, s.type, pdo?.pdos);
+    const opts = enumFor(s.index, s.sub, s.type, pdo?.pdos, live.description);
     await run(`init:${i}`, async () => {
       try {
         const value = outValue(s.target, s.type, opts);
@@ -343,7 +343,7 @@
                   <tbody>
                     {#each p.entries as e, i (i)}
                       {@const k = entryKey(e)}
-                      {@const opts = enumFor(e.index, e.sub, e.type, pdo.pdos)}
+                      {@const opts = enumFor(e.index, e.sub, e.type, pdo.pdos, live.description)}
                       {@const sdo = sdoVals[k]}
                       <tr class:gap={isGap(e)} class:forced={e.override !== null && e.override !== undefined}>
                         <td><code>{isGap(e) ? '—' : k}</code></td>
@@ -434,7 +434,7 @@
             </thead>
             <tbody>
               {#each steps as s, i (i)}
-                {@const opts = enumFor(s.index, s.sub, s.type, pdo?.pdos)}
+                {@const opts = enumFor(s.index, s.sub, s.type, pdo?.pdos, live.description)}
                 {@const k = objKey(s.index, s.sub)}
                 <tr>
                   <td class="num">{i + 1}</td>

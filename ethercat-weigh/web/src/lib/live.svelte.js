@@ -20,6 +20,7 @@ export const live = $state({
   connected: false,
   sample: null,
   config: null,
+  description: null, // Gerätebeschreibung der Klemme (/api/device/description)
   info: null,
   statistics: null,
   measurements: [],
@@ -158,6 +159,16 @@ async function loadMeasurements() {
   }
 }
 
+/** Lädt die Gerätebeschreibung der Klemme (einmal je Seitenaufruf). */
+async function loadDescription() {
+  try {
+    const r = await fetch('/api/device/description');
+    if (r.ok) live.description = await r.json();
+  } catch {
+    /* erneuter Versuch beim nächsten Verbindungsaufbau */
+  }
+}
+
 /**
  * Verarbeitet eine WebSocket-Nachricht.
  * @param {{type: string}} msg Nachricht (init, sample, measurement, measurement_deleted, ...)
@@ -168,6 +179,7 @@ function handle(msg) {
       applySnapshot(msg.snapshot);
       live.config = msg.config;
       loadMeasurements();
+      if (!live.description) loadDescription();
       trend.t.length = 0;
       trend.v.length = 0;
       trendVersion();

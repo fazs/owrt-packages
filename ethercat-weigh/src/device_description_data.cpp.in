@@ -1,0 +1,10 @@
+// Von CMake aus @EW_DESC_SOURCE@ erzeugt (configure_file); nicht bearbeiten.
+#include <string_view>
+
+namespace ew {
+
+/// JSON-Text der Beschreibung der EL3356-0010 (siehe DeviceDescription::el3356_0010()).
+extern const std::string_view kEl3356_0010Json;
+const std::string_view kEl3356_0010Json = R"ew_desc(@EW_DESC_JSON@)ew_desc";
+
+} // namespace ew

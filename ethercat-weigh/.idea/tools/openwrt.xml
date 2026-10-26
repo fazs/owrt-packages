@@ -1,0 +1,23 @@
+<toolSet name="openwrt">
+  <tool name="update feeds" showInMainMenu="false" showInEditor="false" showInProject="false" showInSearchPopup="false" disabled="false" useConsole="true" showConsoleOnStdOut="false" showConsoleOnStdErr="true" synchronizeAfterRun="true">
+    <exec>
+      <option name="COMMAND" value="$USER_HOME$/dev/openwrt-sdk-25.12.6-mediatek-filogic_gcc-14.3.0_musl.Linux-x86_64/scripts/feeds" />
+      <option name="PARAMETERS" value="update -a" />
+      <option name="WORKING_DIRECTORY" value="$USER_HOME$/dev/openwrt-sdk-25.12.6-mediatek-filogic_gcc-14.3.0_musl.Linux-x86_64" />
+    </exec>
+  </tool>
+  <tool name="install ethercat-weigh" showInMainMenu="false" showInEditor="false" showInProject="false" showInSearchPopup="false" disabled="false" useConsole="true" showConsoleOnStdOut="false" showConsoleOnStdErr="true" synchronizeAfterRun="true">
+    <exec>
+      <option name="COMMAND" value="$USER_HOME$/dev/openwrt-sdk-25.12.6-mediatek-filogic_gcc-14.3.0_musl.Linux-x86_64/scripts/feeds" />
+      <option name="PARAMETERS" value="install ethercat-weigh" />
+      <option name="WORKING_DIRECTORY" value="$USER_HOME$/dev/openwrt-sdk-25.12.6-mediatek-filogic_gcc-14.3.0_musl.Linux-x86_64" />
+    </exec>
+  </tool>
+  <tool name="make config" showInMainMenu="false" showInEditor="false" showInProject="false" showInSearchPopup="false" disabled="false" useConsole="true" showConsoleOnStdOut="false" showConsoleOnStdErr="true" synchronizeAfterRun="true">
+    <exec>
+      <option name="COMMAND" value="make" />
+      <option name="PARAMETERS" value="config" />
+      <option name="WORKING_DIRECTORY" value="$USER_HOME$/dev/openwrt-sdk-25.12.6-mediatek-filogic_gcc-14.3.0_musl.Linux-x86_64" />
+    </exec>
+  </tool>
+</toolSet>

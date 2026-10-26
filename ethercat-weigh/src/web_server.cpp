@@ -7,6 +7,7 @@
 #include <unordered_set>
 
 #include "crow.h"
+#include "device_description.hpp"
 #include "log.hpp"
 
 namespace ew {
@@ -152,6 +153,14 @@ void run_web_server(Acquisition& acq, const HttpConfig& http) {
         return json_response(r.ok ? kHttpOk : kHttpBadRequest, {{"ok", r.ok},
                                                 {"restart_required", r.restart_required},
                                                 {"errors", r.errors}});
+    });
+
+    // Gerätebeschreibung der Klemme (aus der ESI erzeugt, siehe scripts/esi_gen.py)
+    CROW_ROUTE(app, "/api/device/description")([] {
+        crow::response r(kHttpOk, DeviceDescription::el3356_0010().text());
+        r.set_header("Content-Type", "application/json");
+        r.set_header("Cache-Control", "no-cache");
+        return r;
     });
 
     CROW_ROUTE(app, "/api/measurements")([&] { return json_response(kHttpOk, acq.measurements_json()); });

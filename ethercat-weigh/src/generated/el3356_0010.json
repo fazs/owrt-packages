@@ -1,0 +1,4732 @@
+{
+ "generator": "scripts/esi_gen.py",
+ "source": {
+  "file": "Beckhoff EL3356-0010.xml",
+  "file_version": "10",
+  "supplement": "esi_supplement.el3356_0010.json"
+ },
+ "device": {
+  "type": "EL3356-0010",
+  "product_code": "0x0D1C3052",
+  "revision": "0x0019000A",
+  "revisions": [
+   "0x0011000A",
+   "0x0012000A",
+   "0x0013000A",
+   "0x0014000A",
+   "0x0015000A",
+   "0x0016000A",
+   "0x0017000A",
+   "0x0018000A",
+   "0x0019000A"
+  ],
+  "name_de": "EL3356-0010 1K . Ana. Eingang, Widerstandsbrücke, 24bit, hochgenau",
+  "name_en": "EL3356-0010 1Ch. Ana. Input Resistor Bridge Terminal, 24bit, High Precision"
+ },
+ "enums": {
+  "DT0800EN16": [
+   {
+    "value": 0,
+    "text": "FIR 50 Hz"
+   },
+   {
+    "value": 1,
+    "text": "FIR 60 Hz"
+   },
+   {
+    "value": 2,
+    "text": "IIR1"
+   },
+   {
+    "value": 3,
+    "text": "IIR2"
+   },
+   {
+    "value": 4,
+    "text": "IIR3"
+   },
+   {
+    "value": 5,
+    "text": "IIR4"
+   },
+   {
+    "value": 6,
+    "text": "IIR5"
+   },
+   {
+    "value": 7,
+    "text": "IIR6"
+   },
+   {
+    "value": 8,
+    "text": "IIR7"
+   },
+   {
+    "value": 9,
+    "text": "IIR8"
+   },
+   {
+    "value": 10,
+    "text": "Dynamic IIR"
+   },
+   {
+    "value": 11,
+    "text": "PDO Filter freqency"
+   }
+  ],
+  "DT0801EN16": [
+   {
+    "value": 0,
+    "text": "FIR 50 Hz"
+   },
+   {
+    "value": 1,
+    "text": "FIR 60 Hz"
+   },
+   {
+    "value": 2,
+    "text": "IIR 1"
+   },
+   {
+    "value": 3,
+    "text": "IIR2"
+   },
+   {
+    "value": 4,
+    "text": "IIR3"
+   },
+   {
+    "value": 5,
+    "text": "IIR4"
+   },
+   {
+    "value": 6,
+    "text": "IIR5"
+   },
+   {
+    "value": 7,
+    "text": "IIR6"
+   },
+   {
+    "value": 8,
+    "text": "IIR7"
+   },
+   {
+    "value": 9,
+    "text": "IIR8"
+   },
+   {
+    "value": 10,
+    "text": "Dynamic IIR"
+   },
+   {
+    "value": 11,
+    "text": "PDO Filter freqency"
+   }
+  ],
+  "DT0808EN16": [
+   {
+    "value": 0,
+    "text": "50 Hz FIR"
+   },
+   {
+    "value": 1,
+    "text": "60 Hz FIR"
+   },
+   {
+    "value": 2,
+    "text": "IIR 1"
+   },
+   {
+    "value": 3,
+    "text": "IIR 2"
+   },
+   {
+    "value": 4,
+    "text": "IIR 3"
+   },
+   {
+    "value": 5,
+    "text": "IIR 4"
+   },
+   {
+    "value": 6,
+    "text": "IIR 5"
+   },
+   {
+    "value": 7,
+    "text": "IIR 6"
+   },
+   {
+    "value": 8,
+    "text": "IIR 7"
+   },
+   {
+    "value": 9,
+    "text": "IIR 8"
+   }
+  ]
+ },
+ "objects": [
+  {
+   "index": "0x1000",
+   "name": "Device type",
+   "type": "UDINT",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "Device type",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "access": "ro",
+     "default": 5001
+    }
+   ]
+  },
+  {
+   "index": "0x1008",
+   "name": "Device name",
+   "type": "STRING(11)",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "Device name",
+     "type": "string",
+     "esi_type": "STRING(11)",
+     "bits": 88,
+     "access": "ro",
+     "default": "EL3356-0010"
+    }
+   ]
+  },
+  {
+   "index": "0x1009",
+   "name": "Hardware version",
+   "type": "STRING(2)",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "Hardware version",
+     "type": "string",
+     "esi_type": "STRING(2)",
+     "bits": 16,
+     "access": "ro"
+    }
+   ]
+  },
+  {
+   "index": "0x100A",
+   "name": "Software version",
+   "type": "STRING(2)",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "Software version",
+     "type": "string",
+     "esi_type": "STRING(2)",
+     "bits": 16,
+     "access": "ro"
+    }
+   ]
+  },
+  {
+   "index": "0x1011",
+   "name": "Restore default parameters",
+   "type": "DT1011",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 1,
+     "never_write": "nur über Kommando restore_defaults",
+     "supplement": [
+      {
+       "fields": [
+        "never_write"
+       ],
+       "source": "Projektentscheidung"
+      }
+     ]
+    },
+    {
+     "sub": "0x01",
+     "name": "SubIndex 001",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 16,
+     "access": "rw",
+     "never_write": "nur über Kommando restore_defaults",
+     "supplement": [
+      {
+       "fields": [
+        "never_write"
+       ],
+       "source": "Projektentscheidung"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "index": "0x1018",
+   "name": "Identity",
+   "type": "DT1018",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 4
+    },
+    {
+     "sub": "0x01",
+     "name": "Vendor ID",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 16,
+     "access": "ro",
+     "default": 2
+    },
+    {
+     "sub": "0x02",
+     "name": "Product code",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 48,
+     "access": "ro",
+     "default": 219951186
+    },
+    {
+     "sub": "0x03",
+     "name": "Revision",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 80,
+     "access": "ro"
+    },
+    {
+     "sub": "0x04",
+     "name": "Serial number",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 112,
+     "access": "ro"
+    }
+   ]
+  },
+  {
+   "index": "0x10F0",
+   "name": "Backup parameter handling",
+   "type": "DT10F0",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 1
+    },
+    {
+     "sub": "0x01",
+     "name": "Checksum",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 16,
+     "access": "ro"
+    }
+   ]
+  },
+  {
+   "index": "0x1600",
+   "name": "RMB RxPDO-Map Control",
+   "type": "DT1600",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 7
+    },
+    {
+     "sub": "0x01",
+     "name": "SubIndex 001",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 16,
+     "access": "ro",
+     "default": 1879048449
+    },
+    {
+     "sub": "0x02",
+     "name": "SubIndex 002",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 48,
+     "access": "ro",
+     "default": 1879048705
+    },
+    {
+     "sub": "0x03",
+     "name": "SubIndex 003",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 80,
+     "access": "ro",
+     "default": 1879048961
+    },
+    {
+     "sub": "0x04",
+     "name": "SubIndex 004",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 112,
+     "access": "ro",
+     "default": 1879049217
+    },
+    {
+     "sub": "0x05",
+     "name": "SubIndex 005",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 144,
+     "access": "ro",
+     "default": 1879049473
+    },
+    {
+     "sub": "0x06",
+     "name": "SubIndex 006",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 176,
+     "access": "ro",
+     "default": 3
+    },
+    {
+     "sub": "0x07",
+     "name": "SubIndex 007",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 208,
+     "access": "ro",
+     "default": 8,
+     "revisions": [
+      "0x0015000A",
+      "0x0016000A",
+      "0x0017000A",
+      "0x0018000A",
+      "0x0019000A"
+     ]
+    }
+   ]
+  },
+  {
+   "index": "0x1601",
+   "name": "RMB RxPDO-Map Filter frequency",
+   "type": "DT1601",
+   "access": "ro",
+   "revisions": [
+    "0x0015000A",
+    "0x0016000A",
+    "0x0017000A",
+    "0x0018000A",
+    "0x0019000A"
+   ],
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 1
+    },
+    {
+     "sub": "0x01",
+     "name": "SubIndex 001",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 16,
+     "access": "ro",
+     "default": 1879052560
+    }
+   ]
+  },
+  {
+   "index": "0x1800",
+   "name": "RMB TxPDO-Par Status",
+   "type": "DT1800",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 6
+    },
+    {
+     "sub": "0x06",
+     "name": "Exclude TxPDOs",
+     "type": "bytes",
+     "esi_type": "ARRAY [0..9] OF BYTE",
+     "bits": 80,
+     "bit_offset": 16,
+     "access": "ro",
+     "default": "041A051A061A071A0000"
+    }
+   ]
+  },
+  {
+   "index": "0x1801",
+   "name": "RMB TxPDO-Par Value (INT32)",
+   "type": "DT1800",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 6
+    },
+    {
+     "sub": "0x06",
+     "name": "Exclude TxPDOs",
+     "type": "bytes",
+     "esi_type": "ARRAY [0..9] OF BYTE",
+     "bits": 80,
+     "bit_offset": 16,
+     "access": "ro",
+     "default": "021A041A051A061A071A"
+    }
+   ]
+  },
+  {
+   "index": "0x1802",
+   "name": "RMB TxPDO-Par Value (Real)",
+   "type": "DT1800",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 6
+    },
+    {
+     "sub": "0x06",
+     "name": "Exclude TxPDOs",
+     "type": "bytes",
+     "esi_type": "ARRAY [0..9] OF BYTE",
+     "bits": 80,
+     "bit_offset": 16,
+     "access": "ro",
+     "default": "011A041A051A061A071A"
+    }
+   ]
+  },
+  {
+   "index": "0x1803",
+   "name": "RMB TxPDO-Par Timestamp",
+   "type": "DT1800",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 6
+    },
+    {
+     "sub": "0x06",
+     "name": "Exclude TxPDOs",
+     "type": "bytes",
+     "esi_type": "ARRAY [0..9] OF BYTE",
+     "bits": 80,
+     "bit_offset": 16,
+     "access": "ro",
+     "default": "041A051A061A071A0000"
+    }
+   ]
+  },
+  {
+   "index": "0x1804",
+   "name": "AI TxPDO-Par Standard Ch.1",
+   "type": "DT1800",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 6
+    },
+    {
+     "sub": "0x06",
+     "name": "Exclude TxPDOs",
+     "type": "bytes",
+     "esi_type": "ARRAY [0..9] OF BYTE",
+     "bits": 80,
+     "bit_offset": 16,
+     "access": "ro",
+     "default": "051A001A011A021A031A"
+    }
+   ]
+  },
+  {
+   "index": "0x1805",
+   "name": "AI TxPDO-Par Compact Ch.1",
+   "type": "DT1800",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 6
+    },
+    {
+     "sub": "0x06",
+     "name": "Exclude TxPDOs",
+     "type": "bytes",
+     "esi_type": "ARRAY [0..9] OF BYTE",
+     "bits": 80,
+     "bit_offset": 16,
+     "access": "ro",
+     "default": "041A001A011A021A031A"
+    }
+   ]
+  },
+  {
+   "index": "0x1806",
+   "name": "AI TxPDO-Par Standard Ch.2",
+   "type": "DT1800",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 6
+    },
+    {
+     "sub": "0x06",
+     "name": "Exclude TxPDOs",
+     "type": "bytes",
+     "esi_type": "ARRAY [0..9] OF BYTE",
+     "bits": 80,
+     "bit_offset": 16,
+     "access": "ro",
+     "default": "071A001A011A021A031A"
+    }
+   ]
+  },
+  {
+   "index": "0x1807",
+   "name": "AI TxPDO-Par Compact Ch.2",
+   "type": "DT1800",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 6
+    },
+    {
+     "sub": "0x06",
+     "name": "Exclude TxPDOs",
+     "type": "bytes",
+     "esi_type": "ARRAY [0..9] OF BYTE",
+     "bits": 80,
+     "bit_offset": 16,
+     "access": "ro",
+     "default": "061A001A011A021A031A"
+    }
+   ]
+  },
+  {
+   "index": "0x1A00",
+   "name": "RMB TxPDO-Map Status",
+   "type": "DT1A00",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 12
+    },
+    {
+     "sub": "0x01",
+     "name": "SubIndex 001",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 16,
+     "access": "ro",
+     "default": 1
+    },
+    {
+     "sub": "0x02",
+     "name": "SubIndex 002",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 48,
+     "access": "ro",
+     "default": 1610613249
+    },
+    {
+     "sub": "0x03",
+     "name": "SubIndex 003",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 80,
+     "access": "ro",
+     "default": 1
+    },
+    {
+     "sub": "0x04",
+     "name": "SubIndex 004",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 112,
+     "access": "ro",
+     "default": 1610613761
+    },
+    {
+     "sub": "0x05",
+     "name": "SubIndex 005",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 144,
+     "access": "ro",
+     "default": 2
+    },
+    {
+     "sub": "0x06",
+     "name": "SubIndex 006",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 176,
+     "access": "ro",
+     "default": 1610614529
+    },
+    {
+     "sub": "0x07",
+     "name": "SubIndex 007",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 208,
+     "access": "ro",
+     "default": 1610614785
+    },
+    {
+     "sub": "0x08",
+     "name": "SubIndex 008",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 240,
+     "access": "ro",
+     "default": 1610615041
+    },
+    {
+     "sub": "0x09",
+     "name": "SubIndex 009",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 272,
+     "access": "ro",
+     "default": 4
+    },
+    {
+     "sub": "0x0A",
+     "name": "SubIndex 010",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 304,
+     "access": "ro",
+     "default": 1610616321
+    },
+    {
+     "sub": "0x0B",
+     "name": "SubIndex 011",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 336,
+     "access": "ro",
+     "default": 1
+    },
+    {
+     "sub": "0x0C",
+     "name": "SubIndex 012",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 368,
+     "access": "ro",
+     "default": 1610616833
+    }
+   ]
+  },
+  {
+   "index": "0x1A01",
+   "name": "RMB TxPDO-Map Value (INT32)",
+   "type": "DT1601",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 1
+    },
+    {
+     "sub": "0x01",
+     "name": "SubIndex 001",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 16,
+     "access": "ro",
+     "default": 1610617120
+    }
+   ]
+  },
+  {
+   "index": "0x1A02",
+   "name": "RMB TxPDO-Map Value (Real)",
+   "type": "DT1601",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 1
+    },
+    {
+     "sub": "0x01",
+     "name": "SubIndex 001",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 16,
+     "access": "ro",
+     "default": 1610617376
+    }
+   ]
+  },
+  {
+   "index": "0x1A03",
+   "name": "RMB TxPDO-Map Timestamp",
+   "type": "DT1601",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 1
+    },
+    {
+     "sub": "0x01",
+     "name": "SubIndex 001",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 16,
+     "access": "ro",
+     "default": 1610617664
+    }
+   ]
+  },
+  {
+   "index": "0x1A04",
+   "name": "AI TxPDO-Map Standard Ch.1",
+   "type": "DT1A04",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 8
+    },
+    {
+     "sub": "0x01",
+     "name": "SubIndex 001",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 16,
+     "access": "ro",
+     "default": 1611661569
+    },
+    {
+     "sub": "0x02",
+     "name": "SubIndex 002",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 48,
+     "access": "ro",
+     "default": 1611661825
+    },
+    {
+     "sub": "0x03",
+     "name": "SubIndex 003",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 80,
+     "access": "ro",
+     "default": 4
+    },
+    {
+     "sub": "0x04",
+     "name": "SubIndex 004",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 112,
+     "access": "ro",
+     "default": 1611663105
+    },
+    {
+     "sub": "0x05",
+     "name": "SubIndex 005",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 144,
+     "access": "ro",
+     "default": 1
+    },
+    {
+     "sub": "0x06",
+     "name": "SubIndex 006",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 176,
+     "access": "ro",
+     "default": 7
+    },
+    {
+     "sub": "0x07",
+     "name": "SubIndex 007",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 208,
+     "access": "ro",
+     "default": 1611665409
+    },
+    {
+     "sub": "0x08",
+     "name": "SubIndex 008",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 240,
+     "access": "ro",
+     "default": 1611665696,
+     "revisions": [
+      "0x0011000A",
+      "0x0012000A",
+      "0x0013000A",
+      "0x0019000A"
+     ]
+    }
+   ]
+  },
+  {
+   "index": "0x1A05",
+   "name": "AI TxPDO-Map Compact Ch.1",
+   "type": "DT1601",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 1
+    },
+    {
+     "sub": "0x01",
+     "name": "SubIndex 001",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 16,
+     "access": "ro",
+     "default": 1611665696
+    }
+   ]
+  },
+  {
+   "index": "0x1A06",
+   "name": "AI TxPDO-Map Standard Ch.2",
+   "type": "DT1A04",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 8
+    },
+    {
+     "sub": "0x01",
+     "name": "SubIndex 001",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 16,
+     "access": "ro",
+     "default": 1612710145
+    },
+    {
+     "sub": "0x02",
+     "name": "SubIndex 002",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 48,
+     "access": "ro",
+     "default": 1612710401
+    },
+    {
+     "sub": "0x03",
+     "name": "SubIndex 003",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 80,
+     "access": "ro",
+     "default": 4
+    },
+    {
+     "sub": "0x04",
+     "name": "SubIndex 004",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 112,
+     "access": "ro",
+     "default": 1612711681
+    },
+    {
+     "sub": "0x05",
+     "name": "SubIndex 005",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 144,
+     "access": "ro",
+     "default": 1
+    },
+    {
+     "sub": "0x06",
+     "name": "SubIndex 006",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 176,
+     "access": "ro",
+     "default": 7
+    },
+    {
+     "sub": "0x07",
+     "name": "SubIndex 007",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 208,
+     "access": "ro",
+     "default": 1612713985
+    },
+    {
+     "sub": "0x08",
+     "name": "SubIndex 008",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 240,
+     "access": "ro",
+     "default": 1612714272,
+     "revisions": [
+      "0x0011000A",
+      "0x0012000A",
+      "0x0013000A",
+      "0x0019000A"
+     ]
+    }
+   ]
+  },
+  {
+   "index": "0x1A07",
+   "name": "AI TxPDO-Map Compact Ch.2",
+   "type": "DT1601",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 1
+    },
+    {
+     "sub": "0x01",
+     "name": "SubIndex 001",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 16,
+     "access": "ro",
+     "default": 1612714272
+    }
+   ]
+  },
+  {
+   "index": "0x1C00",
+   "name": "Sync manager type",
+   "type": "DT1C00",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 4
+    },
+    {
+     "sub": "0x01",
+     "name": "SubIndex 001",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 16,
+     "access": "ro",
+     "default": 1
+    },
+    {
+     "sub": "0x02",
+     "name": "SubIndex 002",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 24,
+     "access": "ro",
+     "default": 2
+    },
+    {
+     "sub": "0x03",
+     "name": "SubIndex 003",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 32,
+     "access": "ro",
+     "default": 3
+    },
+    {
+     "sub": "0x04",
+     "name": "SubIndex 004",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 40,
+     "access": "ro",
+     "default": 4
+    }
+   ]
+  },
+  {
+   "index": "0x1C12",
+   "name": "RxPDO assign",
+   "type": "DT1C12",
+   "access": "rw",
+   "write_restrictions": "PreOP",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "rw",
+     "write_restrictions": "PreOP",
+     "default": 1
+    },
+    {
+     "sub": "0x01",
+     "name": "SubIndex 001",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 16,
+     "access": "rw",
+     "write_restrictions": "PreOP",
+     "default": 5632
+    },
+    {
+     "sub": "0x02",
+     "name": "SubIndex 002",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 32,
+     "access": "rw",
+     "write_restrictions": "PreOP",
+     "default": 0,
+     "revisions": [
+      "0x0015000A",
+      "0x0016000A",
+      "0x0017000A",
+      "0x0018000A",
+      "0x0019000A"
+     ]
+    }
+   ]
+  },
+  {
+   "index": "0x1C13",
+   "name": "TxPDO assign",
+   "type": "DT1C13",
+   "access": "rw",
+   "write_restrictions": "PreOP",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "rw",
+     "write_restrictions": "PreOP",
+     "default": 2
+    },
+    {
+     "sub": "0x01",
+     "name": "SubIndex 001",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 16,
+     "access": "rw",
+     "write_restrictions": "PreOP",
+     "default": 6656
+    },
+    {
+     "sub": "0x02",
+     "name": "SubIndex 002",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 32,
+     "access": "rw",
+     "write_restrictions": "PreOP",
+     "default": 6657
+    },
+    {
+     "sub": "0x03",
+     "name": "SubIndex 003",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 48,
+     "access": "rw",
+     "write_restrictions": "PreOP",
+     "default": 0
+    }
+   ]
+  },
+  {
+   "index": "0x1C32",
+   "name": "SM output parameter",
+   "type": "DT1C32",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 32
+    },
+    {
+     "sub": "0x01",
+     "name": "Sync mode",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 16,
+     "access": "rw",
+     "default": 1
+    },
+    {
+     "sub": "0x02",
+     "name": "Cycle time",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 32,
+     "access": "rw",
+     "default": 812500
+    },
+    {
+     "sub": "0x03",
+     "name": "Shift time",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 64,
+     "access": "ro",
+     "default": 0
+    },
+    {
+     "sub": "0x04",
+     "name": "Sync modes supported",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 96,
+     "access": "ro",
+     "default": 19462
+    },
+    {
+     "sub": "0x05",
+     "name": "Minimum cycle time",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 112,
+     "access": "ro",
+     "default": 100000
+    },
+    {
+     "sub": "0x06",
+     "name": "Calc and copy time",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 144,
+     "access": "ro",
+     "default": 0
+    },
+    {
+     "sub": "0x07",
+     "name": "Minimum delay time",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 176,
+     "access": "ro",
+     "default": 0
+    },
+    {
+     "sub": "0x08",
+     "name": "Command",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 208,
+     "access": "rw",
+     "default": 0
+    },
+    {
+     "sub": "0x09",
+     "name": "Maximum delay time",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 224,
+     "access": "ro",
+     "default": 0
+    },
+    {
+     "sub": "0x0B",
+     "name": "SM event missed counter",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 288,
+     "access": "ro"
+    },
+    {
+     "sub": "0x0C",
+     "name": "Cycle exceeded counter",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 304,
+     "access": "ro"
+    },
+    {
+     "sub": "0x0D",
+     "name": "Shift too short counter",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 320,
+     "access": "ro"
+    },
+    {
+     "sub": "0x20",
+     "name": "Sync error",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 352,
+     "access": "ro"
+    }
+   ]
+  },
+  {
+   "index": "0x1C33",
+   "name": "SM input parameter",
+   "type": "DT1C32",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 32
+    },
+    {
+     "sub": "0x01",
+     "name": "Sync mode",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 16,
+     "access": "rw",
+     "default": 34
+    },
+    {
+     "sub": "0x02",
+     "name": "Cycle time",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 32,
+     "access": "rw",
+     "default": 812500
+    },
+    {
+     "sub": "0x03",
+     "name": "Shift time",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 64,
+     "access": "ro",
+     "default": 0
+    },
+    {
+     "sub": "0x04",
+     "name": "Sync modes supported",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 96,
+     "access": "ro",
+     "default": 19462
+    },
+    {
+     "sub": "0x05",
+     "name": "Minimum cycle time",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 112,
+     "access": "ro",
+     "default": 100000
+    },
+    {
+     "sub": "0x06",
+     "name": "Calc and copy time",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 144,
+     "access": "ro",
+     "default": 0
+    },
+    {
+     "sub": "0x07",
+     "name": "Minimum delay time",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 176,
+     "access": "ro",
+     "default": 0
+    },
+    {
+     "sub": "0x08",
+     "name": "Command",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 208,
+     "access": "rw",
+     "default": 0
+    },
+    {
+     "sub": "0x09",
+     "name": "Maximum delay time",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 224,
+     "access": "ro",
+     "default": 0
+    },
+    {
+     "sub": "0x0B",
+     "name": "SM event missed counter",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 288,
+     "access": "ro"
+    },
+    {
+     "sub": "0x0C",
+     "name": "Cycle exceeded counter",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 304,
+     "access": "ro"
+    },
+    {
+     "sub": "0x0D",
+     "name": "Shift too short counter",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 320,
+     "access": "ro"
+    },
+    {
+     "sub": "0x20",
+     "name": "Sync error",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 352,
+     "access": "ro"
+    }
+   ]
+  },
+  {
+   "index": "0x6000",
+   "name": "RMB Inputs",
+   "type": "DT6000",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 19
+    },
+    {
+     "sub": "0x02",
+     "name": "Overrange",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 17,
+     "access": "ro",
+     "pdo_mapping": "T",
+     "dialog": "OnlineField",
+     "label_de": "Overrange",
+     "label_en": "Overrange",
+     "tooltip_de": "Messbereich überschritten.",
+     "tooltip_en": "Measurement overrange"
+    },
+    {
+     "sub": "0x04",
+     "name": "Data invalid",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 19,
+     "access": "ro",
+     "pdo_mapping": "T",
+     "dialog": "OnlineField",
+     "label_de": "Data invalid",
+     "label_en": "Data invalid",
+     "tooltip_de": "Die angezeigten Prozessdaten sind ungültig. z.B. während der Kalibrierung.",
+     "tooltip_en": "The indicated process data are not valid, e.g. during calibration."
+    },
+    {
+     "sub": "0x07",
+     "name": "Error",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 22,
+     "access": "ro",
+     "pdo_mapping": "T",
+     "dialog": "OnlineField",
+     "label_de": "Error",
+     "label_en": "Error"
+    },
+    {
+     "sub": "0x08",
+     "name": "Calibration in progress",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 23,
+     "access": "ro",
+     "pdo_mapping": "T",
+     "dialog": "OnlineField",
+     "label_de": "Calib. in progress",
+     "label_en": "Calib. in progress",
+     "tooltip_de": "Die Kalibrierung läuft. Die Prozessdaten zeigen den letzten gültigen Messwert an.",
+     "tooltip_en": "Calibration in progress. The process data indicate the last valid measuring value"
+    },
+    {
+     "sub": "0x09",
+     "name": "Steady state",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 24,
+     "access": "ro",
+     "pdo_mapping": "T",
+     "dialog": "OnlineField",
+     "label_de": "Steady State",
+     "label_en": "Steady State",
+     "tooltip_de": "Messwert im Ruhefenster",
+     "tooltip_en": "Measurement value in steady state (idle) window"
+    },
+    {
+     "sub": "0x0E",
+     "name": "Sync error",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 29,
+     "access": "ro",
+     "pdo_mapping": "T"
+    },
+    {
+     "sub": "0x10",
+     "name": "TxPDO Toggle",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 31,
+     "access": "ro",
+     "pdo_mapping": "T"
+    },
+    {
+     "sub": "0x11",
+     "name": "Value",
+     "type": "i32",
+     "esi_type": "DINT",
+     "bits": 32,
+     "bit_offset": 32,
+     "access": "ro",
+     "pdo_mapping": "T",
+     "dialog": "OnlineField",
+     "label_de": "RMB Value",
+     "label_en": "RMB Value",
+     "tooltip_de": "RMB Wert als 32 bit Ganzzahlenwert",
+     "tooltip_en": "RMB Value as 32 bit signed integer"
+    },
+    {
+     "sub": "0x12",
+     "name": "Value (Real)",
+     "type": "f32",
+     "esi_type": "REAL",
+     "bits": 32,
+     "bit_offset": 64,
+     "access": "ro",
+     "pdo_mapping": "T",
+     "dialog": "OnlineField",
+     "label_de": "RMB Value",
+     "label_en": "RMB Value",
+     "tooltip_de": "RMB Wert als 32 bit Fließkommawert (REAL)",
+     "tooltip_en": "RMB Value as 32 bit floating point (REAL)",
+     "convert": {
+      "decimals": 3
+     }
+    },
+    {
+     "sub": "0x13",
+     "name": "Timestamp",
+     "type": "u64",
+     "esi_type": "ULINT",
+     "bits": 64,
+     "bit_offset": 96,
+     "access": "ro",
+     "pdo_mapping": "T"
+    }
+   ]
+  },
+  {
+   "index": "0x6010",
+   "name": "AI Inputs",
+   "type": "DT6010",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 17
+    },
+    {
+     "sub": "0x01",
+     "name": "Underrange",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 16,
+     "access": "ro",
+     "pdo_mapping": "T",
+     "dialog": "OnlineField",
+     "label_de": "Underrange",
+     "label_en": "Underrange",
+     "tooltip_de": "Messbereich unterschritten",
+     "tooltip_en": "Measurement underrange"
+    },
+    {
+     "sub": "0x02",
+     "name": "Overrange",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 17,
+     "access": "ro",
+     "pdo_mapping": "T",
+     "dialog": "OnlineField",
+     "label_de": "Overrange",
+     "label_en": "Overrange",
+     "tooltip_de": "Messbereich überschritten.",
+     "tooltip_en": "Measurement overrange"
+    },
+    {
+     "sub": "0x07",
+     "name": "Error",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 22,
+     "access": "ro",
+     "pdo_mapping": "T",
+     "dialog": "OnlineField",
+     "label_de": "Error",
+     "label_en": "Error",
+     "tooltip_de": "Das Fehlerbit wird gesetzt, wenn das Datum ungültig ist (Overrange, Underrange)",
+     "tooltip_en": "Error bit is set, if data is invalid (overrange, underrange)"
+    },
+    {
+     "sub": "0x10",
+     "name": "TxPDO Toggle",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 31,
+     "access": "ro",
+     "pdo_mapping": "T"
+    },
+    {
+     "sub": "0x11",
+     "name": "Value",
+     "type": "i32",
+     "esi_type": "DINT",
+     "bits": 32,
+     "bit_offset": 32,
+     "access": "ro",
+     "pdo_mapping": "T",
+     "dialog": "OnlineField",
+     "label_de": "Analogwert",
+     "label_en": "Analog Value",
+     "tooltip_de": "Analogwert (skaliert)",
+     "tooltip_en": "Analog Value (scaled)"
+    }
+   ]
+  },
+  {
+   "index": "0x6020",
+   "name": "AI Inputs",
+   "type": "DT6010",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 17
+    },
+    {
+     "sub": "0x01",
+     "name": "Underrange",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 16,
+     "access": "ro",
+     "pdo_mapping": "T"
+    },
+    {
+     "sub": "0x02",
+     "name": "Overrange",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 17,
+     "access": "ro",
+     "pdo_mapping": "T"
+    },
+    {
+     "sub": "0x07",
+     "name": "Error",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 22,
+     "access": "ro",
+     "pdo_mapping": "T"
+    },
+    {
+     "sub": "0x10",
+     "name": "TxPDO Toggle",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 31,
+     "access": "ro",
+     "pdo_mapping": "T"
+    },
+    {
+     "sub": "0x11",
+     "name": "Value",
+     "type": "i32",
+     "esi_type": "DINT",
+     "bits": 32,
+     "bit_offset": 32,
+     "access": "ro",
+     "pdo_mapping": "T"
+    }
+   ]
+  },
+  {
+   "index": "0x7000",
+   "name": "RMB Outputs",
+   "type": "DT7000",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 17
+    },
+    {
+     "sub": "0x01",
+     "name": "Start calibration",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 16,
+     "access": "ro",
+     "pdo_mapping": "R",
+     "dialog": "OutputField",
+     "label_de": "Start calibration",
+     "label_en": "Start calibration",
+     "tooltip_de": "RMB Control -> Start calibration Boolscher Wert -> 0 oder 1 -> Schreiben mit rechtem Mausklick",
+     "tooltip_en": "RMB Control -> Start calibration bool value -> 0 or 1 -> write with right click"
+    },
+    {
+     "sub": "0x02",
+     "name": "Disable calibration",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 17,
+     "access": "ro",
+     "pdo_mapping": "R",
+     "dialog": "OutputField",
+     "label_de": "Disable calibration",
+     "label_en": "Disable calibration",
+     "tooltip_de": "RMB Control -> Disable calibration Boolscher Wert -> 0 oder 1 -> Schreiben mit rechtem Mausklick",
+     "tooltip_en": "RMB Control -> Disable calibration bool value -> 0 or 1 -> write with right click"
+    },
+    {
+     "sub": "0x03",
+     "name": "Input freeze",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 18,
+     "access": "ro",
+     "pdo_mapping": "R",
+     "dialog": "OutputField",
+     "label_de": "Input freeze",
+     "label_en": "Input freeze",
+     "tooltip_de": "RMB Control -> Input freeze Boolscher Wert -> 0 oder 1 -> Schreiben mit rechtem Mausklick",
+     "tooltip_en": "RMB Control -> Input freeze bool value -> 0 or 1 -> write with right click"
+    },
+    {
+     "sub": "0x04",
+     "name": "Sample mode",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 19,
+     "access": "ro",
+     "pdo_mapping": "R",
+     "dialog": "OutputField",
+     "label_de": "Sample Mode",
+     "label_en": "Sample Mode",
+     "tooltip_de": "RMB Control -> Sample Mode Boolscher Wert -> 0 oder 1 -> Schreiben mit rechtem Mausklick",
+     "tooltip_en": "RMB Control -> Sample Mode bool value -> 0 or 1 -> write with right click",
+     "values": [
+      {
+       "value": 0,
+       "text": "10,5 kHz High precision"
+      },
+      {
+       "value": 1,
+       "text": "105 kHz Low latency"
+      }
+     ],
+     "supplement": [
+      {
+       "fields": [
+        "values"
+       ],
+       "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.5 Ausgangsdaten (Sample mode); Kap. 4.2.7 Wandlungsmodus"
+      }
+     ]
+    },
+    {
+     "sub": "0x05",
+     "name": "Tara",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 20,
+     "access": "ro",
+     "pdo_mapping": "R",
+     "dialog": "OutputField",
+     "label_de": "Tara",
+     "label_en": "Tara",
+     "tooltip_de": "RMB Control -> Tara (temporär) Boolscher Wert -> 0 oder 1 -> Schreiben mit rechtem Mausklick",
+     "tooltip_en": "RMB Control -> Tara (temporarily) bool value -> 0 or 1 -> write with right click"
+    },
+    {
+     "sub": "0x11",
+     "name": "Filter frequency",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 32,
+     "access": "ro",
+     "pdo_mapping": "R",
+     "unit": {
+      "code": "0xFF200000",
+      "exp": -1,
+      "unit": "Hz"
+     },
+     "revisions": [
+      "0x0015000A",
+      "0x0016000A",
+      "0x0017000A",
+      "0x0018000A",
+      "0x0019000A"
+     ],
+     "dialog": "OutputField",
+     "label_de": "Filterfrequenz",
+     "label_en": "Filter frequency",
+     "tooltip_de": "RMB Control -> Filter frequency Wertebereich: 1 ... 2000 (entspricht 0,1 ... 200 Hz) 0 oder größer 2000 verhält sich wie ein 50 Hz FIR Filter dez. Wert -> Schreiben mit rechtem Mausklick",
+     "tooltip_en": "RMB Control -> Filter frequency Valuerange: 1 ... 2000 ( corresponds to 0,1 ... 200 Hz) 0 or greater 2000 corresponds to 50 Hz FIR Filter dec. value -> write with right click",
+     "enable_if": [
+      {
+       "obj": "0x8000:11",
+       "eq": 11
+      },
+      {
+       "obj": "0x8000:12",
+       "eq": 11
+      }
+     ],
+     "min": 1,
+     "max": 2000,
+     "supplement": [
+      {
+       "fields": [
+        "max",
+        "min"
+       ],
+       "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.5 Ausgangsdaten; ESI SettingsTab, OutputField 'Filterfrequenz'"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "index": "0x8000",
+   "name": "RMB Settings",
+   "type": "DT8000",
+   "access": "rw",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 50
+    },
+    {
+     "sub": "0x01",
+     "name": "Mode0 enable filter",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 16,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": true,
+     "dialog": "CheckBoxChecked",
+     "label_de": "Modus0 Filter aktiv",
+     "label_en": "Mode0 Filter enable",
+     "enable_if": [
+      {
+       "variant": "Standard (INT32)"
+      },
+      {
+       "variant": "Standard (REAL)"
+      }
+     ],
+     "config_key": "mode0_enable_filter",
+     "supplement": [
+      {
+       "fields": [
+        "config_key"
+       ],
+       "source": "src/config.hpp DeviceConfig"
+      }
+     ]
+    },
+    {
+     "sub": "0x02",
+     "name": "Mode1 enable filter",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 17,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": true,
+     "dialog": "CheckBoxChecked",
+     "label_de": "Modus1 Filter aktiv",
+     "label_en": "Mode1 Filter enable",
+     "enable_if": [
+      {
+       "variant": "Standard (INT32)"
+      },
+      {
+       "variant": "Standard (REAL)"
+      }
+     ]
+    },
+    {
+     "sub": "0x03",
+     "name": "Mode0 enable averager",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 18,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": true,
+     "dialog": "CheckBoxChecked",
+     "label_de": "Modus0 Mittelwertbilder aktiv",
+     "label_en": "Mode0 Averager enable",
+     "enable_if": [
+      {
+       "variant": "Standard (INT32)"
+      },
+      {
+       "variant": "Standard (REAL)"
+      }
+     ],
+     "config_key": "mode0_enable_averager",
+     "supplement": [
+      {
+       "fields": [
+        "config_key"
+       ],
+       "source": "src/config.hpp DeviceConfig"
+      }
+     ]
+    },
+    {
+     "sub": "0x04",
+     "name": "Mode1 enable averager",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 19,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": true,
+     "dialog": "CheckBoxChecked",
+     "label_de": "Modus1 Mittelwertbilder aktiv",
+     "label_en": "Mode1 Averager enable",
+     "enable_if": [
+      {
+       "variant": "Standard (INT32)"
+      },
+      {
+       "variant": "Standard (REAL)"
+      }
+     ]
+    },
+    {
+     "sub": "0x05",
+     "name": "Symmetric reference potential",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 20,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": true,
+     "dialog": "CheckBoxChecked",
+     "label_de": "Symmetrische Messung aktiv",
+     "label_en": "Symmetric reference potential active",
+     "tooltip_de": "Die EL3356 misst die beiden Spannungen Usupply und Ubridge unabhängig voneinander und ohne galvanischen Bezug zu einer Versorgungsspannung. Die Messgenauigkeit kann noch mehr gesteigert werden, wenn ein Auseinanderdriften der internen Messkreise durch eine interne Kopplung verhindert wird. Dazu besitzt die EL3356 diesen internen Schalter, der standardmäßig geschlossen ist und einen Potentialbezug zwischen interner Elektronik und dem Brückenpunkt herstellt.",
+     "tooltip_en": "The EL3356 measures the two voltages Usupply und Ubridge independently of each other and without electrical reference to a supply voltage. The measuring accuracy can be increased still further if an internal coupling is employed to prevent the internal measuring circuits from drifting apart. To this end the EL3356 has this internal switch that is closed in the default state and establishes a potential reference between the internal electronics and the bridge point."
+    },
+    {
+     "sub": "0x11",
+     "name": "Mode0 filter settings",
+     "type": "u16",
+     "esi_type": "DT0800EN16",
+     "bits": 16,
+     "bit_offset": 32,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "enum": "DT0800EN16",
+     "default": 0,
+     "dialog": "ComboBox",
+     "label_de": "Filtertyp",
+     "label_en": "Filter type",
+     "tooltip_de": "Der 50/60-Hz-Filter arbeitet als Notch-Filter (Kerbfilter) und bestimmt die Wandlungszeit der Klemme. Je höher die Filterfrequenz, desto schneller ist die Wandlungszeit. Kerbfilter bedeutet, dass der Filter bei der genannten Filterfrequenz und Vielfachen davon Nullstellen (Kerben) im Frequenzgang hat, diese Frequenzen also in der Amplitude dämpft. Der IIR kann als gleitende Mittelwertberechnung nach einem Tiefpass verstanden werden (Level 1 = schwaches rekursives Filter, bis Level 8 = starkes rekursives Filter).",
+     "tooltip_en": "The 50/60-Hz-filter performs a notch filter function and determines the conversion time of the terminal. The higher the filter frequency, the faster the conversion time. Notch filter means that the filter has zeros (notches) in the frequency response at the filter frequency and multiples thereof, i.e. it attenuates the amplitude at these frequencies. The IIR can be understood to be a moving average value calculation after a low-pass filter (level 1 = weak recursive filter, up to level 8 = strong recursive filter).",
+     "enable_if": [
+      {
+       "obj": "0x8000:01",
+       "eq": true
+      }
+     ],
+     "config_key": "mode0_filter_settings",
+     "supplement": [
+      {
+       "fields": [
+        "config_key"
+       ],
+       "source": "src/config.hpp DeviceConfig"
+      }
+     ]
+    },
+    {
+     "sub": "0x12",
+     "name": "Mode1 filter settings",
+     "type": "u16",
+     "esi_type": "DT0801EN16",
+     "bits": 16,
+     "bit_offset": 48,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "enum": "DT0801EN16",
+     "default": 0,
+     "dialog": "ComboBox",
+     "label_de": "Filtertyp",
+     "label_en": "Filter type",
+     "tooltip_de": "Der 50/60-Hz-Filter arbeitet als Notch-Filter (Kerbfilter) und bestimmt die Wandlungszeit der Klemme. Je höher die Filterfrequenz, desto schneller ist die Wandlungszeit. Kerbfilter bedeutet, dass der Filter bei der genannten Filterfrequenz und Vielfachen davon Nullstellen (Kerben) im Frequenzgang hat, diese Frequenzen also in der Amplitude dämpft. Der IIR kann als gleitende Mittelwertberechnung nach einem Tiefpass verstanden werden (Level 1 = schwaches rekursives Filter, bis Level 8 = starkes rekursives Filter).",
+     "tooltip_en": "The 50/60-Hz-filter performs a notch filter function and determines the conversion time of the terminal. The higher the filter frequency, the faster the conversion time. Notch filter means that the filter has zeros (notches) in the frequency response at the filter frequency and multiples thereof, i.e. it attenuates the amplitude at these frequencies. The IIR can be understood to be a moving average value calculation after a low-pass filter (level 1 = weak recursive filter, up to level 8 = strong recursive filter).",
+     "enable_if": [
+      {
+       "obj": "0x8000:02",
+       "eq": true
+      }
+     ]
+    },
+    {
+     "sub": "0x13",
+     "name": "Dynamic filter change time",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 64,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": 10,
+     "min": 1,
+     "max": 100,
+     "unit": {
+      "code": "0xFE030000",
+      "exp": -2,
+      "unit": "s"
+     },
+     "dialog": "EditField",
+     "label_de": "Abtastrate dyn. Filterumschaltung",
+     "label_en": "Dynamic Filter Change Time",
+     "tooltip_de": "0x8000:13 Abtastrate dyn. Filterumschaltung in s. Die Skalierung im CoE ist 0.01 s (100 = 1 s) (nur wenn die Filter eingeschaltet sind und als Filter \"dynamic IIR\" gewählt ist)",
+     "tooltip_en": "0x8000:13 Dynamic Filter Change Time in s. Scaling in CoE is 0.01 s (100 = 1s) (only active, if filter enabled and filter type \"dynamic IIR\" choosen)",
+     "enable_if": [
+      {
+       "obj": "0x8000:11",
+       "eq": 10
+      },
+      {
+       "obj": "0x8000:12",
+       "eq": 10
+      }
+     ],
+     "convert": {
+      "factor": 0.01,
+      "unit": "s",
+      "decimals": 2
+     }
+    },
+    {
+     "sub": "0x14",
+     "name": "Dynamic filter delta",
+     "type": "f32",
+     "esi_type": "REAL",
+     "bits": 32,
+     "bit_offset": 80,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": 20.0,
+     "dialog": "EditField",
+     "label_de": "Grenzwert dyn. Filterumschaltung",
+     "label_en": "Dynamic Filter Delta",
+     "tooltip_de": "0x8000:14 Grenzwert für die dynamische Filterumschaltung (nur wenn die Filter eingeschaltet sind und als Filter \"dynamic IIR\" gewählt ist)",
+     "tooltip_en": "0x8000:14 Dynamic Filter Delta only active, if filter enabled and filter type \"dynamic IIR\" choosen",
+     "enable_if": [
+      {
+       "obj": "0x8000:11",
+       "eq": 10
+      },
+      {
+       "obj": "0x8000:12",
+       "eq": 10
+      }
+     ],
+     "convert": {
+      "decimals": 6
+     }
+    },
+    {
+     "sub": "0x21",
+     "name": "Gain",
+     "type": "f32",
+     "esi_type": "REAL",
+     "bits": 32,
+     "bit_offset": 112,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": 1.0,
+     "dialog": "EditField",
+     "label_de": "Skalierfaktor",
+     "label_en": "Gain",
+     "tooltip_de": "0x8000:21 Skalierfaktor",
+     "tooltip_en": "0x8000:21 Gain",
+     "convert": {
+      "decimals": 6
+     }
+    },
+    {
+     "sub": "0x22",
+     "name": "Tara",
+     "type": "f32",
+     "esi_type": "REAL",
+     "bits": 32,
+     "bit_offset": 144,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": 0.0,
+     "dialog": "OnlineField",
+     "label_de": "Tara (online)",
+     "label_en": "Tara (online)",
+     "tooltip_de": "0x8000:22 Offset des Prozessdatenwertes",
+     "tooltip_en": "0x8000:22 Offset des process data value",
+     "convert": {
+      "decimals": 6
+     },
+     "never_write": "nur über Kommandos (Tara permanent, Tara Reset)",
+     "supplement": [
+      {
+       "fields": [
+        "never_write"
+       ],
+       "source": "Projektentscheidung; ESI SettingsTab: CmdObjectButton 'Tara Permanent', 'Tara Reset'"
+      }
+     ]
+    },
+    {
+     "sub": "0x23",
+     "name": "Rated output",
+     "type": "f32",
+     "esi_type": "REAL",
+     "bits": 32,
+     "bit_offset": 176,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": 2.0,
+     "unit": {
+      "code": "0xFD262600",
+      "exp": -3,
+      "unit": "V/V"
+     },
+     "dialog": "EditField",
+     "label_de": "Nennkennwert",
+     "label_en": "Rated Output",
+     "tooltip_de": "0x8000:23 Nennkennwert des Sensorelementes in mV/V",
+     "tooltip_en": "0x8000:23 Rated Output (nominal sensitivity) of sensor in mV/V",
+     "convert": {
+      "unit": "mV/V",
+      "decimals": 6
+     },
+     "config_key": "rated_output_mv_v",
+     "supplement": [
+      {
+       "fields": [
+        "config_key"
+       ],
+       "source": "src/config.hpp DeviceConfig"
+      }
+     ]
+    },
+    {
+     "sub": "0x24",
+     "name": "Nominal load",
+     "type": "f32",
+     "esi_type": "REAL",
+     "bits": 32,
+     "bit_offset": 208,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": 5.0,
+     "dialog": "EditField",
+     "label_de": "Nennlast",
+     "label_en": "Nominal Load",
+     "tooltip_de": "0x8000:24 Nennlast des Kraftaufnehmers/Wägezelle/ect. (z.B. in kg, N oder ...)",
+     "tooltip_en": "0x8000:24 Nominal Load of sensor (e.g. kg, N or ...)",
+     "convert": {
+      "decimals": 6
+     },
+     "config_key": "nominal_load",
+     "supplement": [
+      {
+       "fields": [
+        "config_key"
+       ],
+       "source": "src/config.hpp DeviceConfig"
+      }
+     ]
+    },
+    {
+     "sub": "0x25",
+     "name": "Zero balance",
+     "type": "f32",
+     "esi_type": "REAL",
+     "bits": 32,
+     "bit_offset": 240,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": 0.0,
+     "unit": {
+      "code": "0xFD262600",
+      "exp": -3,
+      "unit": "V/V"
+     },
+     "dialog": "EditField",
+     "label_de": "Nullpunkt-Offset",
+     "label_en": "Zero Balance",
+     "tooltip_de": "0x8000:25 Nullpunkt-Offset in mV/V",
+     "tooltip_en": "0x8000:25 Zero Balance in mV/V",
+     "convert": {
+      "unit": "mV/V",
+      "decimals": 6
+     },
+     "config_key": "zero_balance",
+     "supplement": [
+      {
+       "fields": [
+        "config_key"
+       ],
+       "source": "src/config.hpp DeviceConfig"
+      }
+     ]
+    },
+    {
+     "sub": "0x26",
+     "name": "Gravity of earth",
+     "type": "f32",
+     "esi_type": "REAL",
+     "bits": 32,
+     "bit_offset": 272,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": 9.80665,
+     "unit": {
+      "code": "0x00550000",
+      "exp": 0,
+      "unit": "m/s²"
+     },
+     "dialog": "EditField",
+     "label_de": "Erdbeschlg.",
+     "label_en": "Gravity of earth",
+     "tooltip_de": "0x8000:26 Aktuelle Erdbeschleunigung (default 9.806650 m/s^2)",
+     "tooltip_en": "0x8000:26 Actually gravity of earth (default 9.806650 m/s^2)",
+     "convert": {
+      "unit": "m/s²",
+      "decimals": 6
+     },
+     "config_key": "gravity_of_earth",
+     "supplement": [
+      {
+       "fields": [
+        "config_key"
+       ],
+       "source": "src/config.hpp DeviceConfig"
+      }
+     ]
+    },
+    {
+     "sub": "0x27",
+     "name": "Scale factor",
+     "type": "f32",
+     "esi_type": "REAL",
+     "bits": 32,
+     "bit_offset": 304,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": 1000.0,
+     "dialog": "EditField",
+     "label_de": "Skalierungsfaktor",
+     "label_en": "Scale factor",
+     "tooltip_de": "0x8000:27 Über diesen Faktor kann das Prozessdatum umskaliert werden. Um z.B. die Anzeige von kg in g zu ändern, kann hier der Faktor 1000 eingetragen werden.",
+     "tooltip_en": "0x8000:27 Factor for scaling into other measurement unit.",
+     "convert": {
+      "decimals": 6
+     },
+     "config_key": "scale_factor",
+     "supplement": [
+      {
+       "fields": [
+        "config_key"
+       ],
+       "source": "src/config.hpp DeviceConfig"
+      }
+     ]
+    },
+    {
+     "sub": "0x28",
+     "name": "Reference load",
+     "type": "f32",
+     "esi_type": "REAL",
+     "bits": 32,
+     "bit_offset": 336,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": 5.0,
+     "dialog": "EditField",
+     "label_de": "Kalibriergewicht",
+     "label_en": "Reference Load",
+     "tooltip_de": "0x8000:28 Referenzgewicht für manuelles Kalibrieren",
+     "tooltip_en": "0x8000:28 Reference load for manually calibrating.",
+     "convert": {
+      "decimals": 6
+     },
+     "config_key": "reference_load",
+     "supplement": [
+      {
+       "fields": [
+        "config_key"
+       ],
+       "source": "src/config.hpp DeviceConfig"
+      }
+     ]
+    },
+    {
+     "sub": "0x29",
+     "name": "Steady state window",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 368,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": 1000,
+     "min": 10,
+     "max": 65535,
+     "unit": {
+      "code": "0xFD030000",
+      "exp": -3,
+      "unit": "s"
+     },
+     "dialog": "EditField",
+     "label_de": "Zeit steady state",
+     "label_en": "Steady state window",
+     "tooltip_de": "0x8000:29 Zeitfenster \"steady state\" [ms] Zeitkonstante (Fenster) für das \"Steady state\" Bit in ms Minimaler Wert: 10ms",
+     "tooltip_en": "0x8000:29 Steady state window [ms] Time window for \"steady state\" bit in ms. Minimum value: 10ms",
+     "convert": {
+      "unit": "ms"
+     },
+     "config_key": "steady_state_window",
+     "supplement": [
+      {
+       "fields": [
+        "config_key"
+       ],
+       "source": "src/config.hpp DeviceConfig"
+      }
+     ]
+    },
+    {
+     "sub": "0x2A",
+     "name": "Steady state tolerance",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 384,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": 5,
+     "min": 1,
+     "max": 4294967295,
+     "dialog": "EditField",
+     "label_de": "Toleranz steady state",
+     "label_en": "Steady state tolerance",
+     "tooltip_de": "0x8000:2A Toleranzfenster \"steady state\" Toleranzfenster für das \"Steady state\" Bit",
+     "tooltip_en": "0x8000:2A Steady state tolerance Tolerance window for \"steady state\" bit.",
+     "config_key": "steady_state_tolerance",
+     "supplement": [
+      {
+       "fields": [
+        "config_key"
+       ],
+       "source": "src/config.hpp DeviceConfig"
+      }
+     ]
+    },
+    {
+     "sub": "0x31",
+     "name": "Calibration interval",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 416,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": 1800,
+     "min": 5,
+     "max": 65535,
+     "unit": {
+      "code": "0xFF030000",
+      "exp": -1,
+      "unit": "s"
+     },
+     "dialog": "EditField",
+     "label_de": "Kalibrierintervall",
+     "label_en": "Calibration interval",
+     "tooltip_de": "0x8000:31 Kalibrierintervall in s für die automatische Kalibrierung der Klemme. Die Einheit im CoE ist 100 ms. Minimaler Wert: 0.5s (5) Das automatische Kalibrieren lässt sich über das Prozessdaten-Bit \"Disable calibration\" unterbinden.",
+     "tooltip_en": "0x8000:31 Calibration interval in s for automation calibrating. Unit in CoE is 100ms. Minimum value: 0.5s (5) Automation calibrating can disabled in process data bit \"Disable calibration\".",
+     "convert": {
+      "factor": 0.1,
+      "unit": "s",
+      "decimals": 1
+     },
+     "config_key": "calibration_interval",
+     "supplement": [
+      {
+       "fields": [
+        "config_key"
+       ],
+       "source": "src/config.hpp DeviceConfig"
+      }
+     ]
+    },
+    {
+     "sub": "0x32",
+     "name": "Test interval",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 432,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": 10,
+     "dialog": "EditField",
+     "label_de": "Prüfintervall",
+     "label_en": "Test interval",
+     "tooltip_de": "0x8000:32 Dieses Register beinhaltet das Prüfintervall für den zyklischen Selbsttest der Klemme. Dieses Intervall ist immer ein vielfaches (Default: 10dez) des Kalibrierintervalls (8000:31). Somit ergibt sich im Auslieferungszustand ein Prüfintervall von 10 x 180 s = 1800 s. Über das Prozessdaten-Bit \"Disable calibration\" kann der Selbsttest unterbunden werden.",
+     "tooltip_en": "0x8000:32 This object contains the testing interval for the cyclic self test of the terminal. This interval is always a multiple (default: 10dec) of the calibration interval (8000:31So the delivery state of the testing interval result from 10 x 180 s = 1800 s. The self test can be prevented by setting the process data bit \"Disable calibration\""
+    }
+   ]
+  },
+  {
+   "index": "0x8010",
+   "name": "AI Settings",
+   "type": "DT8010",
+   "access": "rw",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 24
+    },
+    {
+     "sub": "0x01",
+     "name": "Enable user scale",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 16,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": false,
+     "dialog": "CheckBoxChecked",
+     "label_de": "Anwenderskalierung aktiv",
+     "label_en": "Enable User Scale",
+     "tooltip_de": "Analogwert(skaliert) = (Analogwert*Gain)+Offset Max/Min Gain: +/-255.000",
+     "tooltip_en": "AnalogValue(scaled) = (AnalogValue*Gain)+Offset Min/Max Gain: +/-255.000"
+    },
+    {
+     "sub": "0x06",
+     "name": "Enable filter",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 21,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": true,
+     "dialog": "CheckBoxChecked",
+     "label_de": "Filter aktivieren (alle Kanäle)",
+     "label_en": "activate Filter (for all channels)"
+    },
+    {
+     "sub": "0x0A",
+     "name": "Enable user calibration",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 25,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": false
+    },
+    {
+     "sub": "0x0B",
+     "name": "Enable vendor calibration",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 26,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": true
+    },
+    {
+     "sub": "0x11",
+     "name": "User scale offset",
+     "type": "i32",
+     "esi_type": "DINT",
+     "bits": 32,
+     "bit_offset": 32,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": 0,
+     "dialog": "EditField",
+     "label_de": "Offset",
+     "label_en": "Offset",
+     "enable_if": [
+      {
+       "obj": "0x8010:01",
+       "eq": true
+      }
+     ]
+    },
+    {
+     "sub": "0x12",
+     "name": "User scale gain",
+     "type": "i32",
+     "esi_type": "DINT",
+     "bits": 32,
+     "bit_offset": 64,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": 65536,
+     "dialog": "EditField",
+     "label_de": "Gain",
+     "label_en": "Gain",
+     "tooltip_de": "Analogwert(skaliert) = (Analogwert*Gain)+Offset",
+     "tooltip_en": "AnalogValue(scaled) = (AnalogValue*Gain)+Offset",
+     "enable_if": [
+      {
+       "obj": "0x8010:01",
+       "eq": true
+      }
+     ],
+     "convert": {
+      "factor": 1.52587890625e-05,
+      "decimals": 3
+     }
+    },
+    {
+     "sub": "0x15",
+     "name": "Filter settings",
+     "type": "u16",
+     "esi_type": "DT0808EN16",
+     "bits": 16,
+     "bit_offset": 128,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "enum": "DT0808EN16",
+     "default": 0,
+     "dialog": "ComboBox",
+     "label_de": "Filtereinstellung",
+     "label_en": "Filter type",
+     "tooltip_de": "Der 50/60-Hz-Filter arbeitet als Notch-Filter (Kerbfilter) und bestimmt die Wandlungszeit der Klemme. Je höher die Filterfrequenz, desto schneller ist die Wandlungszeit. Kerbfilter bedeutet, dass der Filter bei der genannten Filterfrequenz und Vielfachen davon Nullstellen (Kerben) im Frequenzgang hat, diese Frequenzen also in der Amplitude dämpft. Der IIR kann als gleitende Mittelwertberechnung nach einem Tiefpass verstanden werden (Level 1 = schwaches rekursives Filter, bis Level 8 = starkes rekursives Filter).",
+     "tooltip_en": "The 50/60-Hz-filter performs a notch filter function and determines the conversion time of the terminal. The higher the filter frequency, the faster the conversion time. Notch filter means that the filter has zeros (notches) in the frequency response at the filter frequency and multiples thereof, i.e. it attenuates the amplitude at these frequencies. The IIR can be understood to be a moving average value calculation after a low-pass filter (level 1 = weak recursive filter, up to level 8 = strong recursive filter).",
+     "enable_if": [
+      {
+       "obj": "0x8010:06",
+       "eq": true
+      }
+     ]
+    },
+    {
+     "sub": "0x17",
+     "name": "User calibration offset",
+     "type": "i32",
+     "esi_type": "DINT",
+     "bits": 32,
+     "bit_offset": 144,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": 0
+    },
+    {
+     "sub": "0x18",
+     "name": "User calibration gain",
+     "type": "i16",
+     "esi_type": "INT",
+     "bits": 16,
+     "bit_offset": 176,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": 16384
+    }
+   ]
+  },
+  {
+   "index": "0x801E",
+   "name": "AI Internal data",
+   "type": "DT801E",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 1
+    },
+    {
+     "sub": "0x01",
+     "name": "ADC raw value 1",
+     "type": "i32",
+     "esi_type": "DINT",
+     "bits": 32,
+     "bit_offset": 16,
+     "access": "ro",
+     "description_de": "ADC-Rohwert",
+     "supplement": [
+      {
+       "fields": [
+        "description_de"
+       ],
+       "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.6 Informations-/Diagnostikdaten"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "index": "0x801F",
+   "name": "AI Vendor data",
+   "type": "DT801F",
+   "access": "rw",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 2,
+     "never_write": "Herstellerabgleich (AI Vendor data)",
+     "supplement": [
+      {
+       "fields": [
+        "never_write"
+       ],
+       "source": "Projektentscheidung; Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.7 Hersteller-Konfigurationsdaten"
+      }
+     ]
+    },
+    {
+     "sub": "0x01",
+     "name": "Calibration offset",
+     "type": "i32",
+     "esi_type": "DINT",
+     "bits": 32,
+     "bit_offset": 16,
+     "access": "rw",
+     "never_write": "Herstellerabgleich (AI Vendor data)",
+     "supplement": [
+      {
+       "fields": [
+        "never_write"
+       ],
+       "source": "Projektentscheidung; Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.7 Hersteller-Konfigurationsdaten"
+      }
+     ]
+    },
+    {
+     "sub": "0x02",
+     "name": "Calibration gain",
+     "type": "i16",
+     "esi_type": "INT",
+     "bits": 16,
+     "bit_offset": 48,
+     "access": "rw",
+     "never_write": "Herstellerabgleich (AI Vendor data)",
+     "supplement": [
+      {
+       "fields": [
+        "never_write"
+       ],
+       "source": "Projektentscheidung; Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.7 Hersteller-Konfigurationsdaten"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "index": "0x8020",
+   "name": "AI Settings",
+   "type": "DT8010",
+   "access": "rw",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 24
+    },
+    {
+     "sub": "0x01",
+     "name": "Enable user scale",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 16,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": false
+    },
+    {
+     "sub": "0x06",
+     "name": "Enable filter",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 21,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": true
+    },
+    {
+     "sub": "0x0A",
+     "name": "Enable user calibration",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 25,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": false
+    },
+    {
+     "sub": "0x0B",
+     "name": "Enable vendor calibration",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 26,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": true
+    },
+    {
+     "sub": "0x11",
+     "name": "User scale offset",
+     "type": "i32",
+     "esi_type": "DINT",
+     "bits": 32,
+     "bit_offset": 32,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": 0
+    },
+    {
+     "sub": "0x12",
+     "name": "User scale gain",
+     "type": "i32",
+     "esi_type": "DINT",
+     "bits": 32,
+     "bit_offset": 64,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": 65536
+    },
+    {
+     "sub": "0x15",
+     "name": "Filter settings",
+     "type": "u16",
+     "esi_type": "DT0808EN16",
+     "bits": 16,
+     "bit_offset": 128,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "enum": "DT0808EN16",
+     "default": 0
+    },
+    {
+     "sub": "0x17",
+     "name": "User calibration offset",
+     "type": "i32",
+     "esi_type": "DINT",
+     "bits": 32,
+     "bit_offset": 144,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": 0
+    },
+    {
+     "sub": "0x18",
+     "name": "User calibration gain",
+     "type": "i16",
+     "esi_type": "INT",
+     "bits": 16,
+     "bit_offset": 176,
+     "access": "rw",
+     "setting": true,
+     "backup": true,
+     "default": 16384
+    }
+   ]
+  },
+  {
+   "index": "0x802E",
+   "name": "AI Internal data",
+   "type": "DT801E",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 1
+    },
+    {
+     "sub": "0x01",
+     "name": "ADC raw value 1",
+     "type": "i32",
+     "esi_type": "DINT",
+     "bits": 32,
+     "bit_offset": 16,
+     "access": "ro",
+     "description_de": "ADC-Rohwert",
+     "supplement": [
+      {
+       "fields": [
+        "description_de"
+       ],
+       "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.6 Informations-/Diagnostikdaten"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "index": "0x802F",
+   "name": "AI Vendor data",
+   "type": "DT801F",
+   "access": "rw",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 2,
+     "never_write": "Herstellerabgleich (AI Vendor data)",
+     "supplement": [
+      {
+       "fields": [
+        "never_write"
+       ],
+       "source": "Projektentscheidung; Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.7 Hersteller-Konfigurationsdaten"
+      }
+     ]
+    },
+    {
+     "sub": "0x01",
+     "name": "Calibration offset",
+     "type": "i32",
+     "esi_type": "DINT",
+     "bits": 32,
+     "bit_offset": 16,
+     "access": "rw",
+     "never_write": "Herstellerabgleich (AI Vendor data)",
+     "supplement": [
+      {
+       "fields": [
+        "never_write"
+       ],
+       "source": "Projektentscheidung; Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.7 Hersteller-Konfigurationsdaten"
+      }
+     ]
+    },
+    {
+     "sub": "0x02",
+     "name": "Calibration gain",
+     "type": "i16",
+     "esi_type": "INT",
+     "bits": 16,
+     "bit_offset": 48,
+     "access": "rw",
+     "never_write": "Herstellerabgleich (AI Vendor data)",
+     "supplement": [
+      {
+       "fields": [
+        "never_write"
+       ],
+       "source": "Projektentscheidung; Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.7 Hersteller-Konfigurationsdaten"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "index": "0x9000",
+   "name": "RMB Info data",
+   "type": "DT9000",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 17
+    },
+    {
+     "sub": "0x11",
+     "name": "mV/V",
+     "type": "f32",
+     "esi_type": "REAL",
+     "bits": 32,
+     "bit_offset": 16,
+     "access": "ro",
+     "description_de": "Aktueller mV/V Wert",
+     "supplement": [
+      {
+       "fields": [
+        "description_de"
+       ],
+       "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.6 Informations-/Diagnostikdaten"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "index": "0xA000",
+   "name": "RMB Diag data",
+   "type": "DTA000",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 24
+    },
+    {
+     "sub": "0x11",
+     "name": "No internal referecnce supply",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 16,
+     "access": "ro",
+     "description_de": "Keine interne Referenzspannung am ADC-Eingang (URef Kanal)",
+     "supplement": [
+      {
+       "fields": [
+        "description_de"
+       ],
+       "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.6 Informations-/Diagnostikdaten"
+      }
+     ]
+    },
+    {
+     "sub": "0x12",
+     "name": "No internal referecnce bridge",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 17,
+     "access": "ro",
+     "description_de": "Keine interne Referenzspannung am ADC-Eingang (UDif Kanal)",
+     "supplement": [
+      {
+       "fields": [
+        "description_de"
+       ],
+       "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.6 Informations-/Diagnostikdaten"
+      }
+     ]
+    },
+    {
+     "sub": "0x13",
+     "name": "No external reference supply",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 18,
+     "access": "ro",
+     "description_de": "Die externe Referenzspannung ist kleiner ±1 V",
+     "supplement": [
+      {
+       "fields": [
+        "description_de"
+       ],
+       "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.6 Informations-/Diagnostikdaten"
+      }
+     ]
+    },
+    {
+     "sub": "0x15",
+     "name": "Overrange bridge",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 19,
+     "access": "ro",
+     "description_de": "Messbereichsüberschreitung im Brückenzweig",
+     "supplement": [
+      {
+       "fields": [
+        "description_de"
+       ],
+       "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.6 Informations-/Diagnostikdaten"
+      }
+     ]
+    },
+    {
+     "sub": "0x16",
+     "name": "Underrange bridge",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 20,
+     "access": "ro",
+     "description_de": "Messbereichsunterschreitung im Brückenzweig",
+     "supplement": [
+      {
+       "fields": [
+        "description_de"
+       ],
+       "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.6 Informations-/Diagnostikdaten"
+      }
+     ]
+    },
+    {
+     "sub": "0x17",
+     "name": "Overrange supply",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 21,
+     "access": "ro",
+     "description_de": "Messbereichsüberschreitung der Referenzspannung",
+     "supplement": [
+      {
+       "fields": [
+        "description_de"
+       ],
+       "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.6 Informations-/Diagnostikdaten"
+      }
+     ]
+    },
+    {
+     "sub": "0x18",
+     "name": "Underrange supply",
+     "type": "bool",
+     "esi_type": "BOOL",
+     "bits": 1,
+     "bit_offset": 22,
+     "access": "ro",
+     "description_de": "Messbereichsunterschreitung der Referenzspannung",
+     "supplement": [
+      {
+       "fields": [
+        "description_de"
+       ],
+       "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.6 Informations-/Diagnostikdaten"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "index": "0xF000",
+   "name": "Modular device profile",
+   "type": "DTF000",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 2
+    },
+    {
+     "sub": "0x01",
+     "name": "Module index distance",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 16,
+     "access": "ro",
+     "default": 16
+    },
+    {
+     "sub": "0x02",
+     "name": "Maximum number of modules",
+     "type": "u16",
+     "esi_type": "UINT",
+     "bits": 16,
+     "bit_offset": 32,
+     "access": "ro",
+     "default": 3
+    }
+   ]
+  },
+  {
+   "index": "0xF008",
+   "name": "Code word",
+   "type": "UDINT",
+   "access": "rw",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "Code word",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "access": "rw"
+    }
+   ]
+  },
+  {
+   "index": "0xF010",
+   "name": "Module list",
+   "type": "DTF010",
+   "access": "rw",
+   "write_restrictions": "PreOP",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "rw",
+     "write_restrictions": "PreOP",
+     "default": 3
+    },
+    {
+     "sub": "0x01",
+     "name": "SubIndex 001",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 16,
+     "access": "rw",
+     "write_restrictions": "PreOP",
+     "default": 370
+    },
+    {
+     "sub": "0x02",
+     "name": "SubIndex 002",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 48,
+     "access": "rw",
+     "write_restrictions": "PreOP",
+     "default": 300
+    },
+    {
+     "sub": "0x03",
+     "name": "SubIndex 003",
+     "type": "u32",
+     "esi_type": "UDINT",
+     "bits": 32,
+     "bit_offset": 80,
+     "access": "rw",
+     "write_restrictions": "PreOP",
+     "default": 300
+    }
+   ]
+  },
+  {
+   "index": "0xFB00",
+   "name": "RMB Command",
+   "type": "DTFB00",
+   "access": "ro",
+   "entries": [
+    {
+     "sub": "0x00",
+     "name": "SubIndex 000",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 0,
+     "access": "ro",
+     "default": 3
+    },
+    {
+     "sub": "0x01",
+     "name": "Request",
+     "type": "bytes",
+     "esi_type": "ARRAY [0..1] OF BYTE",
+     "bits": 16,
+     "bit_offset": 16,
+     "access": "rw"
+    },
+    {
+     "sub": "0x02",
+     "name": "Status",
+     "type": "u8",
+     "esi_type": "USINT",
+     "bits": 8,
+     "bit_offset": 32,
+     "access": "ro",
+     "values": [
+      {
+       "value": 0,
+       "text": "Kommando fehlerfrei ausgeführt"
+      },
+      {
+       "value": 255,
+       "text": "Kommando wird ausgeführt"
+      }
+     ],
+     "supplement": [
+      {
+       "fields": [
+        "values"
+       ],
+       "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.4.4 Übersicht der Kommandos"
+      }
+     ]
+    },
+    {
+     "sub": "0x03",
+     "name": "Response",
+     "type": "bytes",
+     "esi_type": "ARRAY [0..3] OF BYTE",
+     "bits": 32,
+     "bit_offset": 40,
+     "access": "ro"
+    }
+   ]
+  }
+ ],
+ "pdos": [
+  {
+   "index": "0x1600",
+   "name": "RMB Control",
+   "dir": "rx",
+   "fixed": true,
+   "exclude": [],
+   "sm": 2,
+   "layouts": [
+    {
+     "revisions": [
+      "0x0011000A",
+      "0x0012000A",
+      "0x0013000A",
+      "0x0014000A"
+     ],
+     "entries": [
+      {
+       "bits": 1,
+       "index": "0x7000",
+       "name": "Ctrl__Start calibration",
+       "sub": "0x01",
+       "type": "bool"
+      },
+      {
+       "bits": 1,
+       "index": "0x7000",
+       "name": "Ctrl__Disable calibration",
+       "sub": "0x02",
+       "type": "bool"
+      },
+      {
+       "bits": 1,
+       "index": "0x7000",
+       "name": "Ctrl__Input freeze",
+       "sub": "0x03",
+       "type": "bool"
+      },
+      {
+       "bits": 1,
+       "index": "0x7000",
+       "name": "Ctrl__Sample mode",
+       "sub": "0x04",
+       "type": "bool"
+      },
+      {
+       "bits": 1,
+       "index": "0x7000",
+       "name": "Ctrl__Tara",
+       "sub": "0x05",
+       "type": "bool"
+      },
+      {
+       "bits": 11,
+       "index": "0x0000"
+      }
+     ]
+    },
+    {
+     "revisions": [
+      "0x0015000A",
+      "0x0016000A",
+      "0x0017000A",
+      "0x0018000A",
+      "0x0019000A"
+     ],
+     "entries": [
+      {
+       "bits": 1,
+       "index": "0x7000",
+       "name": "Ctrl__Start calibration",
+       "sub": "0x01",
+       "type": "bool"
+      },
+      {
+       "bits": 1,
+       "index": "0x7000",
+       "name": "Ctrl__Disable calibration",
+       "sub": "0x02",
+       "type": "bool"
+      },
+      {
+       "bits": 1,
+       "index": "0x7000",
+       "name": "Ctrl__Input freeze",
+       "sub": "0x03",
+       "type": "bool"
+      },
+      {
+       "bits": 1,
+       "index": "0x7000",
+       "name": "Ctrl__Sample mode",
+       "sub": "0x04",
+       "type": "bool"
+      },
+      {
+       "bits": 1,
+       "index": "0x7000",
+       "name": "Ctrl__Tara",
+       "sub": "0x05",
+       "type": "bool"
+      },
+      {
+       "bits": 3,
+       "index": "0x0000"
+      },
+      {
+       "bits": 8,
+       "index": "0x0000"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "index": "0x1601",
+   "name": "RMB Filter frequency",
+   "dir": "rx",
+   "fixed": true,
+   "exclude": [],
+   "revisions": [
+    "0x0015000A",
+    "0x0016000A",
+    "0x0017000A",
+    "0x0018000A",
+    "0x0019000A"
+   ],
+   "layouts": [
+    {
+     "entries": [
+      {
+       "bits": 16,
+       "index": "0x7000",
+       "name": "Filter frequency",
+       "sub": "0x11",
+       "type": "u16"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "index": "0x1A00",
+   "name": "RMB Status",
+   "dir": "tx",
+   "fixed": true,
+   "exclude": [
+    "0x1A04",
+    "0x1A05",
+    "0x1A06",
+    "0x1A07"
+   ],
+   "sm": 3,
+   "layouts": [
+    {
+     "revisions": [
+      "0x0011000A",
+      "0x0012000A",
+      "0x0013000A",
+      "0x0014000A"
+     ],
+     "entries": [
+      {
+       "bits": 1,
+       "index": "0x0000"
+      },
+      {
+       "bits": 1,
+       "index": "0x6000",
+       "name": "Status__Overrange",
+       "sub": "0x02",
+       "type": "bool"
+      },
+      {
+       "bits": 1,
+       "index": "0x0000"
+      },
+      {
+       "bits": 1,
+       "index": "0x6000",
+       "name": "Status__Data invalid",
+       "sub": "0x04",
+       "type": "bool"
+      },
+      {
+       "bits": 2,
+       "index": "0x0000"
+      },
+      {
+       "bits": 1,
+       "index": "0x6000",
+       "name": "Status__Error",
+       "sub": "0x07",
+       "type": "bool"
+      },
+      {
+       "bits": 1,
+       "index": "0x6000",
+       "name": "Status__Calibration in progress",
+       "sub": "0x08",
+       "type": "bool"
+      },
+      {
+       "bits": 1,
+       "index": "0x6000",
+       "name": "Status__Steady state",
+       "sub": "0x09",
+       "type": "bool"
+      },
+      {
+       "bits": 4,
+       "index": "0x0000"
+      },
+      {
+       "bits": 1,
+       "index": "0x1C32",
+       "name": "Status__Sync error",
+       "sub": "0x20",
+       "type": "bool"
+      },
+      {
+       "bits": 1,
+       "index": "0x0000"
+      },
+      {
+       "bits": 1,
+       "index": "0x1800",
+       "name": "Status__TxPDO Toggle",
+       "sub": "0x09",
+       "type": "bool"
+      }
+     ]
+    },
+    {
+     "revisions": [
+      "0x0015000A",
+      "0x0016000A",
+      "0x0017000A",
+      "0x0018000A",
+      "0x0019000A"
+     ],
+     "entries": [
+      {
+       "bits": 1,
+       "index": "0x0000"
+      },
+      {
+       "bits": 1,
+       "index": "0x6000",
+       "name": "Status__Overrange",
+       "sub": "0x02",
+       "type": "bool"
+      },
+      {
+       "bits": 1,
+       "index": "0x0000"
+      },
+      {
+       "bits": 1,
+       "index": "0x6000",
+       "name": "Status__Data invalid",
+       "sub": "0x04",
+       "type": "bool"
+      },
+      {
+       "bits": 2,
+       "index": "0x0000"
+      },
+      {
+       "bits": 1,
+       "index": "0x6000",
+       "name": "Status__Error",
+       "sub": "0x07",
+       "type": "bool"
+      },
+      {
+       "bits": 1,
+       "index": "0x6000",
+       "name": "Status__Calibration in progress",
+       "sub": "0x08",
+       "type": "bool"
+      },
+      {
+       "bits": 1,
+       "index": "0x6000",
+       "name": "Status__Steady state",
+       "sub": "0x09",
+       "type": "bool"
+      },
+      {
+       "bits": 4,
+       "index": "0x0000"
+      },
+      {
+       "bits": 1,
+       "index": "0x6000",
+       "name": "Status__Sync error",
+       "sub": "0x0E",
+       "type": "bool"
+      },
+      {
+       "bits": 1,
+       "index": "0x0000"
+      },
+      {
+       "bits": 1,
+       "index": "0x6000",
+       "name": "Status__TxPDO Toggle",
+       "sub": "0x10",
+       "type": "bool"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "index": "0x1A01",
+   "name": "RMB Value (INT32)",
+   "dir": "tx",
+   "fixed": true,
+   "exclude": [
+    "0x1A02",
+    "0x1A04",
+    "0x1A05",
+    "0x1A06",
+    "0x1A07"
+   ],
+   "sm": 3,
+   "layouts": [
+    {
+     "entries": [
+      {
+       "bits": 32,
+       "index": "0x6000",
+       "name": "Value",
+       "sub": "0x11",
+       "type": "i32"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "index": "0x1A02",
+   "name": "RMB Value (Real)",
+   "dir": "tx",
+   "fixed": true,
+   "exclude": [
+    "0x1A01",
+    "0x1A04",
+    "0x1A05",
+    "0x1A06",
+    "0x1A07"
+   ],
+   "layouts": [
+    {
+     "entries": [
+      {
+       "bits": 32,
+       "index": "0x6000",
+       "name": "Value (Real)",
+       "sub": "0x12",
+       "type": "f32"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "index": "0x1A03",
+   "name": "RMB Timestamp",
+   "dir": "tx",
+   "fixed": true,
+   "exclude": [
+    "0x1A04",
+    "0x1A05",
+    "0x1A06",
+    "0x1A07"
+   ],
+   "layouts": [
+    {
+     "entries": [
+      {
+       "bits": 64,
+       "index": "0x6000",
+       "name": "Timestamp",
+       "sub": "0x13",
+       "type": "u64"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "index": "0x1A04",
+   "name": "AI Standard Channel 1",
+   "dir": "tx",
+   "fixed": true,
+   "exclude": [
+    "0x1A00",
+    "0x1A01",
+    "0x1A02",
+    "0x1A03",
+    "0x1A05"
+   ],
+   "layouts": [
+    {
+     "revisions": [
+      "0x0011000A",
+      "0x0012000A",
+      "0x0013000A",
+      "0x0014000A",
+      "0x0019000A"
+     ],
+     "entries": [
+      {
+       "bits": 1,
+       "index": "0x6010",
+       "name": "Underrange",
+       "sub": "0x01",
+       "type": "bool"
+      },
+      {
+       "bits": 1,
+       "index": "0x6010",
+       "name": "Overrange",
+       "sub": "0x02",
+       "type": "bool"
+      },
+      {
+       "bits": 4,
+       "index": "0x0000"
+      },
+      {
+       "bits": 1,
+       "index": "0x6010",
+       "name": "Error",
+       "sub": "0x07",
+       "type": "bool"
+      },
+      {
+       "bits": 1,
+       "index": "0x0000"
+      },
+      {
+       "bits": 7,
+       "index": "0x0000"
+      },
+      {
+       "bits": 1,
+       "index": "0x6010",
+       "name": "TxPDO Toggle",
+       "sub": "0x10",
+       "type": "bool"
+      },
+      {
+       "bits": 32,
+       "index": "0x6010",
+       "name": "Value",
+       "sub": "0x11",
+       "type": "i32"
+      }
+     ]
+    },
+    {
+     "revisions": [
+      "0x0015000A",
+      "0x0016000A",
+      "0x0017000A",
+      "0x0018000A"
+     ],
+     "entries": [
+      {
+       "bits": 1,
+       "index": "0x6010",
+       "name": "Underrange",
+       "sub": "0x01",
+       "type": "bool"
+      },
+      {
+       "bits": 1,
+       "index": "0x6010",
+       "name": "Overrange",
+       "sub": "0x02",
+       "type": "bool"
+      },
+      {
+       "bits": 4,
+       "index": "0x0000"
+      },
+      {
+       "bits": 1,
+       "index": "0x6010",
+       "name": "Error",
+       "sub": "0x07",
+       "type": "bool"
+      },
+      {
+       "bits": 8,
+       "index": "0x0000"
+      },
+      {
+       "bits": 1,
+       "index": "0x6010",
+       "name": "TxPDO Toggle",
+       "sub": "0x10",
+       "type": "bool"
+      },
+      {
+       "bits": 32,
+       "index": "0x6010",
+       "name": "Value",
+       "sub": "0x11",
+       "type": "i32"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "index": "0x1A05",
+   "name": "AI Compact Channel 1",
+   "dir": "tx",
+   "fixed": true,
+   "exclude": [
+    "0x1A00",
+    "0x1A01",
+    "0x1A02",
+    "0x1A03",
+    "0x1A04"
+   ],
+   "layouts": [
+    {
+     "entries": [
+      {
+       "bits": 32,
+       "index": "0x6010",
+       "name": "Value",
+       "sub": "0x11",
+       "type": "i32"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "index": "0x1A06",
+   "name": "AI Standard Channel 2",
+   "dir": "tx",
+   "fixed": true,
+   "exclude": [
+    "0x1A00",
+    "0x1A01",
+    "0x1A02",
+    "0x1A03",
+    "0x1A07"
+   ],
+   "layouts": [
+    {
+     "revisions": [
+      "0x0011000A",
+      "0x0012000A",
+      "0x0013000A",
+      "0x0014000A",
+      "0x0019000A"
+     ],
+     "entries": [
+      {
+       "bits": 1,
+       "index": "0x6020",
+       "name": "Underrange",
+       "sub": "0x01",
+       "type": "bool"
+      },
+      {
+       "bits": 1,
+       "index": "0x6020",
+       "name": "Overrange",
+       "sub": "0x02",
+       "type": "bool"
+      },
+      {
+       "bits": 4,
+       "index": "0x0000"
+      },
+      {
+       "bits": 1,
+       "index": "0x6020",
+       "name": "Error",
+       "sub": "0x07",
+       "type": "bool"
+      },
+      {
+       "bits": 1,
+       "index": "0x0000"
+      },
+      {
+       "bits": 7,
+       "index": "0x0000"
+      },
+      {
+       "bits": 1,
+       "index": "0x6020",
+       "name": "TxPDO Toggle",
+       "sub": "0x10",
+       "type": "bool"
+      },
+      {
+       "bits": 32,
+       "index": "0x6020",
+       "name": "Value",
+       "sub": "0x11",
+       "type": "i32"
+      }
+     ]
+    },
+    {
+     "revisions": [
+      "0x0015000A",
+      "0x0016000A",
+      "0x0017000A",
+      "0x0018000A"
+     ],
+     "entries": [
+      {
+       "bits": 1,
+       "index": "0x6020",
+       "name": "Underrange",
+       "sub": "0x01",
+       "type": "bool"
+      },
+      {
+       "bits": 1,
+       "index": "0x6020",
+       "name": "Overrange",
+       "sub": "0x02",
+       "type": "bool"
+      },
+      {
+       "bits": 4,
+       "index": "0x0000"
+      },
+      {
+       "bits": 1,
+       "index": "0x6020",
+       "name": "Error",
+       "sub": "0x07",
+       "type": "bool"
+      },
+      {
+       "bits": 8,
+       "index": "0x0000"
+      },
+      {
+       "bits": 1,
+       "index": "0x6020",
+       "name": "TxPDO Toggle",
+       "sub": "0x10",
+       "type": "bool"
+      },
+      {
+       "bits": 32,
+       "index": "0x6020",
+       "name": "Value",
+       "sub": "0x11",
+       "type": "i32"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "index": "0x1A07",
+   "name": "AI Compact Channel 2",
+   "dir": "tx",
+   "fixed": true,
+   "exclude": [
+    "0x1A00",
+    "0x1A01",
+    "0x1A02",
+    "0x1A03",
+    "0x1A06"
+   ],
+   "layouts": [
+    {
+     "entries": [
+      {
+       "bits": 32,
+       "index": "0x6020",
+       "name": "Value",
+       "sub": "0x11",
+       "type": "i32"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "pdo_rules": [
+  {
+   "pdo": "0x1601",
+   "if_any": [
+    {
+     "obj": "0x8000:11",
+     "eq": 11
+    },
+    {
+     "obj": "0x8000:12",
+     "eq": 11
+    }
+   ]
+  }
+ ],
+ "variants": [
+  {
+   "name": "Standard (INT32)",
+   "default": true,
+   "sm2": [
+    "0x1600"
+   ],
+   "sm2_excluded": [
+    "0x1601"
+   ],
+   "sm3": [
+    "0x1A00",
+    "0x1A01"
+   ],
+   "dc_mode": "Synchron",
+   "init": [
+    {
+     "index": "0x8000",
+     "sub": "0x01",
+     "transition": [
+      "PS"
+     ],
+     "complete_access": true,
+     "data": "1F00000000000A000000A0410000803FFFFFFFFF000000400000A040000000000AE81C4100007A440000A040E8030500000008070A00"
+    },
+    {
+     "index": "0x8010",
+     "sub": "0x01",
+     "transition": [
+      "PS"
+     ],
+     "complete_access": true,
+     "data": "20040000000000000100000000000000000000000040"
+    },
+    {
+     "index": "0x8020",
+     "sub": "0x01",
+     "transition": [
+      "PS"
+     ],
+     "complete_access": true,
+     "data": "20040000000000000100000000000000000000000040"
+    }
+   ]
+  },
+  {
+   "name": "Standard (REAL)",
+   "default": false,
+   "sm2": [
+    "0x1600"
+   ],
+   "sm2_excluded": [
+    "0x1601"
+   ],
+   "sm3": [
+    "0x1A00",
+    "0x1A02"
+   ],
+   "dc_mode": "Synchron",
+   "init": [
+    {
+     "index": "0x8000",
+     "sub": "0x01",
+     "transition": [
+      "PS"
+     ],
+     "complete_access": true,
+     "data": "1F00000000000A000000A0410000803FFFFFFFFF000000400000A040000000000AE81C4100007A440000A040E8030500000008070A00"
+    },
+    {
+     "index": "0x8010",
+     "sub": "0x01",
+     "transition": [
+      "PS"
+     ],
+     "complete_access": true,
+     "data": "20040000000000000100000000000000000000000040"
+    },
+    {
+     "index": "0x8020",
+     "sub": "0x01",
+     "transition": [
+      "PS"
+     ],
+     "complete_access": true,
+     "data": "20040000000000000100000000000000000000000040"
+    }
+   ]
+  },
+  {
+   "name": "2x AnalogIn (Standard)",
+   "default": false,
+   "sm2": [],
+   "sm3": [
+    "0x1A04",
+    "0x1A06"
+   ],
+   "dc_mode": "Synchron",
+   "init": [
+    {
+     "index": "0x8000",
+     "sub": "0x01",
+     "transition": [
+      "PS"
+     ],
+     "complete_access": true,
+     "data": "1F00000000000A000000A0410000803FFFFFFFFF000000400000A040000000000AE81C4100007A440000A040E8030500000008070A00"
+    },
+    {
+     "index": "0x8010",
+     "sub": "0x01",
+     "transition": [
+      "PS"
+     ],
+     "complete_access": true,
+     "data": "20040000000000000100000000000000000000000040"
+    },
+    {
+     "index": "0x8020",
+     "sub": "0x01",
+     "transition": [
+      "PS"
+     ],
+     "complete_access": true,
+     "data": "20040000000000000100000000000000000000000040"
+    }
+   ]
+  },
+  {
+   "name": "2x AnalogIn (Compact)",
+   "default": false,
+   "sm2": [],
+   "sm3": [
+    "0x1A05",
+    "0x1A07"
+   ],
+   "dc_mode": "Synchron",
+   "init": [
+    {
+     "index": "0x8000",
+     "sub": "0x01",
+     "transition": [
+      "PS"
+     ],
+     "complete_access": true,
+     "data": "1F00000000000A000000A0410000803FFFFFFFFF000000400000A040000000000AE81C4100007A440000A040E8030500000008070A00"
+    },
+    {
+     "index": "0x8010",
+     "sub": "0x01",
+     "transition": [
+      "PS"
+     ],
+     "complete_access": true,
+     "data": "20040000000000000100000000000000000000000040"
+    },
+    {
+     "index": "0x8020",
+     "sub": "0x01",
+     "transition": [
+      "PS"
+     ],
+     "complete_access": true,
+     "data": "20040000000000000100000000000000000000000040"
+    }
+   ]
+  },
+  {
+   "name": "Standard (INT32) - DC-Synchron (input base)",
+   "default": false,
+   "sm2": [
+    "0x1600"
+   ],
+   "sm2_excluded": [
+    "0x1601"
+   ],
+   "sm3": [
+    "0x1A00",
+    "0x1A01",
+    "0x1A03"
+   ],
+   "dc_mode": "DCIN",
+   "init": [
+    {
+     "index": "0x8000",
+     "sub": "0x01",
+     "transition": [
+      "PS"
+     ],
+     "complete_access": true,
+     "data": "1000000000000A000000A0410000803FFFFFFFFF000000400000A040000000000AE81C4100007A440000A040E8030500000008070A00"
+    },
+    {
+     "index": "0x8010",
+     "sub": "0x01",
+     "transition": [
+      "PS"
+     ],
+     "complete_access": true,
+     "data": "20040000000000000100000000000000000000000040"
+    },
+    {
+     "index": "0x8020",
+     "sub": "0x01",
+     "transition": [
+      "PS"
+     ],
+     "complete_access": true,
+     "data": "20040000000000000100000000000000000000000040"
+    }
+   ],
+   "revisions": [
+    "0x0016000A",
+    "0x0017000A",
+    "0x0018000A",
+    "0x0019000A"
+   ]
+  },
+  {
+   "name": "Standard (REAL) - DC-Synchron (input base)",
+   "default": false,
+   "sm2": [
+    "0x1600"
+   ],
+   "sm2_excluded": [
+    "0x1601"
+   ],
+   "sm3": [
+    "0x1A00",
+    "0x1A02",
+    "0x1A03"
+   ],
+   "dc_mode": "DCIN",
+   "init": [
+    {
+     "index": "0x8000",
+     "sub": "0x01",
+     "transition": [
+      "PS"
+     ],
+     "complete_access": true,
+     "data": "1000000000000A000000A0410000803FFFFFFFFF000000400000A040000000000AE81C4100007A440000A040E8030500000008070A00"
+    },
+    {
+     "index": "0x8010",
+     "sub": "0x01",
+     "transition": [
+      "PS"
+     ],
+     "complete_access": true,
+     "data": "20040000000000000100000000000000000000000040"
+    },
+    {
+     "index": "0x8020",
+     "sub": "0x01",
+     "transition": [
+      "PS"
+     ],
+     "complete_access": true,
+     "data": "20040000000000000100000000000000000000000040"
+    }
+   ],
+   "revisions": [
+    "0x0016000A",
+    "0x0017000A",
+    "0x0018000A",
+    "0x0019000A"
+   ]
+  }
+ ],
+ "dc_modes": [
+  {
+   "name": "Synchron",
+   "desc": "SM-Synchron",
+   "assign_activate": "0x0000",
+   "cycleTimeSync0": {
+    "value": 0,
+    "factor": 0
+   },
+   "shiftTimeSync0": {
+    "value": 0
+   },
+   "cycleTimeSync1": {
+    "value": 0,
+    "factor": 1
+   },
+   "shiftTimeSync1": {
+    "value": 0
+   }
+  },
+  {
+   "name": "DC",
+   "desc": "DC-Synchron",
+   "assign_activate": "0x0320",
+   "cycleTimeSync0": {
+    "value": 0,
+    "factor": 1
+   },
+   "shiftTimeSync0": {
+    "value": 0,
+    "input": 0
+   },
+   "cycleTimeSync1": {
+    "value": 0,
+    "factor": 1
+   },
+   "shiftTimeSync1": {
+    "value": 0
+   }
+  },
+  {
+   "name": "DCIN",
+   "desc": "DC-Synchron (input based)",
+   "assign_activate": "0x0320",
+   "cycleTimeSync0": {
+    "value": 0,
+    "factor": 1
+   },
+   "shiftTimeSync0": {
+    "value": 0,
+    "input": 1
+   },
+   "cycleTimeSync1": {
+    "value": 0,
+    "factor": 1
+   },
+   "shiftTimeSync1": {
+    "value": 0
+   }
+  }
+ ],
+ "commands": [
+  {
+   "id": "esi_148",
+   "origin": "esi",
+   "label_de": "Tara Permanent",
+   "label_en": "Tara permanent",
+   "tooltip_de": "Index 0xFB00, Online Command: 0x0200 permanentes Tarieren",
+   "tooltip_en": "Index 0xFB00, Online Command: 0x0200 Tara permanently",
+   "writes": [
+    {
+     "obj": "0xFB00:01",
+     "data": "0200"
+    },
+    {
+     "obj": "0xFB00:02",
+     "data": "00"
+    },
+    {
+     "obj": "0xFB00:03",
+     "data": "00000000"
+    }
+   ]
+  },
+  {
+   "id": "esi_147",
+   "origin": "esi",
+   "label_de": "Tara Reset",
+   "label_en": "Tara Reset",
+   "tooltip_de": "Index 0x8000:22 Setzt Tara permanent online zu 0.0",
+   "tooltip_en": "Index 0x8000:22 Set Tara permanet online to 0.0",
+   "writes": [
+    {
+     "obj": "0x8000:22",
+     "data": "00000000"
+    }
+   ]
+  },
+  {
+   "origin": "supplement",
+   "id": "tare_temporary",
+   "label_de": "Tara (temporär, nicht im EEPROM)",
+   "writes": [
+    {
+     "obj": "0xFB00:01",
+     "data": "0100"
+    }
+   ],
+   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.4.3 Tarierung, Kap. 4.4.4 Übersicht der Kommandos"
+  },
+  {
+   "origin": "supplement",
+   "id": "zero_balance",
+   "label_de": "Nullabgleich",
+   "writes": [
+    {
+     "obj": "0xFB00:01",
+     "data": "0101"
+    }
+   ],
+   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.4.1 Sensorkalibrierung, Kap. 4.4.4 Übersicht der Kommandos"
+  },
+  {
+   "origin": "supplement",
+   "id": "calibration",
+   "label_de": "Kalibrierung mit Reference load",
+   "writes": [
+    {
+     "obj": "0xFB00:01",
+     "data": "0201"
+    }
+   ],
+   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.4.1 Sensorkalibrierung, Kap. 4.4.4 Übersicht der Kommandos"
+  },
+  {
+   "origin": "supplement",
+   "id": "restore_defaults",
+   "label_de": "Werkseinstellungen laden",
+   "writes": [
+    {
+     "obj": "0x1011:01",
+     "data": "6C6F6164"
+    }
+   ],
+   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.1 Restore-Object (0x64616F6C)"
+  }
+ ],
+ "warnings": [
+  "0x8000:28: Enable SubMode 99 verweist auf kein Feld"
+ ]
+}

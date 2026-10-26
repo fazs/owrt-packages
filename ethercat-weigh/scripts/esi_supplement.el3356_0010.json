@@ -1,0 +1,186 @@
+{
+ "$comment": "Ergänzungen zur ESI der EL3356-0010 für scripts/esi_gen.py. Jede Angabe nennt ihre Quelle; Felder der ESI werden nicht überschrieben.",
+ "entries": {
+  "0x8000:01": {
+   "config_key": "mode0_enable_filter",
+   "source": "src/config.hpp DeviceConfig"
+  },
+  "0x8000:03": {
+   "config_key": "mode0_enable_averager",
+   "source": "src/config.hpp DeviceConfig"
+  },
+  "0x8000:11": {
+   "config_key": "mode0_filter_settings",
+   "source": "src/config.hpp DeviceConfig"
+  },
+  "0x8000:23": {
+   "config_key": "rated_output_mv_v",
+   "source": "src/config.hpp DeviceConfig"
+  },
+  "0x8000:24": {
+   "config_key": "nominal_load",
+   "source": "src/config.hpp DeviceConfig"
+  },
+  "0x8000:25": {
+   "config_key": "zero_balance",
+   "source": "src/config.hpp DeviceConfig"
+  },
+  "0x8000:26": {
+   "config_key": "gravity_of_earth",
+   "source": "src/config.hpp DeviceConfig"
+  },
+  "0x8000:27": {
+   "config_key": "scale_factor",
+   "source": "src/config.hpp DeviceConfig"
+  },
+  "0x8000:28": {
+   "config_key": "reference_load",
+   "source": "src/config.hpp DeviceConfig"
+  },
+  "0x8000:29": {
+   "config_key": "steady_state_window",
+   "source": "src/config.hpp DeviceConfig"
+  },
+  "0x8000:2A": {
+   "config_key": "steady_state_tolerance",
+   "source": "src/config.hpp DeviceConfig"
+  },
+  "0x8000:31": {
+   "config_key": "calibration_interval",
+   "source": "src/config.hpp DeviceConfig"
+  },
+  "0x8000:22": {
+   "never_write": "nur über Kommandos (Tara permanent, Tara Reset)",
+   "source": "Projektentscheidung; ESI SettingsTab: CmdObjectButton 'Tara Permanent', 'Tara Reset'"
+  },
+  "0x801F": {
+   "never_write": "Herstellerabgleich (AI Vendor data)",
+   "source": "Projektentscheidung; Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.7 Hersteller-Konfigurationsdaten"
+  },
+  "0x802F": {
+   "never_write": "Herstellerabgleich (AI Vendor data)",
+   "source": "Projektentscheidung; Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.7 Hersteller-Konfigurationsdaten"
+  },
+  "0x1011": {
+   "never_write": "nur über Kommando restore_defaults",
+   "source": "Projektentscheidung"
+  },
+  "0x7000:11": {
+   "min": 1,
+   "max": 2000,
+   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.5 Ausgangsdaten; ESI SettingsTab, OutputField 'Filterfrequenz'"
+  },
+  "0x7000:04": {
+   "values": [
+    {
+     "value": 0,
+     "text": "10,5 kHz High precision"
+    },
+    {
+     "value": 1,
+     "text": "105 kHz Low latency"
+    }
+   ],
+   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.5 Ausgangsdaten (Sample mode); Kap. 4.2.7 Wandlungsmodus"
+  },
+  "0xFB00:02": {
+   "values": [
+    {
+     "value": 0,
+     "text": "Kommando fehlerfrei ausgeführt"
+    },
+    {
+     "value": 255,
+     "text": "Kommando wird ausgeführt"
+    }
+   ],
+   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.4.4 Übersicht der Kommandos"
+  },
+  "0x9000:11": {
+   "description_de": "Aktueller mV/V Wert",
+   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.6 Informations-/Diagnostikdaten"
+  },
+  "0xA000:11": {
+   "description_de": "Keine interne Referenzspannung am ADC-Eingang (URef Kanal)",
+   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.6 Informations-/Diagnostikdaten"
+  },
+  "0xA000:12": {
+   "description_de": "Keine interne Referenzspannung am ADC-Eingang (UDif Kanal)",
+   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.6 Informations-/Diagnostikdaten"
+  },
+  "0xA000:13": {
+   "description_de": "Die externe Referenzspannung ist kleiner ±1 V",
+   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.6 Informations-/Diagnostikdaten"
+  },
+  "0xA000:15": {
+   "description_de": "Messbereichsüberschreitung im Brückenzweig",
+   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.6 Informations-/Diagnostikdaten"
+  },
+  "0xA000:16": {
+   "description_de": "Messbereichsunterschreitung im Brückenzweig",
+   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.6 Informations-/Diagnostikdaten"
+  },
+  "0xA000:17": {
+   "description_de": "Messbereichsüberschreitung der Referenzspannung",
+   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.6 Informations-/Diagnostikdaten"
+  },
+  "0xA000:18": {
+   "description_de": "Messbereichsunterschreitung der Referenzspannung",
+   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.6 Informations-/Diagnostikdaten"
+  },
+  "0x801E:01": {
+   "description_de": "ADC-Rohwert",
+   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.6 Informations-/Diagnostikdaten"
+  },
+  "0x802E:01": {
+   "description_de": "ADC-Rohwert",
+   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.6 Informations-/Diagnostikdaten"
+  }
+ },
+ "commands": [
+  {
+   "id": "tare_temporary",
+   "label_de": "Tara (temporär, nicht im EEPROM)",
+   "writes": [
+    {
+     "obj": "0xFB00:01",
+     "data": "0100"
+    }
+   ],
+   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.4.3 Tarierung, Kap. 4.4.4 Übersicht der Kommandos"
+  },
+  {
+   "id": "zero_balance",
+   "label_de": "Nullabgleich",
+   "writes": [
+    {
+     "obj": "0xFB00:01",
+     "data": "0101"
+    }
+   ],
+   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.4.1 Sensorkalibrierung, Kap. 4.4.4 Übersicht der Kommandos"
+  },
+  {
+   "id": "calibration",
+   "label_de": "Kalibrierung mit Reference load",
+   "writes": [
+    {
+     "obj": "0xFB00:01",
+     "data": "0201"
+    }
+   ],
+   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.4.1 Sensorkalibrierung, Kap. 4.4.4 Übersicht der Kommandos"
+  },
+  {
+   "id": "restore_defaults",
+   "label_de": "Werkseinstellungen laden",
+   "writes": [
+    {
+     "obj": "0x1011:01",
+     "data": "6C6F6164"
+    }
+   ],
+   "source": "Beckhoff-Dokumentation EL3356-00x0, Version 4.8.0 (27.07.2026), Kap. 4.10.1 Restore-Object (0x64616F6C)"
+  }
+ ]
+}

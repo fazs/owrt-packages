@@ -9,7 +9,7 @@
 /**
  * @brief Objektverzeichnis, PDO-Mapping und Initialisierungssequenz der EL3356-0010.
  *
- * Referenz: Beckhoff-ESI, misc/Beckhoff-ESI/Beckhoff EL33xx.xml.
+ * Referenz: Beckhoff-ESI, esi/Beckhoff EL3356-0010.xml; Gerätebeschreibung src/generated/el3356_0010.json.
  */
 namespace ew::el3356 {
 
@@ -267,7 +267,20 @@ struct SdoWrite {
     DType type = DType::None;   ///< Datentyp von data
     bool pre_op_only = false;   ///< nur in PRE-OP zulässig (PDO-Zuordnung)
 };
-std::vector<SdoWrite> settings_writes(const DeviceConfig& dc);
+
+/// Schreibbarer Klemmenparameter (0x8000..0x8FFF, rw) mit dem wirksamen Wert.
+struct DeviceSetting {
+    uint16_t index = 0;        ///< Objektindex
+    uint8_t sub = 0;           ///< Subindex
+    std::string name;          ///< Name laut ESI
+    std::string key;           ///< Konfigurationspfad: "device.<config_key>" bzw. "device.coe.0xIIII:SS"
+    DType type = DType::None;  ///< Datentyp
+    double value = 0.0;        ///< CoE-Rohwert
+    bool configured = false;   ///< aus der Konfiguration; false = Default der ESI
+};
+std::vector<DeviceSetting> device_settings(const DeviceConfig& dc, uint32_t revision = 0U);
+std::vector<std::string> validate_device(const DeviceConfig& dc);
+std::vector<SdoWrite> settings_writes(const DeviceConfig& dc, uint32_t revision = 0U);
 
 const std::vector<uint16_t>& rx_assignment();
 const std::vector<uint16_t>& tx_assignment();

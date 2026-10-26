@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <map>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -19,9 +20,11 @@ struct EthercatConfig {
 };
 
 /**
- * @brief CoE-Objekt 0x8000 "RMB Settings" der EL3356-00x0.
+ * @brief Klemmenparameter der EL3356-00x0 (CoE 0x8000 "RMB Settings", 0x8010/0x8020 "AI Settings").
  *
- * Lastwerte (nominal_load, reference_load) in calibration.device_unit.
+ * Die typisierten Felder werden von Kennlinie, Simulation und Kalibrierung genutzt; ihre
+ * Zuordnung zu CoE-Einträgen steht in der Gerätebeschreibung (config_key). Lastwerte
+ * (nominal_load, reference_load) in calibration.device_unit.
  */
 struct DeviceConfig {
     bool write_on_start = true;            ///< beim Start in die Klemme schreiben
@@ -37,6 +40,9 @@ struct DeviceConfig {
     uint16_t steady_state_window = 1000;   ///< 0x8000:29 [ms]
     uint32_t steady_state_tolerance = 5;   ///< 0x8000:2A
     uint16_t calibration_interval = 1800;  ///< 0x8000:31
+    /// Übrige schreibbare Klemmenparameter (0x8000, 0x8010, 0x8020) als CoE-Rohwert, Schlüssel
+    /// "0xIIII:SS"; nicht aufgeführte Einträge erhalten beim Schreiben den Default der ESI
+    std::map<std::string, double> coe;
 };
 
 /// Stützpunkt der Kennlinie (Kalibrierung in der Anwendung).
@@ -111,6 +117,7 @@ void to_json(nlohmann::json& j, const Config& c);
 void from_json(const nlohmann::json& j, Config& c);
 
 Config config_from_json(const nlohmann::json& j);
+nlohmann::json device_json(const DeviceConfig& dc);
 Config load_config(const std::string& path);
 void save_config(const std::string& path, const Config& c);
 

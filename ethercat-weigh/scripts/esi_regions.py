@@ -24,6 +24,8 @@ import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
+from esi_common import ENC_RE, decode, matches_type
+
 # <Device ...> bis </Device> samt Einrückung; <Devices> und <DeviceType> werden durch \b
 # bzw. (?=[\s>]) nicht erfasst. Device ist in EtherCATInfo nicht verschachtelt.
 DEVICE_RE = re.compile(r'(?P<indent>[ \t]*)<Device(?=[\s>])[^>]*>.*?</Device>', re.DOTALL)
@@ -34,19 +36,6 @@ IMAGE_RE = re.compile(
     re.DOTALL | re.MULTILINE,
 )
 DECL_RE = re.compile(r'^<\?xml[^>]*\?>')
-ENC_RE = re.compile(r'''encoding\s*=\s*["']([^"']+)["']''')
-
-
-def decode(raw: bytes) -> str:
-    """Dekodiert gemäß XML-Deklaration (Default UTF-8).
-
-    @param raw Dateiinhalt
-    @return Text ohne BOM
-    """
-    head = raw[:200].decode('ascii', errors='replace')
-    m = ENC_RE.search(head.split('?>', 1)[0])
-    enc = m.group(1) if m else 'utf-8'
-    return raw.decode(enc).lstrip('﻿')
 
 
 def to_utf8_decl(text: str) -> str:
@@ -85,17 +74,6 @@ def device_info(block: str) -> tuple[str, str]:
         desc += f' (Rev. {rev.replace("#x", "0x")})'
     # "--" ist in XML-Kommentaren nicht erlaubt
     return dev_type, desc.replace('--', '- -')
-
-
-def matches_type(dev_type: str, wanted: str) -> bool:
-    """Prüft, ob ein Gerät zum Filter gehört (exakt oder Variante mit "-").
-
-    @param dev_type Inhalt von Device/Type, z. B. "EL3356-0010"
-    @param wanted Filter, z. B. "EL3356"
-    @return True für "EL3356" und "EL3356-xxxx", nicht für "EL33561"
-    """
-    a, b = dev_type.upper(), wanted.upper()
-    return a == b or a.startswith(b + '-')
 
 
 def process(text: str, wanted: str | None, strip_images: bool) -> tuple[str, int, int]:

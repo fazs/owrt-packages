@@ -14,7 +14,7 @@ folgt den genannten Regeln, ist aber nicht formal geprüft oder zertifiziert.
 | Kommentare (C++, Java) | [Doxygen](https://www.doxygen.nl/manual/docblocks.html) | `/** … */`, `///`, `///<` mit `@brief`, `@param`, `@return`, `@throws` |
 | Kommentare (JavaScript) | [JSDoc](https://jsdoc.app/) | `/** … */` mit `@param {Typ}`, `@returns`, `@throws`, `@file` |
 | Namen (JavaScript) | [Google JavaScript Style Guide](https://google.github.io/styleguide/jsguide.html), Abschnitt *Constant names* | Modulkonstanten `CONSTANT_CASE`, sonst `camelCase` |
-| EtherCAT-Gerät | Beckhoff-ESI EL3356-0010 (`misc/Beckhoff-ESI/Beckhoff EL33xx.xml`, Schema `EtherCATInfo.xsd`, ETG.2000) | PDOs, Objekte, Subindizes, Wertebereiche, Exclude-Listen |
+| EtherCAT-Gerät | Beckhoff-ESI EL3356-0010 (`esi/Beckhoff EL3356-0010.xml`, Auszug aus `Beckhoff EL33xx.xml`, Schema `EtherCATInfo.xsd`, ETG.2000) | PDOs, Objekte, Subindizes, Wertebereiche, Exclude-Listen |
 | EtherCAT-Protokoll | ETG.1000.6 (Application Layer: CoE-Datentypcodes, AL-Status) | `kCoe…`, Zustandsmaske in `ethercat_backend.cpp` |
 | HTTP | [RFC 9110](https://www.rfc-editor.org/rfc/rfc9110) *HTTP Semantics* | Statuscodes `kHttpOk`, `kHttpBadRequest`, `kHttpNotFound`, `kHttpConflict` |
 | Exit-Codes | C-Standard `EXIT_SUCCESS`/`EXIT_FAILURE`; Exit-Code 2 für ungültige Optionen (Konvention der Shell-Werkzeuge) | `kExitOk`, `kExitError`, `kExitUsage` in `main.cpp` |
@@ -58,6 +58,18 @@ Ausnahmen, die als Literal stehen bleiben dürfen:
   Inline-Funktionen sowie rein virtuelle Schnittstellen ohne Definition (`IoBackend`).
   Implementierungen verweisen mit `@copydoc` bzw. `@copydetails`.
 - Kommentare im Funktionsrumpf und Abschnittstrenner sind normale `//`-Kommentare.
+
+## Generierte Dateien
+
+- Erzeugte Dateien liegen unter `src/generated/`, werden eingecheckt und nicht von Hand
+  bearbeitet. Kopf bzw. Feld `generator` nennt das erzeugende Skript.
+- `src/generated/el3356_0010.json` stammt aus `scripts/esi_gen.py` (ESI-Auszug
+  `esi/Beckhoff EL3356-0010.xml` + Zusatzdatei).
+  `scripts/build_host.sh` prüft mit `--check`, ob sie zur ESI passt.
+- Angaben, die die ESI nicht enthält, stehen in `scripts/esi_supplement.el3356_0010.json`;
+  jede mit `source` (Dokument, Kapitel, Norm oder Projektentscheidung). Die Zusatzdatei darf
+  ESI-Felder nicht überschreiben.
+- CMake bettet das JSON als Raw-String ein (`src/device_description_data.cpp.in`).
 
 ## Weitere Regeln
 

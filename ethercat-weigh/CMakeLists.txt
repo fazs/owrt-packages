@@ -40,11 +40,26 @@ target_include_directories(ew_deps SYSTEM INTERFACE
   ${TP}/asio/asio/include)
 target_compile_definitions(ew_deps INTERFACE ASIO_STANDALONE)
 
+# --- Gerätebeschreibung (aus der ESI erzeugt, siehe scripts/esi_gen.py) --------
+# Das eingecheckte JSON wird als Raw-String eingebettet; Änderungen lösen ein erneutes
+# Konfigurieren aus.
+set(EW_DESC_SOURCE src/generated/el3356_0010.json)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/${EW_DESC_SOURCE})
+file(READ ${CMAKE_CURRENT_SOURCE_DIR}/${EW_DESC_SOURCE} EW_DESC_JSON)
+string(FIND "${EW_DESC_JSON}" ")ew_desc\"" EW_DESC_DELIM)
+if(NOT EW_DESC_DELIM EQUAL -1)
+  message(FATAL_ERROR "${EW_DESC_SOURCE} enthält den Raw-String-Begrenzer )ew_desc\"")
+endif()
+configure_file(src/device_description_data.cpp.in
+  ${CMAKE_CURRENT_BINARY_DIR}/generated/device_description_data.cpp @ONLY)
+
 # --- Kernlogik (hardwareunabhängig, testbar) ----------------------------------
 add_library(ew_core STATIC
   src/calibration.cpp
   src/calibration_controller.cpp
   src/config.cpp
+  src/device_description.cpp
+  ${CMAKE_CURRENT_BINARY_DIR}/generated/device_description_data.cpp
   src/el3356.cpp
   src/measurement.cpp
   src/measurement_csv.cpp

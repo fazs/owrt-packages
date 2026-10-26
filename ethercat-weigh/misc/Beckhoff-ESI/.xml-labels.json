@@ -1,0 +1,58 @@
+{
+  "$comment": "Beispiel für Beckhoff-ESI-Dateien (EtherCATInfo). Als .xml-labels.json neben die ESI-Dateien oder in ein übergeordnetes Verzeichnis legen.",
+  "rules": [
+    {
+      "$comment": "Geräte: deutscher Name, sonst erster Name bzw. Typ; Revision. Beim Öffnen zugeklappt.",
+      "root": "EtherCATInfo",
+      "element": "Devices/Device",
+      "label": "{Name[@LcId='1031']|Name|Type}[ (Rev. {Type/@RevisionNo})]",
+      "collapse": true
+    },
+    {
+      "root": "EtherCATInfo",
+      "element": "Groups/Group",
+      "label": "{Name[@LcId='1031']|Name|Type}"
+    },
+    {
+      "root": "EtherCATInfo",
+      "element": "Device/RxPdo",
+      "label": "RxPDO {Index} {Name}"
+    },
+    {
+      "root": "EtherCATInfo",
+      "element": "Device/TxPdo",
+      "label": "TxPDO {Index} {Name}"
+    },
+    {
+      "$comment": "PDO-Einträge; Lücken (Index #x0) haben keinen Namen",
+      "root": "EtherCATInfo",
+      "element": "/EtherCATInfo/Descriptions/Devices/Device/*/Entry",
+      "label": "{Index}[:{SubIndex}] {Name|BitLen}[ ({DataType})]"
+    },
+    {
+      "root": "EtherCATInfo",
+      "element": "Objects/Object",
+      "label": "{Index} {Name}[ ({Type})]"
+    },
+    {
+      "root": "EtherCATInfo",
+      "element": "DataTypes/DataType",
+      "label": "{Name}[ ({BitSize} Bit)]"
+    },
+    {
+      "root": "EtherCATInfo",
+      "element": "DataType/SubItem",
+      "label": "[{SubIdx} ]{Name}[ ({Type})]"
+    },
+    {
+      "root": "EtherCATInfo",
+      "element": "Info/SubItem",
+      "label": "{Name}[ = {Info/DefaultValue|Info/DefaultData}]"
+    },
+    {
+      "root": "EtherCATInfo",
+      "element": "Device/Sm",
+      "label": "SM {.}[ @{@StartAddress}]"
+    }
+  ]
+}

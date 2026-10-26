@@ -16,6 +16,7 @@
 #include <vector>
 
 #include "config.hpp"
+#include "device_description.hpp"
 #include "el3356.hpp"
 #include "measurement.hpp"
 #include "measurement_csv.hpp"
@@ -401,15 +402,84 @@ TEST(el3356_layout_and_decode) {
     const auto back = decode_map_entry(encode_map_entry(me));
     CHECK(back.index == me.index && back.sub == me.sub && back.bits == me.bits);
 
-    // Reihenfolge der Parameter in 0x8000 laut Initialisierungssequenz
-    const std::vector<uint8_t> expected = {kSubMode0EnableFilter, kSubMode0EnableAverager, kSubFilterMode0,
-                                           kSubRatedOutput,       kSubNominalLoad,         kSubZeroBalance,
-                                           kSubGravity,           kSubScaleFactor,         kSubReferenceLoad,
-                                           kSubSteadyStateWindow, kSubSteadyStateTolerance, kSubCalibrationInterval};
+    // Klemmenparameter aus der Gerätebeschreibung: Default-Config schreibt alle 0x8000-Einträge
     const auto writes = settings_writes(ew::DeviceConfig{});
-    CHECK(writes.size() == expected.size());
-    for (size_t i = 0U; i < std::min(writes.size(), expected.size()); ++i)
-        CHECK(writes[i].index == kObjSettings && writes[i].sub == expected[i]);
+    CHECK(std::any_of(writes.begin(), writes.end(),
+                      [](const SdoWrite& w) { return w.index == kObjSettings && w.sub == kSubRatedOutput; }));
+    CHECK(std::none_of(writes.begin(), writes.end(),
+                       [](const SdoWrite& w) { return w.index == kObjSettings && w.sub == kSubTara; }));
+}
+
+constexpr int kHexBase = 16;  ///< Basis der Hex-Texte der Gerätebeschreibung
+
+/**
+ * @brief Bitfeld aus einem Init-Block der ESI (Hex-Text, little endian).
+ * @param hex Daten
+ * @param off Bitoffset
+ * @param len Länge in Bit
+ * @return Bytes des Felds, little endian
+ */
+std::vector<uint8_t> init_field(const std::string& hex, uint32_t off, uint32_t len) {
+    constexpr size_t kHexPerByte = 2U;
+    std::vector<uint8_t> bytes;
+    for (size_t i = 0U; i + kHexPerByte <= hex.size(); i += kHexPerByte)
+        bytes.push_back(static_cast<uint8_t>(std::stoul(hex.substr(i, kHexPerByte), nullptr, kHexBase)));
+    std::vector<uint8_t> out(ew::el3356::bytes_for_bits(len), 0U);
+    for (uint32_t i = 0U; i < len; ++i, ++off)
+        if ((bytes.at(off / kBitsPerByte) >> (off % kBitsPerByte)) & 1U)
+            out[i / kBitsPerByte] |= static_cast<uint8_t>(1U << (i % kBitsPerByte));
+    return out;
+}
+
+TEST(device_settings_from_description) {
+    using namespace ew::el3356;
+    constexpr uint32_t kBitsSubCount = 16U;  ///< Init-Block ab Subindex 1: SubIndex 000 + Lücke
+    constexpr uint8_t kSubDynChangeTime = 0x13U;
+    constexpr double kDynChangeTimeMax = 100.0;  ///< laut ESI
+    const auto& d = ew::DeviceDescription::el3356_0010();
+
+    // Typisierte Felder auf die ESI-Defaults setzen: Schreibliste = Init-Block der Variante REAL
+    nlohmann::json typed = ew::device_json(ew::DeviceConfig{});
+    for (const auto& e : d.entries())
+        if (e.raw.contains("config_key")) typed[e.raw.at("config_key").get<std::string>()] = e.raw.at("default");
+    const ew::Config cfg = ew::config_from_json({{"device", typed}});
+    CHECK(cfg.validate().empty());
+    const nlohmann::json* variant = nullptr;
+    for (const auto& v : d.json().at("variants"))
+        if (v.at("name") == "Standard (REAL)") variant = &v;
+    CHECK(variant != nullptr);
+    size_t compared = 0U;
+    for (const auto& w : settings_writes(cfg.device)) {
+        for (const auto& ic : variant ? variant->at("init") : nlohmann::json::array()) {
+            if (std::stoul(ic.at("index").get<std::string>(), nullptr, kHexBase) != w.index) continue;
+            const auto* e = d.entry(w.index, w.sub);
+            const auto field = init_field(ic.at("data").get<std::string>(),
+                                          e->raw.at("bit_offset").get<uint32_t>() - kBitsSubCount, e->bits);
+            CHECK(decode_value(w.type, field) == decode_value(w.type, w.data));
+            ++compared;
+        }
+    }
+    CHECK(compared > 0U);
+
+    // Validierung: Bereich, never_write, typisierte Felder, unbekannte Schlüssel
+    ew::Config c;
+    c.device.coe["0x8000:13"] = kDynChangeTimeMax;
+    CHECK(c.validate().empty());
+    c.device.coe["0x8000:13"] = kDynChangeTimeMax + 1.0;
+    CHECK(c.validate().size() == 1U);
+    c.device.coe = {{"0x8000:22", 0.0}};
+    CHECK(c.validate().size() == 1U);
+    c.device.coe = {{"0x8000:23", 1.0}};
+    CHECK(c.validate().size() == 1U);
+    c.device.coe = {{"0x8000:99", 1.0}};
+    CHECK(c.validate().size() == 1U);
+    c.device.coe = {{"8000:13", 1.0}};
+    CHECK(c.validate().size() == 1U);
+    c.device.coe = {};
+    c.device.mode0_filter_settings = kFilterPdoFrequency + 1U;
+    CHECK(c.validate().size() == 1U);
+    const auto* dyn = d.entry(kObjSettings, kSubDynChangeTime);
+    CHECK(dyn && dyn->raw.at("max") == kDynChangeTimeMax);
 }
 
 TEST(el3356_debug_catalog_and_init_sequence) {
@@ -492,6 +562,50 @@ TEST(el3356_debug_catalog_and_init_sequence) {
     CHECK(real_assign != seq.end() && decode_value(DType::U16, real_assign->data) == kPdoValueReal);
     dc.write_on_start = false;
     CHECK(init_sequence(dc).size() == rx_len + tx_len);
+}
+
+TEST(device_description_el3356) {
+    using namespace ew::el3356;
+    constexpr uint32_t kRevNewest = 0x0019000AU;     ///< neueste Revision der ESI
+    constexpr uint32_t kRevBefore1601 = 0x0014000AU; ///< letzte Revision ohne 0x1601
+    constexpr uint8_t kSubDynChangeTime = 0x13U;     ///< 0x8000:13 Dynamic filter change time
+    constexpr double kDynChangeTimeFactor = 0.01;    ///< ConvertValue: 1/100 s
+    constexpr uint16_t kFilterDynamicIir = 10U;      ///< DT0800EN16: Dynamic IIR
+
+    const auto& d = ew::DeviceDescription::el3356_0010();
+    CHECK(d.json().at("device").at("type") == "EL3356-0010" && d.newest_revision() == kRevNewest);
+    CHECK(d.json().at("warnings").is_array());
+
+    const auto* dyn = d.entry(kObjSettings, kSubDynChangeTime);
+    CHECK(dyn != nullptr && dyn->type == "u16");
+    if (dyn) {
+        CHECK_NEAR(dyn->raw.at("convert").at("factor").get<double>(), kDynChangeTimeFactor, kEps);
+        const auto& en = dyn->raw.at("enable_if");
+        CHECK(en.size() == 2U && en.at(0).at("obj") == "0x8000:11" && en.at(0).at("eq") == kFilterDynamicIir);
+    }
+    const auto* rated = d.entry(kObjSettings, kSubRatedOutput);
+    CHECK(rated && rated->raw.at("config_key") == "rated_output_mv_v");
+
+    // 0x1601 erst ab Revision 0x0015; Mapping von 0x1A00 bis 0x0014 mit 0x1C32:20 und 0x1800:09
+    const auto* ff = d.pdo(kPdoFilterFrequency);
+    CHECK(ff && d.layout(*ff) != nullptr && d.layout(*ff, kRevBefore1601) == nullptr);
+    const auto* status = d.pdo(kPdoStatus);
+    const auto* old = status ? d.layout(*status, kRevBefore1601) : nullptr;
+    CHECK(old && std::any_of(old->entries.begin(), old->entries.end(), [](const ew::DescPdoEntry& e) {
+              return e.index == kObjTxPdoPar && e.sub == kSubTxPdoParToggle;
+          }));
+
+    // Katalog aus der Beschreibung: Namen und Typen wie im Objektverzeichnis
+    std::string name;
+    DType type = DType::None;
+    CHECK(known_entry(kObjTxPdoPar, kSubTxPdoParToggle, name, type) && name == "TxPDO Toggle" &&
+          type == DType::Bool);
+    CHECK(known_entry(kObjInputs, kSubInValueReal, name, type) && name == "Value (Real)" && type == DType::F32);
+    CHECK(known_pdo_name(kPdoValueReal) == "RMB Value (Real)");
+    for (const auto& p : known_pdos()) {
+        const auto* dp = d.pdo(p.index);
+        CHECK(dp && p.excludes == dp->exclude && p.rx == dp->rx);
+    }
 }
 
 /// @name Simulation

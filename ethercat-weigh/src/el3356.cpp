@@ -1,8 +1,13 @@
 #include "el3356.hpp"
 
+#include <algorithm>
 #include <cmath>
+#include <cfloat>
 #include <cstdio>
 #include <limits>
+#include <string_view>
+
+#include "device_description.hpp"
 
 namespace ew::el3356 {
 
@@ -171,48 +176,22 @@ uint64_t to_raw(DType t, double v) {
     }
 }
 
-/// Bekannter Objekteintrag laut ESI.
-struct KnownEntry {
-    uint16_t index;    ///< Objektindex
-    uint8_t sub;       ///< Subindex
-    const char* name;  ///< Name laut ESI
-    DType type;        ///< Datentyp
-};
-
-/// Objektverzeichnis laut ESI (Revision 0x0019): RMB 0x6000/0x7000, AI-Kanäle 0x6010/0x6020
-const KnownEntry kKnownEntries[] = {
-    {kObjInputs, kSubInOverrange, "Overrange", DType::Bool},
-    {kObjInputs, kSubInDataInvalid, "Data invalid", DType::Bool},
-    {kObjInputs, kSubInError, "Error", DType::Bool},
-    {kObjInputs, kSubInCalibration, "Calibration in progress", DType::Bool},
-    {kObjInputs, kSubInSteadyState, "Steady state", DType::Bool},
-    {kObjInputs, kSubInSyncError, "Sync error", DType::Bool},
-    {kObjInputs, kSubInToggle, "TxPDO Toggle", DType::Bool},
-    {kObjInputs, kSubInValue, "Value", DType::I32},
-    {kObjInputs, kSubInValueReal, "Value (Real)", DType::F32},
-    {kObjInputs, kSubInTimestamp, "Timestamp", DType::U64},
-    {kObjAiInputsCh1, kSubAiUnderrange, "Underrange", DType::Bool},
-    {kObjAiInputsCh1, kSubAiOverrange, "Overrange", DType::Bool},
-    {kObjAiInputsCh1, kSubAiError, "Error", DType::Bool},
-    {kObjAiInputsCh1, kSubAiToggle, "TxPDO Toggle", DType::Bool},
-    {kObjAiInputsCh1, kSubAiValue, "Value", DType::I32},
-    {kObjAiInputsCh2, kSubAiUnderrange, "Underrange", DType::Bool},
-    {kObjAiInputsCh2, kSubAiOverrange, "Overrange", DType::Bool},
-    {kObjAiInputsCh2, kSubAiError, "Error", DType::Bool},
-    {kObjAiInputsCh2, kSubAiToggle, "TxPDO Toggle", DType::Bool},
-    {kObjAiInputsCh2, kSubAiValue, "Value", DType::I32},
-    {kObjSmOutParam, kSubSmOutSyncError, "Sync error", DType::Bool},
-    {kObjTxPdoPar, kSubTxPdoParToggle, "TxPDO Toggle", DType::Bool},
-    {kObjControl, kSubCtrlStartCalibration, "Start calibration", DType::Bool},
-    {kObjControl, kSubCtrlDisableCalibration, "Disable calibration", DType::Bool},
-    {kObjControl, kSubCtrlInputFreeze, "Input freeze", DType::Bool},
-    {kObjControl, kSubCtrlSampleMode, "Sample mode", DType::Bool},
-    {kObjControl, kSubCtrlTare, "Tara", DType::Bool},
-    {kObjControl, kSubCtrlFilterFrequency, "Filter frequency", DType::U16},
-};
+constexpr std::string_view kPdoNamePrefixSep = "__";  ///< ESI-Mappingnamen: "Status__Overrange"
 
 /**
- * @brief PDO-Eintrag mit Name und Typ aus der ESI-Tabelle.
+ * @brief Datentyp eines Eintrags der Gerätebeschreibung.
+ * @param type Kurzname laut Beschreibung
+ * @param bits Bitlänge, Rückfall für "string"/"bytes" und unbekannte Namen
+ * @return Datentyp
+ */
+DType desc_type(const std::string& type, uint16_t bits) {
+    DType t = DType::None;
+    if (dtype_from_name(type, t)) return t;
+    return dtype_from_coe(kCoeUnknown, static_cast<uint8_t>(std::min<uint16_t>(bits, kMaxFieldBits)));
+}
+
+/**
+ * @brief PDO-Eintrag mit Name und Typ aus der Gerätebeschreibung.
  * @param index Objektindex (kObjGap = Lücke)
  * @param sub Subindex
  * @param bits Länge in Bit
@@ -228,15 +207,6 @@ PdoEntry known(uint16_t index, uint8_t sub, uint8_t bits) {
         e.name = b;
     }
     return e;
-}
-
-/**
- * @brief Lücke im Mapping.
- * @param bits Breite in Bit (laut ESI)
- * @return Eintrag ohne Objekt
- */
-PdoEntry gap(uint8_t bits) {
-    return known(kObjGap, kSubCount, bits);
 }
 
 } // namespace
@@ -487,7 +457,11 @@ bool* control_bit(El3356Control& c, uint8_t sub) {
 }
 
 /**
- * @brief Name und Typ eines Eintrags laut ESI.
+ * @brief Name und Typ eines Eintrags laut Gerätebeschreibung.
+ *
+ * Gesucht wird im Objektverzeichnis, danach in den PDO-Mappings aller Revisionen (z. B.
+ * 0x1800:09 bis Revision 0x0014, das kein Objekteintrag ist); dort ohne Präfix "Status__".
+ *
  * @param index Objektindex
  * @param sub Subindex
  * @param[out] name Name
@@ -495,86 +469,56 @@ bool* control_bit(El3356Control& c, uint8_t sub) {
  * @return false, wenn der Eintrag unbekannt ist
  */
 bool known_entry(uint16_t index, uint8_t sub, std::string& name, DType& type) {
-    for (const auto& k : kKnownEntries)
-        if (k.index == index && k.sub == sub) {
-            name = k.name;
-            type = k.type;
-            return true;
-        }
+    const auto& d = DeviceDescription::el3356_0010();
+    if (const auto* e = d.entry(index, sub)) {
+        name = e->name;
+        type = desc_type(e->type, e->bits);
+        return true;
+    }
+    if (index == kObjGap) return false;
+    for (const auto& p : d.pdos())
+        for (const auto& l : p.layouts)
+            for (const auto& e : l.entries)
+                if (e.index == index && e.sub == sub) {
+                    const auto sep = e.name.find(kPdoNamePrefixSep);
+                    name = sep == std::string::npos ? e.name : e.name.substr(sep + kPdoNamePrefixSep.size());
+                    type = desc_type(e.type, e.bits);
+                    return true;
+                }
     return false;
 }
 
 /**
- * @brief Name eines PDOs laut ESI.
+ * @brief Name eines PDOs laut Gerätebeschreibung.
  * @param pdo Index 0x16xx/0x1Axx
  * @return Name, sonst "0xIIII"
  */
 std::string known_pdo_name(uint16_t pdo) {
-    switch (pdo) {
-    case kPdoControl: return "RMB Control";
-    case kPdoFilterFrequency: return "RMB Filter frequency";
-    case kPdoStatus: return "RMB Status";
-    case kPdoValueInt: return "RMB Value (INT32)";
-    case kPdoValueReal: return "RMB Value (Real)";
-    case kPdoTimestamp: return "RMB Timestamp";
-    case kPdoAiStandardCh1: return "AI Standard Channel 1";
-    case kPdoAiCompactCh1: return "AI Compact Channel 1";
-    case kPdoAiStandardCh2: return "AI Standard Channel 2";
-    case kPdoAiCompactCh2: return "AI Compact Channel 2";
-    default: {
-        char b[kPdoNameLen];
-        std::snprintf(b, sizeof b, "0x%04X", pdo);
-        return b;
-    }
-    }
+    if (const auto* p = DeviceDescription::el3356_0010().pdo(pdo)) return p->name;
+    char b[kPdoNameLen];
+    std::snprintf(b, sizeof b, "0x%04X", pdo);
+    return b;
 }
 
 /**
- * @brief PDOs der EL3356-0010 laut ESI (Revision 0x0019) mit Mapping und Exclude-Listen.
+ * @brief PDOs der EL3356-0010 laut Gerätebeschreibung mit Mapping und Exclude-Listen.
  *
- * Grundlage für die Simulation und Rückfall für Namen ohne SDO-Information.
- * Die Breiten der Lücken stammen aus dem Mapping der ESI.
+ * Mapping der neuesten Revision. Grundlage für die Simulation und Rückfall für Namen ohne
+ * SDO-Information.
  *
- * @return alle PDOs, nicht zugeordnet
+ * @return alle PDOs der neuesten Revision, nicht zugeordnet
  */
 std::vector<PdoInfo> known_pdos() {
-    auto pdo = [](uint16_t idx, bool rx, std::vector<PdoEntry> e, std::vector<uint16_t> ex) {
-        return PdoInfo{idx, known_pdo_name(idx), rx, false, std::move(e), std::move(ex)};
-    };
-    auto ai_standard = [](uint16_t obj) {
-        return std::vector<PdoEntry>{known(obj, kSubAiUnderrange, kBitsBool), known(obj, kSubAiOverrange, kBitsBool),
-                                     gap(4U), known(obj, kSubAiError, kBitsBool), gap(1U), gap(7U),
-                                     known(obj, kSubAiToggle, kBitsBool), known(obj, kSubAiValue, kBitsDint)};
-    };
-    const std::vector<uint16_t> ai = {kPdoAiStandardCh1, kPdoAiCompactCh1, kPdoAiStandardCh2, kPdoAiCompactCh2};
-    const std::vector<uint16_t> rmb = {kPdoStatus, kPdoValueInt, kPdoValueReal, kPdoTimestamp};
-    auto with = [](std::vector<uint16_t> a, uint16_t b) {
-        a.insert(a.begin(), b);
-        return a;
-    };
-    return {
-        pdo(kPdoControl, true,
-            {known(kObjControl, kSubCtrlStartCalibration, kBitsBool),
-             known(kObjControl, kSubCtrlDisableCalibration, kBitsBool),
-             known(kObjControl, kSubCtrlInputFreeze, kBitsBool), known(kObjControl, kSubCtrlSampleMode, kBitsBool),
-             known(kObjControl, kSubCtrlTare, kBitsBool), gap(3U), gap(8U)},
-            {}),
-        pdo(kPdoFilterFrequency, true, {known(kObjControl, kSubCtrlFilterFrequency, kBitsUint)}, {}),
-        pdo(kPdoStatus, false,
-            {gap(1U), known(kObjInputs, kSubInOverrange, kBitsBool), gap(1U),
-             known(kObjInputs, kSubInDataInvalid, kBitsBool), gap(2U), known(kObjInputs, kSubInError, kBitsBool),
-             known(kObjInputs, kSubInCalibration, kBitsBool), known(kObjInputs, kSubInSteadyState, kBitsBool),
-             gap(4U), known(kObjInputs, kSubInSyncError, kBitsBool), gap(1U),
-             known(kObjInputs, kSubInToggle, kBitsBool)},
-            ai),
-        pdo(kPdoValueInt, false, {known(kObjInputs, kSubInValue, kBitsDint)}, with(ai, kPdoValueReal)),
-        pdo(kPdoValueReal, false, {known(kObjInputs, kSubInValueReal, kBitsDint)}, with(ai, kPdoValueInt)),
-        pdo(kPdoTimestamp, false, {known(kObjInputs, kSubInTimestamp, kBitsUlint)}, ai),
-        pdo(kPdoAiStandardCh1, false, ai_standard(kObjAiInputsCh1), with(rmb, kPdoAiCompactCh1)),
-        pdo(kPdoAiCompactCh1, false, {known(kObjAiInputsCh1, kSubAiValue, kBitsDint)}, with(rmb, kPdoAiStandardCh1)),
-        pdo(kPdoAiStandardCh2, false, ai_standard(kObjAiInputsCh2), with(rmb, kPdoAiCompactCh2)),
-        pdo(kPdoAiCompactCh2, false, {known(kObjAiInputsCh2, kSubAiValue, kBitsDint)}, with(rmb, kPdoAiStandardCh2)),
-    };
+    const auto& d = DeviceDescription::el3356_0010();
+    std::vector<PdoInfo> out;
+    for (const auto& p : d.pdos()) {
+        const auto* lay = d.layout(p);
+        if (lay == nullptr) continue;
+        PdoInfo info{p.index, p.name, p.rx, false, {}, p.exclude};
+        for (const auto& e : lay->entries) info.entries.push_back(known(e.index, e.sub, e.bits));
+        out.push_back(std::move(info));
+    }
+    return out;
 }
 
 /**
@@ -614,29 +558,198 @@ double entry_value(const uint8_t* img, const PdoEntry& e) {
     return from_raw(e.type, get_bits(img, e.loc.bit_offset, e.loc.bit_len));
 }
 
+namespace {
+
+/// @name Konfigurationsbereich des Objektverzeichnisses (ETG.5001 Modular Device Profile)
+/// @{
+constexpr uint16_t kObjConfigFirst = 0x8000U;  ///< erstes Konfigurationsobjekt
+constexpr uint16_t kObjConfigLast = 0x8FFFU;   ///< letztes Konfigurationsobjekt
+/// @}
+constexpr size_t kNumTextLen = 32U;  ///< Puffer für eine formatierte Zahl
+
 /**
- * @brief Schreibliste für 0x8000 aus der Konfiguration.
- * @param dc Klemmenparameter
- * @return SDO-Schreibzugriffe (auch in OP zulässig)
+ * @brief Adresse als "0xIIII:SS" (Schlüssel in DeviceConfig::coe und der Gerätebeschreibung).
+ * @param index Objektindex
+ * @param sub Subindex
+ * @return Adresse
  */
-std::vector<SdoWrite> settings_writes(const DeviceConfig& dc) {
-    auto w = [](uint8_t sub, DType t, double v, const char* name) {
-        return SdoWrite{kObjSettings, sub, encode_value(t, v), name, t, false};
+std::string obj_key(uint16_t index, uint8_t sub) {
+    char b[kObjNameLen];
+    std::snprintf(b, sizeof b, "0x%04X:%02X", index, sub);
+    return b;
+}
+
+/**
+ * @brief Zahl für Meldungen (Dezimalkomma, ohne überflüssige Stellen).
+ * @param v Wert
+ * @return Text
+ */
+std::string num_text(double v) {
+    char b[kNumTextLen];
+    std::snprintf(b, sizeof b, "%.10g", v);
+    std::string t = b;
+    std::replace(t.begin(), t.end(), '.', ',');
+    return t;
+}
+
+/**
+ * @brief JSON-Wert (Zahl oder bool) als Zahl.
+ * @param j Wert
+ * @return Zahl; bool als 0/1
+ */
+double json_number(const nlohmann::json& j) {
+    return j.is_boolean() ? (j.get<bool>() ? 1.0 : 0.0) : j.get<double>();
+}
+
+/**
+ * @brief Prüft, ob ein Eintrag ein schreibbarer Klemmenparameter ist.
+ * @param e Eintrag der Gerätebeschreibung
+ * @return true für rw-Einträge 0x8000..0x8FFF mit Zahlentyp, ohne Subindex 0 und ohne never_write
+ */
+bool is_setting(const DescEntry& e) {
+    if (e.index < kObjConfigFirst || e.index > kObjConfigLast || e.sub == kSubCount) return false;
+    if (e.raw.value("access", "") != "rw" || e.raw.contains("never_write")) return false;
+    DType t = DType::None;
+    return dtype_from_name(e.type, t);
+}
+
+/**
+ * @brief Prüft einen Wert gegen Datentyp, Grenzen und Aufzählung laut Gerätebeschreibung.
+ * @param e Eintrag
+ * @param t Datentyp
+ * @param v Wert (CoE-Rohwert)
+ * @return Fehlertext, leer = gültig
+ */
+std::string check_value(const DescEntry& e, DType t, double v) {
+    auto range = [](double lo, double hi) { return "zulässig " + num_text(lo) + ".." + num_text(hi); };
+    auto int_range = [&](auto lim) -> std::string {
+        using L = decltype(lim);
+        if (std::floor(v) != v) return "Ganzzahl erwartet";
+        if (v < static_cast<double>(std::numeric_limits<L>::min()) ||
+            v > static_cast<double>(std::numeric_limits<L>::max()))
+            return range(static_cast<double>(std::numeric_limits<L>::min()),
+                         static_cast<double>(std::numeric_limits<L>::max()));
+        return {};
     };
-    return {
-        w(kSubMode0EnableFilter, DType::Bool, dc.mode0_enable_filter, "Mode0 enable filter"),
-        w(kSubMode0EnableAverager, DType::Bool, dc.mode0_enable_averager, "Mode0 enable averager"),
-        w(kSubFilterMode0, DType::U16, dc.mode0_filter_settings, "Mode0 filter settings"),
-        w(kSubRatedOutput, DType::F32, dc.rated_output_mv_v, "Rated output"),
-        w(kSubNominalLoad, DType::F32, dc.nominal_load, "Nominal load"),
-        w(kSubZeroBalance, DType::F32, dc.zero_balance, "Zero balance"),
-        w(kSubGravity, DType::F32, dc.gravity_of_earth, "Gravity of earth"),
-        w(kSubScaleFactor, DType::F32, dc.scale_factor, "Scale factor"),
-        w(kSubReferenceLoad, DType::F32, dc.reference_load, "Reference load"),
-        w(kSubSteadyStateWindow, DType::U16, dc.steady_state_window, "Steady state window"),
-        w(kSubSteadyStateTolerance, DType::U32, dc.steady_state_tolerance, "Steady state tolerance"),
-        w(kSubCalibrationInterval, DType::U16, dc.calibration_interval, "Calibration interval"),
-    };
+    std::string err;
+    switch (t) {
+    case DType::Bool: err = (v == 0.0 || v == 1.0) ? "" : "0 oder 1 erwartet"; break;
+    case DType::U8: err = int_range(uint8_t{}); break;
+    case DType::U16: err = int_range(uint16_t{}); break;
+    case DType::U32: err = int_range(uint32_t{}); break;
+    case DType::I8: err = int_range(int8_t{}); break;
+    case DType::I16: err = int_range(int16_t{}); break;
+    case DType::I32: err = int_range(int32_t{}); break;
+    case DType::F32: err = std::isfinite(v) && std::fabs(v) <= FLT_MAX ? "" : "kein gültiger REAL32-Wert"; break;
+    default: err = "Datentyp nicht unterstützt"; break;
+    }
+    if (!err.empty()) return err;
+    const double lo = e.raw.contains("min") ? json_number(e.raw.at("min")) : -HUGE_VAL;
+    const double hi = e.raw.contains("max") ? json_number(e.raw.at("max")) : HUGE_VAL;
+    if (v < lo || v > hi) return range(lo, hi);
+    if (e.raw.contains("enum")) {
+        const auto& items = DeviceDescription::el3356_0010().json().at("enums").at(e.raw.at("enum").get<std::string>());
+        const bool hit = std::any_of(items.begin(), items.end(),
+                                     [&](const nlohmann::json& it) { return json_number(it.at("value")) == v; });
+        if (!hit) {
+            std::string vals;
+            for (const auto& it : items) vals += (vals.empty() ? "" : ", ") + num_text(json_number(it.at("value")));
+            return "zulässig " + vals;
+        }
+    }
+    return {};
+}
+
+} // namespace
+
+/**
+ * @brief Schreibbare Klemmenparameter laut Gerätebeschreibung mit dem wirksamen Wert.
+ *
+ * Wert: typisiertes Feld von DeviceConfig (config_key), sonst DeviceConfig::coe, sonst Default
+ * der ESI. Einträge ohne Wert und Einträge, die in der Revision fehlen, entfallen.
+ *
+ * @param dc Klemmenparameter
+ * @param revision Revision der Klemme, 0 = neueste der Beschreibung
+ * @return Parameter nach Index und Subindex
+ */
+std::vector<DeviceSetting> device_settings(const DeviceConfig& dc, uint32_t revision) {
+    const auto& d = DeviceDescription::el3356_0010();
+    const nlohmann::json typed = device_json(dc);
+    std::vector<DeviceSetting> out;
+    for (const auto& e : d.entries()) {
+        if (!is_setting(e) || !d.in_revision(e.revisions, revision)) continue;
+        DeviceSetting s{e.index, e.sub, e.name, "", desc_type(e.type, e.bits), 0.0, false};
+        const std::string key = obj_key(e.index, e.sub);
+        if (e.raw.contains("config_key")) {
+            const auto ck = e.raw.at("config_key").get<std::string>();
+            s.key = "device." + ck;
+            s.value = json_number(typed.at(ck));
+            s.configured = true;
+        } else if (const auto it = dc.coe.find(key); it != dc.coe.end()) {
+            s.key = "device.coe." + key;
+            s.value = it->second;
+            s.configured = true;
+        } else if (e.raw.contains("default")) {
+            s.key = "device.coe." + key;
+            s.value = json_number(e.raw.at("default"));
+        } else {
+            continue;
+        }
+        out.push_back(std::move(s));
+    }
+    return out;
+}
+
+/**
+ * @brief Prüft die Klemmenparameter gegen die Gerätebeschreibung.
+ *
+ * Schlüssel in DeviceConfig::coe müssen schreibbare Klemmenparameter ohne typisiertes Feld
+ * sein; alle konfigurierten Werte werden gegen Datentyp, Grenzen und Aufzählung geprüft.
+ *
+ * @param dc Klemmenparameter
+ * @return Fehlermeldungen; leer = gültig
+ */
+std::vector<std::string> validate_device(const DeviceConfig& dc) {
+    const auto& d = DeviceDescription::el3356_0010();
+    std::vector<std::string> errs;
+    for (const auto& kv : dc.coe) {
+        const std::string field = "device.coe." + kv.first;
+        unsigned idx = 0U, sub = 0U;
+        const bool parsed = std::sscanf(kv.first.c_str(), "0x%4X:%2X", &idx, &sub) == 2 &&
+                            kv.first == obj_key(static_cast<uint16_t>(idx), static_cast<uint8_t>(sub));
+        const DescEntry* e = parsed ? d.entry(static_cast<uint16_t>(idx), static_cast<uint8_t>(sub)) : nullptr;
+        if (!parsed)
+            errs.push_back(field + ": Schlüssel im Format 0xIIII:SS erwartet");
+        else if (e == nullptr)
+            errs.push_back(field + ": Eintrag nicht in der Gerätebeschreibung");
+        else if (e->raw.contains("never_write"))
+            errs.push_back(field + " (" + e->name + "): darf nicht geschrieben werden (" +
+                           e->raw.at("never_write").get<std::string>() + ")");
+        else if (!is_setting(*e))
+            errs.push_back(field + " (" + e->name + "): kein schreibbarer Klemmenparameter");
+        else if (e->raw.contains("config_key"))
+            errs.push_back(field + " (" + e->name + "): über device." +
+                           e->raw.at("config_key").get<std::string>() + " einstellen");
+    }
+    for (const auto& s : device_settings(dc)) {
+        if (!s.configured) continue;
+        const auto err = check_value(*d.entry(s.index, s.sub), s.type, s.value);
+        if (!err.empty()) errs.push_back(s.key + " (" + obj_key(s.index, s.sub) + " " + s.name + "): " + err);
+    }
+    return errs;
+}
+
+/**
+ * @brief Schreibliste aller Klemmenparameter (wie eine Startup-Liste in TwinCAT).
+ * @param dc Klemmenparameter
+ * @param revision Revision der Klemme, 0 = neueste der Beschreibung
+ * @return SDO-Schreibzugriffe nach Index und Subindex (auch in OP zulässig)
+ */
+std::vector<SdoWrite> settings_writes(const DeviceConfig& dc, uint32_t revision) {
+    std::vector<SdoWrite> out;
+    for (const auto& s : device_settings(dc, revision))
+        out.push_back({s.index, s.sub, encode_value(s.type, s.value), s.name, s.type, false});
+    return out;
 }
 
 /// @brief Feste RxPDO-Zuordnung dieser Anwendung (0x1C12): RMB Control.
