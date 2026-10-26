@@ -15,6 +15,7 @@
   import { UNITS } from './lib/format.js';
   import Calibration from './lib/Calibration.svelte';
   import Readout from './lib/Readout.svelte';
+  import StatusBits from './lib/StatusBits.svelte';
   import Trend from './lib/Trend.svelte';
   import Histogram from './lib/Histogram.svelte';
   import Stats from './lib/Stats.svelte';
@@ -64,6 +65,7 @@
   <div class="title">
     <h1>Wägung</h1>
     <span class="conn {conn.cls}"><span class="led" aria-hidden="true"></span>{conn.text}</span>
+    <StatusBits />
   </div>
   <div class="actions">
     <div class="units" role="radiogroup" aria-label="Anzeigeeinheit">
@@ -160,10 +162,13 @@
     border-bottom: 1px solid var(--line);
     background: var(--panel);
   }
+  /* nimmt den Platz neben den Buttons; die Statusbits passen sich an, statt umzubrechen */
   .title {
     display: flex;
     align-items: baseline;
     flex-wrap: wrap;
+    flex: 1 1 auto;
+    min-width: 0;
     gap: 0.25rem 1rem;
   }
   h1 {

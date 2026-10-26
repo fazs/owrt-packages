@@ -593,12 +593,29 @@ namespace ew {
         };
     }
 
+    /**
+     * @brief Anzeigewert: gleitender Mittelwert der letzten ui.display_average gültigen
+     *        Bruttowerte minus Tara; mtx_ muss gehalten werden.
+     *
+     * Gemittelt wird brutto, damit Tara sofort wirkt. Nur für die Anzeige; die Erkennung
+     * gültiger Messungen arbeitet mit den ungeglätteten Werten.
+     *
+     * @return Netto [g], null ohne gültige Werte
+     */
+    nlohmann::json Acquisition::display_value_locked() const {
+        if (display_hist_.empty()) return nullptr;
+        double sum = 0.0;
+        for (double g: display_hist_) sum += g;
+        return sum / static_cast<double>(display_hist_.size()) - tare_g_.value_or(0.0);
+    }
+
     /// @brief Letztes Sample als "sample"-Nachricht; mtx_ muss gehalten werden.
     nlohmann::json Acquisition::sample_json_locked() const {
         return {
             {"type", "sample"},
             {"t", last_.t},
             {"value", last_.value},
+            {"display", display_value_locked()},
             {"gross", last_.gross},
             {"raw", last_.raw},
             {"tare", tare_g_ ? nlohmann::json(*tare_g_) : nlohmann::json(nullptr)},
@@ -652,6 +669,7 @@ namespace ew {
         if (char_changed) {
             tare_g_.reset();
             gross_hist_.clear();
+            display_hist_.clear();
             engine_.reset();
         }
     }
@@ -758,6 +776,7 @@ namespace ew {
                     backend_error_ = err;
                     last_ = {};
                     last_.t = secs();
+                    display_hist_.clear();
                     engine_.process(last_);
                 }
                 publish({{"type", "backend"}, {"state", "error"}, {"error", err}});
@@ -848,8 +867,11 @@ namespace ew {
                     if (sample_valid(s)) {
                         gross_hist_.push_back(s.gross);
                         while (gross_hist_.size() > kTareSamples) gross_hist_.pop_front();
+                        display_hist_.push_back(s.gross);
+                        while (display_hist_.size() > c.ui.display_average) display_hist_.pop_front();
                     } else {
                         gross_hist_.clear();
+                        display_hist_.clear();
                     }
                     last_ = s;
                     m = engine_.process(s);

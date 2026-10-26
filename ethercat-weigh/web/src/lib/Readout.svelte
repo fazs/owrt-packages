@@ -28,21 +28,12 @@
     pulse = false;
     requestAnimationFrame(() => (pulse = true));
   });
-
-  const bits = $derived([
-    { key: 'link', label: 'Link', on: s?.link_ok && s?.wkc_ok, good: true },
-    { key: 'steady', label: 'Steady state', on: s?.status?.steady_state, good: true },
-    { key: 'cal', label: 'Kalibrierung', on: s?.status?.calibration_in_progress },
-    { key: 'inv', label: 'Data invalid', on: s?.status?.data_invalid },
-    { key: 'ovr', label: 'Overrange', on: s?.status?.overrange },
-    { key: 'err', label: 'Error', on: s?.status?.error },
-  ]);
 </script>
 
 <section class="readout state-{state}" class:pulse aria-live="polite">
   <div class="value-row">
     <output class="value" aria-label="Aktueller Messwert">
-      {s && s.valid ? fmt(fromG(s.value, unit), dec) : '– – –'}
+      {s && s.valid ? fmt(fromG(s.display ?? s.value, unit), dec) : '– – –'}
     </output>
     <span class="unit">{unit}</span>
   </div>
@@ -82,12 +73,6 @@
       </div>
     </div>
   </div>
-
-  <ul class="bits">
-    {#each bits as b (b.key)}
-      <li class:on={b.on} class:good={b.good}>{b.label}</li>
-    {/each}
-  </ul>
 </section>
 
 <style>
@@ -200,31 +185,6 @@
   }
   .fill.range.over {
     background: var(--st-fault);
-  }
-
-  .bits {
-    list-style: none;
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.4rem;
-    margin: 0.9rem 0 0;
-    padding: 0;
-  }
-  .bits li {
-    font-size: 0.8rem;
-    padding: 0.15rem 0.55rem;
-    border-radius: 999px;
-    border: 1px solid var(--line);
-    color: var(--muted);
-  }
-  .bits li.on {
-    border-color: var(--st-fault);
-    color: var(--st-fault);
-    font-weight: 600;
-  }
-  .bits li.on.good {
-    border-color: var(--st-captured);
-    color: var(--st-captured);
   }
 
   @media (max-width: 520px) {

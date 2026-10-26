@@ -159,6 +159,9 @@
           },
           "ui": {
             "properties": {
+              "display_average": {
+                "type": "integer"
+              },
               "display_unit": {
                 "type": "string"
               },
@@ -1300,6 +1303,7 @@
                           },
                           "type": "object"
                         },
+                        "display": {},
                         "fault": {
                           "type": "string"
                         },

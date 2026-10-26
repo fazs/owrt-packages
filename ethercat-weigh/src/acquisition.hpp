@@ -121,6 +121,8 @@ namespace ew {
 
         nlohmann::json sample_json_locked() const;
 
+        nlohmann::json display_value_locked() const;
+
         nlohmann::json measurement_json(const Measurement &m) const;
 
         CalResult handle_calibration(const nlohmann::json &req, double t);
@@ -143,6 +145,7 @@ namespace ew {
         Characteristic char_; ///< Kennlinie
         std::optional<double> tare_g_; ///< Tara [g], std::nullopt = keine
         std::deque<double> gross_hist_; ///< gültige Bruttowerte für die Tara-Mittelung
+        std::deque<double> display_hist_; ///< gültige Bruttowerte für den Anzeigewert (ui.display_average)
         MeasurementEngine engine_; ///< Erkennung gültiger Messungen
         TemporaryStatistics stats_; ///< Statistik
         std::deque<Measurement> history_; ///< gehaltene Messungen

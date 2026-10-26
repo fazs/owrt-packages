@@ -14,7 +14,7 @@ set -eu
 
 EW_DIR=$(cd "$(dirname "$0")/.." && pwd)
 OPENWRT_DIR=${OPENWRT_DIR:-$EW_DIR/../../openwrt-sdk-25.12.6-mediatek-filogic_gcc-14.3.0_musl.Linux-x86_64}
-EW_TARGET=${EW_TARGET:-root@192.168.128.231}
+EW_TARGET=${EW_TARGET:-root@192.168.128.209}
 MAKEFILE=$EW_DIR/openwrt/ethercat-weigh/Makefile
 EW_VERBOSE=1
 step() { printf '\n\033[1m==> %s\033[0m\n' "$*"; }

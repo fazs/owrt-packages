@@ -92,6 +92,7 @@ constexpr std::array<std::string_view, 6> kMeasurementColumns = {
 /// Anzeige.
 struct UiConfig {
     uint32_t rate_hz = 20;              ///< Rate der sample-Nachrichten
+    uint32_t display_average = 10;      ///< gleitender Mittelwert des Anzeigewerts [Zyklen], 1 = aus
     std::string display_unit = "g";     ///< Vorgabe für die Anzeige: mg, g, kg, gr
     std::vector<std::string> hidden_columns; ///< ausgeblendete Spalten (kMeasurementColumns)
 };

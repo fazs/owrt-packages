@@ -62,6 +62,7 @@
       fields: [
         { k: 'display_unit', l: 'Vorgabe-Einheit', t: 'select', o: unitOptions, h: 'Gilt, solange im Browser keine Einheit gewählt wurde.' },
         { k: 'rate_hz', l: 'Aktualisierungsrate [Hz]', t: 'int' },
+        { k: 'display_average', l: 'Glättung des Anzeigewerts [Zyklen]', t: 'int', h: 'Gleitender Mittelwert über die letzten Zyklen; 1 = aus. Wirkt nur auf die Anzeige, nicht auf die Messungserkennung.' },
         {
           k: 'hidden_columns',
           l: 'Spalten der Messwerttabelle',

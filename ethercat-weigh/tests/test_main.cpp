@@ -323,6 +323,12 @@ TEST(config_validation_and_json) {
     cu.ui.hidden_columns.emplace_back("unknown");
     CHECK(!cu.validate().empty());
 
+    ew::Config cd;
+    cd.ui.display_average = 1U;  // ohne Glättung
+    CHECK(cd.validate().empty());
+    cd.ui.display_average = 0U;
+    CHECK(!cd.validate().empty());
+
     const nlohmann::json j = {{"measurement", {{"min_load", kJsonMinLoad}}}, {"unknown", 1}};
     const auto c2 = ew::config_from_json(j);
     CHECK_NEAR(c2.measurement.min_load, kJsonMinLoad, kEps);

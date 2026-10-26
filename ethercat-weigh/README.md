@@ -88,6 +88,8 @@ Intern wird in Gramm gerechnet. Alle Parameter (`measurement.*`), Messungen und 
 | `kg` | 1000 |
 | `gr` (Grain) | 0,06479891 (1 gr = 64,79891 mg, exakt) |
 
+Der große Anzeigewert ist ein gleitender Mittelwert über die letzten `ui.display_average` Zyklen (Default 10, 1 = aus; Feld `display` der `sample`-Nachricht). Trend, Messungserkennung, Tara und Kalibrierung verwenden die ungeglätteten Werte (`value`).
+
 Die Anzeigeeinheit wird im Kopf des Webinterfaces gewählt und im Browser gespeichert; ohne Auswahl gilt `ui.display_unit`. Der CSV-Export verwendet die gewählte Einheit (`/api/measurements.csv?unit=gr`).
 
 ## Kennlinie und Kalibrierung

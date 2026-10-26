@@ -31,6 +31,8 @@ constexpr uint32_t kHistorySizeMin = 1U;           ///< statistics.history_size
 constexpr uint32_t kHistorySizeMax = 100000U;
 constexpr uint32_t kRateHzMin = 1U;                ///< ui.rate_hz
 constexpr uint32_t kRateHzMax = 100U;
+constexpr uint32_t kDisplayAverageMin = 1U;        ///< ui.display_average (1 = ohne Glättung)
+constexpr uint32_t kDisplayAverageMax = 1000U;
 constexpr uint16_t kThreadsMin = 1U;               ///< http.threads
 constexpr uint16_t kThreadsMax = 8U;
 /// @}
@@ -75,7 +77,7 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(DeviceConfig,
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(MeasurementConfig,
     min_load, zero_threshold, stable_time_ms, tolerance, sigma_max, use_device_steady_state)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(StatisticsConfig, rolling_window, history_size)
-NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(UiConfig, rate_hz, display_unit, hidden_columns)
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(UiConfig, rate_hz, display_average, display_unit, hidden_columns)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(HttpConfig, bind, port, web_root, threads)
 
 /// @brief JSON-Darstellung eines Stützpunkts ({"raw", "mass_g"}).
@@ -213,6 +215,8 @@ std::vector<std::string> Config::validate() const {
         e.push_back(range_msg("statistics.history_size", kHistorySizeMin, kHistorySizeMax));
     if (ui.rate_hz < kRateHzMin || ui.rate_hz > kRateHzMax)
         e.push_back(range_msg("ui.rate_hz", kRateHzMin, kRateHzMax));
+    if (ui.display_average < kDisplayAverageMin || ui.display_average > kDisplayAverageMax)
+        e.push_back(range_msg("ui.display_average", kDisplayAverageMin, kDisplayAverageMax));
     if (!valid_unit(ui.display_unit)) e.emplace_back("ui.display_unit: mg, g, kg oder gr");
     for (const auto& col : ui.hidden_columns)
         if (std::find(kMeasurementColumns.begin(), kMeasurementColumns.end(), col) == kMeasurementColumns.end())

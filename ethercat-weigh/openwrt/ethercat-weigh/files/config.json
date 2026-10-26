@@ -53,6 +53,7 @@
     "rolling_window": 50
   },
   "ui": {
+    "display_average": 10,
     "display_unit": "g",
     "hidden_columns": [],
     "rate_hz": 20
