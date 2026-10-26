@@ -9,18 +9,18 @@
 namespace ew {
 
 namespace {
-constexpr double kPi = 3.14159265358979323846;  ///< Kreiszahl
-constexpr double kDecimalBase = 10.0;           ///< Basis für das Runden auf signifikante Stellen
-constexpr double kMassEqualKg = 1e-12;          ///< gleiche feste Masse: kein neues Einschwingen
-constexpr double kNoLoadSince = -1.0;           ///< Einschwingen beim nächsten Zyklus neu starten
-constexpr uint32_t kOdSubBits = 8U;             ///< Objektschlüssel: Subindex in Bit 0..7
-constexpr size_t kErrLen = 64U;                 ///< Puffer für Fehlermeldungen
+constexpr double kPi = 3.14159265358979323846;  ///< pi
+constexpr double kDecimalBase = 10.0;           ///< base for rounding to significant digits
+constexpr double kMassEqualKg = 1e-12;          ///< same fixed mass: no new settling
+constexpr double kNoLoadSince = -1.0;           ///< restart settling in the next cycle
+constexpr uint32_t kOdSubBits = 8U;             ///< object key: subindex in bits 0..7
+constexpr size_t kErrLen = 64U;                 ///< buffer for error messages
 
 /**
- * @brief Rundet auf signifikante Stellen.
- * @param v Wert
- * @param digits signifikante Stellen
- * @return gerundeter Wert
+ * @brief Rounds to significant digits.
+ * @param v value
+ * @param digits significant digits
+ * @return rounded value
  */
 double round_sig(double v, int digits) {
     if (v == 0.0) return 0.0;
@@ -29,11 +29,11 @@ double round_sig(double v, int digits) {
 }
 
 /**
- * @brief Einschwingen auf eine Last: gedämpfte Schwingung (SimBackend::kSettleFrequencyHz,
+ * @brief Settling to a load: damped oscillation (SimBackend::kSettleFrequencyHz,
  *        SimBackend::kSettleTauS).
- * @param target Endwert
- * @param tl Zeit seit Lastwechsel [s]
- * @return momentaner Wert
+ * @param target final value
+ * @param tl time since load change [s]
+ * @return momentary value
  */
 double settle(double target, double tl) {
     return target * (1.0 - std::exp(-tl / SimBackend::kSettleTauS) *
@@ -41,9 +41,9 @@ double settle(double target, double tl) {
 }
 
 /**
- * @brief Schlüssel eines Objekts im simulierten Objektverzeichnis.
- * @param index Objektindex
- * @param sub Subindex
+ * @brief Key of an object in the simulated object dictionary.
+ * @param index object index
+ * @param sub subindex
  * @return index << 8 | sub
  */
 uint32_t od_key(uint16_t index, uint8_t sub) {
@@ -52,21 +52,21 @@ uint32_t od_key(uint16_t index, uint8_t sub) {
 } // namespace
 
 /**
- * @brief Leitet den simulierten Sensor aus der Konfiguration ab.
+ * @brief Derives the simulated sensor from the configuration.
  *
- * - Kapazität = Nominal load (in calibration.device_unit)
- * - Kennwert/Nullpunkt = Nennwerte der Config mit kleiner Abweichung (kRatedDev, kZeroDev),
- *   damit eine Kalibrierung etwas zu korrigieren hat
- * - Nennwerte sind die Config-Werte gerundet (Rated output auf kRatedSigDigits signifikante
- *   Stellen, Zero balance auf kZeroStepRel des Rated output), damit eine in der Simulation
- *   gespeicherte Kalibrierung den Sensor nicht verschiebt
+ * - Capacity = nominal load (in calibration.device_unit)
+ * - Rated value/zero point = nominal values of the config with a small deviation (kRatedDev, kZeroDev),
+ *   so that a calibration has something to correct
+ * - Nominal values are the config values rounded (rated output to kRatedSigDigits significant
+ *   digits, zero balance to kZeroStepRel of the rated output), so that a calibration saved in
+ *   the simulation does not shift the sensor
  *
- * @param cfg Konfiguration
- * @return Sensorparameter
+ * @param cfg configuration
+ * @return sensor parameters
  */
 SimBackend::SimSensor SimBackend::sensor_for(const Config& cfg) {
     double rated = round_sig(cfg.device.rated_output_mv_v, kRatedSigDigits);
-    if (rated == 0.0) rated = kFallbackRatedMvV;  // ungültige Config: Simulation trotzdem lauffähig
+    if (rated == 0.0) rated = kFallbackRatedMvV;  // invalid config: simulation still runs
     const double zero_step = kZeroStepRel * std::fabs(rated);
     const double zero = std::round(cfg.device.zero_balance / zero_step) * zero_step;
     const double cap_g = to_grams(cfg.device.nominal_load, cfg.calibration.device_unit);
@@ -79,9 +79,9 @@ SimBackend::SimSensor SimBackend::sensor_for(const Config& cfg) {
 }
 
 /**
- * @brief Baut PDO-Katalog und Prozessabbild gemäß Default-Zuordnung auf;
- *        Sensor und Objektverzeichnis aus der Default-Konfiguration.
- * @param seed Startwert des Zufallsgenerators (reproduzierbare Tests)
+ * @brief Builds the PDO catalog and process image according to the default assignment;
+ *        sensor and object dictionary from the default configuration.
+ * @param seed seed of the random generator (reproducible tests)
  */
 SimBackend::SimBackend(unsigned seed) : rng_(seed), sensor_(sensor_for(Config{})) {
     build_image(DeviceConfig{});
@@ -90,8 +90,8 @@ SimBackend::SimBackend(unsigned seed) : rng_(seed), sensor_(sensor_for(Config{})
 }
 
 /**
- * @brief Baut PDO-Katalog, Lage der Ein- und Ausgänge und Prozessabbild auf.
- * @param dc Klemmenparameter (Variante, Filter; siehe el3356::pdo_assignment)
+ * @brief Builds the PDO catalog, position of the inputs and outputs and the process image.
+ * @param dc terminal parameters (variant, filter; see el3356::pdo_assignment)
  */
 void SimBackend::build_image(const DeviceConfig& dc) {
     using namespace el3356;
@@ -100,7 +100,7 @@ void SimBackend::build_image(const DeviceConfig& dc) {
     locate_pdos(pdos_, a.rx, a.tx);
     std::vector<std::vector<MapEntry>> rx, tx;
     uint32_t rx_bits = 0U, tx_bits = 0U;
-    // Mappings in Zuordnungsreihenfolge (wie 0x1C12/0x1C13)
+    // Mappings in assignment order (like 0x1C12/0x1C13)
     for (bool is_rx : {true, false})
         for (uint16_t idx : is_rx ? a.rx : a.tx)
             for (const auto& p : pdos_) {
@@ -119,23 +119,23 @@ void SimBackend::build_image(const DeviceConfig& dc) {
 }
 
 /**
- * @brief Übernimmt Sensor und Klemmenparameter aus der Config; bildet den PO2SO-Hook nach.
- * @param cfg Konfiguration
- * @param[out] err ungenutzt
- * @return immer true
+ * @brief Takes over sensor and terminal parameters from the config; emulates the PO2SO hook.
+ * @param cfg configuration
+ * @param[out] err unused
+ * @return always true
  */
 bool SimBackend::open(const Config& cfg, std::string& err) {
     sensor_ = sensor_for(cfg);
     phase_start_ = 0.0;
     target_ = load_dist_(rng_) * sensor_.capacity_kg;
     build_image(cfg.device);
-    // Wirkung des PO2SO-Hooks nachbilden
+    // Emulate the effect of the PO2SO hook
     for (const auto& w : el3356::init_sequence(cfg.device)) od_[od_key(w.index, w.sub)] = w.data;
     return write_device_config(cfg.device, err);
 }
 
 /**
- * @brief Übernimmt die Klemmenparameter; Gain und Tara der Klemme werden neutral gesetzt.
+ * @brief Takes over the terminal parameters; gain and tare of the terminal are set neutral.
  * @copydetails IoBackend::write_device_config
  */
 bool SimBackend::write_device_config(const DeviceConfig& dc, std::string&) {
@@ -159,9 +159,9 @@ bool SimBackend::set_sim_load(std::optional<double> grams) {
 }
 
 /**
- * @brief Aufgelegte Masse zum Zeitpunkt @p t (feste Masse oder Lastprofil, mit Einschwingen).
- * @param t Zeit seit Start [s]
- * @return Masse [kg]
+ * @brief Applied mass at time @p t (fixed mass or load profile, with settling).
+ * @param t time since start [s]
+ * @return mass [kg]
  */
 double SimBackend::mass_kg(double t) {
     if (fixed_kg_) {
@@ -179,9 +179,9 @@ double SimBackend::mass_kg(double t) {
 }
 
 /**
- * @brief Brückensignal des Sensors inkl. Rauschen (IIR8 dämpft um kIir8NoiseFactor).
- * @param mass Masse [kg]
- * @return Signal [mV/V]
+ * @brief Bridge signal of the sensor incl. noise (IIR8 attenuates by kIir8NoiseFactor).
+ * @param mass mass [kg]
+ * @return signal [mV/V]
  */
 double SimBackend::signal_mvv(double mass) {
     const double noise =
@@ -190,17 +190,17 @@ double SimBackend::signal_mvv(double mass) {
 }
 
 /**
- * @brief Prozessdatenzyklus: Value aus Signal und Klemmenparametern, Steady state und Overrange.
- * @param t Zeit seit Start [s]
- * @param ctrl Steuerbits (nur im Ausgangsabbild sichtbar, ohne Wirkung)
- * @param[out] out Sample
+ * @brief Process data cycle: Value from signal and terminal parameters, steady state and overrange.
+ * @param t time since start [s]
+ * @param ctrl control bits (only visible in the output image, without effect)
+ * @param[out] out sample
  */
 void SimBackend::cycle(double t, const El3356Control& ctrl, Sample& out) {
     last_signal_ = signal_mvv(mass_kg(t));
     const double load = (last_signal_ - zero_bal_) / rated_ * nominal_ * gain_ - tara_;
     const double v = load * scale_;
 
-    // Nachbildung Steady state: Wert seit kSteadyTimeS innerhalb ±kSteadyBandRel der Nennlast
+    // Emulation of steady state: value within ±kSteadyBandRel of the nominal load for kSteadyTimeS
     const double tol = kSteadyBandRel * nominal_ * scale_;
     if (std::fabs(v - steady_ref_) > tol) {
         steady_ref_ = v;
@@ -221,10 +221,10 @@ void SimBackend::cycle(double t, const El3356Control& ctrl, Sample& out) {
 }
 
 /**
- * @brief SDO-Schreibzugriff auf das simulierte Objektverzeichnis.
+ * @brief SDO write access to the simulated object dictionary.
  *
- * 0x8000 wirkt auf die Messung, 0xFB00:01 startet Kommandos; 0x6000, 0x16xx und 0x1Axx
- * sind nur lesbar, alle übrigen Objekte werden gespeichert.
+ * 0x8000 affects the measurement, 0xFB00:01 starts commands; 0x6000, 0x16xx and 0x1Axx
+ * are read-only, all other objects are stored.
  *
  * @copydetails IoBackend::sdo_write
  */
@@ -243,7 +243,7 @@ bool SimBackend::sdo_write(uint16_t index, uint8_t sub, const std::vector<uint8_
         case kSubScaleFactor: scale_ = f(); return true;
         case kSubReferenceLoad: reference_ = f(); return true;
         case kSubFilterMode0: filter_ = u16(); return true;
-        default: break;  // übrige Parameter ohne Wirkung in der Simulation
+        default: break;  // other parameters without effect in the simulation
         }
     }
     if (index == kObjCommand && sub == kSubCmdRequest) {
@@ -279,10 +279,10 @@ bool SimBackend::sdo_write(uint16_t index, uint8_t sub, const std::vector<uint8_
 }
 
 /**
- * @brief SDO-Lesezugriff auf das simulierte Objektverzeichnis.
+ * @brief SDO read access to the simulated object dictionary.
  *
- * 0xFB00:02 schließt laufende Kommandos nach kCmdBusyReads Abfragen ab; Mapping und
- * Eingänge kommen aus Katalog bzw. Prozessabbild, übrige Objekte aus dem Speicher.
+ * 0xFB00:02 completes running commands after kCmdBusyReads polls; mapping and
+ * inputs come from the catalog or the process image, other objects from the store.
  *
  * @copydetails IoBackend::sdo_read
  */
@@ -297,7 +297,7 @@ bool SimBackend::sdo_read(uint16_t index, uint8_t sub, size_t, std::vector<uint8
                 const double span = last_signal_ - zero_bal_;
                 rated_ = static_cast<float>(span * nominal_ / reference_);
             } else if (cmd_ == kCmdTareTemporary || cmd_ == kCmdTarePermanent) {
-                // Tara so, dass der aktuelle Wert 0 ergibt
+                // Tare such that the current value results in 0
                 tara_ = static_cast<float>((last_signal_ - zero_bal_) / rated_ * nominal_ * gain_);
             }
             cmd_status_ = kCmdStatusDone;
@@ -323,10 +323,10 @@ bool SimBackend::sdo_read(uint16_t index, uint8_t sub, size_t, std::vector<uint8
         return true;
     }
     if (index == kObjDiag && sub > kSubCount) {
-        d = {0U};  // keine Diagnose in der Simulation
+        d = {0U};  // no diagnostics in the simulation
         return true;
     }
-    // PDO-Mapping und Eingangsobjekte aus dem Katalog bzw. dem Prozessabbild
+    // PDO mapping and input objects from the catalog or the process image
     for (const auto& p : pdos_) {
         if (index == p.index) {
             if (sub == kSubCount) {

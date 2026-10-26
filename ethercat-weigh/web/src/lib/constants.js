@@ -1,31 +1,31 @@
 /**
- * @file Gemeinsame Konstanten des Frontends.
+ * @file Common constants of the frontend.
  *
- * Werte, die das Backend vorgibt (Defaults, Grenzen), stehen hier mit Verweis auf die Quelle;
- * sie werden nur verwendet, solange die Konfiguration noch nicht geladen ist.
+ * Values defined by the backend (defaults, limits) are listed here with a reference to the source;
+ * they are only used as long as the configuration has not been loaded yet.
  */
 
-/** Millisekunden je Sekunde. */
+/** Milliseconds per second. */
 export const MS_PER_S = 1000;
-/** Sekunden je Minute. */
+/** Seconds per minute. */
 export const S_PER_MIN = 60;
-/** Sekunden je Stunde. */
+/** Seconds per hour. */
 export const S_PER_H = 3600;
 
-/** Abfrage von /api/info [ms]. */
+/** Polling of /api/info [ms]. */
 export const INFO_REFRESH_MS = 5000;
-/** Anzeigedauer eines Hinweises [ms]. */
+/** Display duration of a notice [ms]. */
 export const NOTICE_MS = 4000;
-/** Zeit für den zweiten Klick bei Aktionen mit Bestätigung [ms]. */
+/** Time for the second click on actions with confirmation [ms]. */
 export const CONFIRM_MS = 3000;
-/** Abfrage der PDO-Werte im Debug-Dialog [ms]. */
+/** Polling of the PDO values in the debug dialog [ms]. */
 export const DEBUG_POLL_MS = 300;
 
-/** WebSocket: erste Wartezeit vor dem Wiederverbinden [ms]. */
+/** WebSocket: first waiting time before reconnecting [ms]. */
 export const WS_RETRY_MIN_MS = 1000;
-/** WebSocket: längste Wartezeit vor dem Wiederverbinden [ms]. */
+/** WebSocket: longest waiting time before reconnecting [ms]. */
 export const WS_RETRY_MAX_MS = 8000;
-/** WebSocket: Faktor, um den die Wartezeit nach jedem Fehlschlag wächst. */
+/** WebSocket: factor by which the waiting time grows after each failure. */
 export const WS_RETRY_FACTOR = 2;
 
 /** Default statistics.history_size (src/config.hpp). */
@@ -34,23 +34,23 @@ export const DEFAULT_HISTORY_SIZE = 500;
 export const DEFAULT_ROLLING_WINDOW = 50;
 /** Default calibration.stable_time_s (src/config.hpp). */
 export const DEFAULT_STABLE_TIME_S = 10;
-/** Messungen im Snapshot des Backends (kSnapshotMeasurements, src/acquisition.cpp). */
+/** Measurements in the snapshot of the backend (kSnapshotMeasurements, src/acquisition.cpp). */
 export const SNAPSHOT_MEASUREMENTS = 50;
-/** Zeilen der Messwerttabelle; auch Basis von „Im Bereich“ (Statistik) und der Verteilung. */
+/** Rows of the measurement table; also the basis of „Im Bereich“ (statistics) and the distribution. */
 export const VISIBLE_MEASUREMENTS = SNAPSHOT_MEASUREMENTS;
-/** Mindestanzahl Stützpunkte einer Kennlinie (kMinCalPoints, src/config.cpp). */
+/** Minimum number of calibration points of a characteristic (kMinCalPoints, src/config.cpp). */
 export const MIN_CAL_POINTS = 2;
-/** Kalibrierung in der Klemme: Referenzlast mindestens dieser Anteil der Nennlast (kMinReferenceRatio). */
+/** Calibration in the terminal: reference load at least this fraction of the nominal load (kMinReferenceRatio). */
 export const MIN_REFERENCE_RATIO = 0.2;
 
-/** Simulation: Vorbelegung der aufgelegten Masse als Anteil der Nennlast. */
+/** Simulation: preset of the applied mass as a fraction of the nominal load. */
 export const SIM_DEFAULT_LOAD_RATIO = 0.5;
-/** Prozentfaktor für Anzeigen. */
+/** Percent factor for displays. */
 export const PERCENT = 100;
 
 /**
- * Spalten der Messwerttabelle (Schlüssel wie kMeasurementColumns, src/config.hpp).
- * dir: Sortierrichtung beim ersten Klick.
+ * Columns of the measurement table (keys as kMeasurementColumns, src/config.hpp).
+ * dir: sort direction on the first click.
  * @type {ReadonlyArray<{key: string, label: string, dir: 'asc'|'desc'}>}
  */
 export const MEASUREMENT_COLUMNS = Object.freeze([

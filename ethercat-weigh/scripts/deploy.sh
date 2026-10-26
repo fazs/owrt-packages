@@ -1,15 +1,15 @@
 #!/bin/sh
-# Paket ethercat-weigh im OpenWrt-SDK bauen und auf dem Zielgerät installieren.
+# Build the ethercat-weigh package in the OpenWrt SDK and install it on the target device.
 #
-#   scripts/deploy.sh            Tests, Frontend, Feeds, Paket bauen, hochladen, installieren, prüfen
+#   scripts/deploy.sh            tests, frontend, feeds, build package, upload, install, verify
 #
-# Umgebung:
-#   OPENWRT_DIR   SDK-/Build-Verzeichnis (Default: ../../openwrt-sdk-25.12.6-mediatek-filogic_...
-#                 relativ zu ethercat-weigh/, d. h. neben owrt-packages)
-#   EW_TARGET     SSH-Ziel (Default: root@waage)
-#   EW_VERBOSE=1  make mit V=s
-#   EW_FEEDS_ALL=1  alle Feeds aktualisieren (Default: nur fazs)
-#   EW_NO_TESTS=1   Host-Build mit Unit-Tests überspringen
+# Environment:
+#   OPENWRT_DIR   SDK/build directory (default: ../../openwrt-sdk-25.12.6-mediatek-filogic_...
+#                 relative to ethercat-weigh/, i.e. next to owrt-packages)
+#   EW_TARGET     SSH target (default: root@waage)
+#   EW_VERBOSE=1  make with V=s
+#   EW_FEEDS_ALL=1  update all feeds (default: only fazs)
+#   EW_NO_TESTS=1   skip the host build with unit tests
 set -eu
 
 EW_DIR=$(cd "$(dirname "$0")/.." && pwd)
@@ -49,7 +49,7 @@ step "Pakete des Feeds fazs installieren"
 make defconfig >/dev/null
 
 step "Paket bauen"
-# Änderungen in src/ und web/ erkennt das SDK nicht (nur den Paketordner): immer neu vorbereiten
+# The SDK does not detect changes in src/ and web/ (only the package folder): always prepare again
 make package/ethercat-weigh/clean >/dev/null
 make -j"$(nproc)" package/ethercat-weigh/compile ${EW_VERBOSE:+V=s}
 
@@ -60,14 +60,14 @@ step "Hochladen: $apk"
 scp "$apk" "$EW_TARGET:/root/"
 
 step "Installieren auf $EW_TARGET"
-# Lokal gebautes Paket ist nicht signiert -> --allow-untrusted
+# A locally built package is not signed -> --allow-untrusted
 ssh "$EW_TARGET" "set -e
   /etc/init.d/ethercat-weigh stop || true
   apk add --allow-untrusted /root/$pkg
   /etc/init.d/ethercat-weigh start"
 
 step "Dienst prüfen"
-# Läuft der Prozess nach einigen Sekunden noch mit derselben PID (kein Respawn) und antwortet die API?
+# Is the process still running with the same PID after a few seconds (no respawn) and does the API respond?
 ssh "$EW_TARGET" 'sleep 3; p1=$(pidof ethercat-weigh); sleep 3; p2=$(pidof ethercat-weigh)
   if [ -z "$p1" ] || [ "$p1" != "$p2" ]; then
     echo "ethercat-weigh läuft nicht stabil (PID \"$p1\" -> \"$p2\")" >&2

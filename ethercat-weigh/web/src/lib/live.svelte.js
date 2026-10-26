@@ -1,5 +1,5 @@
 /**
- * @file Verbindung zum Backend: WebSocket /ws (Live-Daten) + REST /api (Kommandos, Config).
+ * @file Connection to the backend: WebSocket /ws (live data) + REST /api (commands, config).
  */
 
 import {
@@ -12,29 +12,29 @@ import {
 } from './constants.js';
 import { toG } from './format.js';
 
-/** Länge des Verlaufs [s]. */
+/** Length of the trend [s]. */
 export const TREND_SECONDS = 30;
 
-/** Reaktiver Zustand der Anwendung (Svelte 5 `$state`). */
+/** Reactive state of the application (Svelte 5 `$state`). */
 export const live = $state({
   connected: false,
   sample: null,
   config: null,
-  description: null, // Gerätebeschreibung der Klemme (/api/device/description)
+  description: null, // device description of the terminal (/api/device/description)
   info: null,
   statistics: null,
   measurements: [],
   restartRequired: false,
-  lastCapture: null, // {id, at} für die Erfassungsanimation
+  lastCapture: null, // {id, at} for the capture animation
   notice: null, // {kind: 'ok'|'error', text}
-  calibration: null, // Status des Kalibrierablaufs
-  unit: readUnit(), // Anzeigeeinheit (lokal gespeichert), sonst config.ui.display_unit
-  limits: { lo: null, hi: null }, // Grenzen der Verteilung [g], null = offen; nur bis zum Neuladen
+  calibration: null, // state of the calibration sequence
+  unit: readUnit(), // display unit (stored locally), otherwise config.ui.display_unit
+  limits: { lo: null, hi: null }, // limits of the distribution [g], null = open; only until reload
 });
 
 /**
- * Liest die im Browser gespeicherte Anzeigeeinheit.
- * @returns {string|null} Einheit oder null (nicht gesetzt bzw. Speicher nicht verfügbar)
+ * Reads the display unit stored in the browser.
+ * @returns {string|null} unit or null (not set or storage not available)
  */
 function readUnit() {
   try {
@@ -45,30 +45,30 @@ function readUnit() {
 }
 
 /**
- * Setzt die Anzeigeeinheit und speichert sie im Browser.
- * @param {string} u Einheit ("mg", "g", "kg", "gr")
+ * Sets the display unit and stores it in the browser.
+ * @param {string} u unit ("mg", "g", "kg", "gr")
  */
 export function setUnit(u) {
   live.unit = u;
   try {
     localStorage.setItem('ew.unit', u);
   } catch {
-    /* Anzeigeeinheit gilt dann nur bis zum Neuladen */
+    /* the display unit then only applies until reload */
   }
 }
 
 /**
- * Setzt die Grenzen der Verteilung (gelten bis zum Neuladen der Seite).
- * @param {number|null} lo linke Grenze [g], null = offen
- * @param {number|null} hi rechte Grenze [g], null = offen
+ * Sets the limits of the distribution (apply until the page is reloaded).
+ * @param {number|null} lo left limit [g], null = open
+ * @param {number|null} hi right limit [g], null = open
  */
 export function setLimits(lo, hi) {
   live.limits = { lo, hi };
 }
 
 /**
- * Prüft, ob ein Wert außerhalb der Grenzen liegt (die Grenzen selbst gehören dazu).
- * @param {number} grams Wert [g]
+ * Checks whether a value lies outside the limits (the limits themselves belong to it).
+ * @param {number} grams value [g]
  * @returns {boolean}
  */
 export function outsideLimits(grams) {
@@ -77,19 +77,19 @@ export function outsideLimits(grams) {
 }
 
 /**
- * Wirksame Anzeigeeinheit: Browser, sonst config.ui.display_unit, sonst g.
- * @returns {string} Einheit
+ * Effective display unit: browser, otherwise config.ui.display_unit, otherwise g.
+ * @returns {string} unit
  */
 export function displayUnit() {
   return live.unit ?? live.config?.ui?.display_unit ?? 'g';
 }
 
 /**
- * Trenddaten (Zeit [s], Nettowert [g] bzw. null bei ungültigem Wert); bewusst nicht
- * tief reaktiv (Performance), Änderungen signalisiert {@link trendTick}.
+ * Trend data (time [s], net value [g] or null for an invalid value); deliberately not
+ * deeply reactive (performance), changes are signaled by {@link trendTick}.
  */
 export const trend = { t: [], v: [] };
-/** Zähler, der bei jeder Änderung von {@link trend} erhöht wird. */
+/** Counter that is incremented on every change of {@link trend}. */
 export const trendTick = $state({ version: 0 });
 
 let ws = null;
@@ -97,9 +97,9 @@ let retryMs = WS_RETRY_MIN_MS;
 let noticeTimer = null;
 
 /**
- * Zeigt einen Hinweis für NOTICE_MS an.
- * @param {'ok'|'error'} kind Art
- * @param {string} text Text
+ * Shows a notice for NOTICE_MS.
+ * @param {'ok'|'error'} kind kind
+ * @param {string} text text
  */
 export function notify(kind, text) {
   live.notice = { kind, text };
@@ -108,9 +108,9 @@ export function notify(kind, text) {
 }
 
 /**
- * Hängt einen Wert an den Verlauf an und verwirft Werte älter als TREND_SECONDS.
- * @param {number} t Zeit [s]
- * @param {number|null} v Nettowert [g], null bei ungültigem Wert
+ * Appends a value to the trend and discards values older than TREND_SECONDS.
+ * @param {number} t time [s]
+ * @param {number|null} v net value [g], null for an invalid value
  */
 function pushTrend(t, v) {
   trend.t.push(t);
@@ -125,14 +125,14 @@ function pushTrend(t, v) {
   trendVersion();
 }
 
-/** Signalisiert eine Änderung des Verlaufs. */
+/** Signals a change of the trend. */
 function trendVersion() {
   trendTick.version++;
 }
 
 /**
- * Übernimmt einen vollständigen Zustand (init-Nachricht bzw. /api/state).
- * @param {object} s Snapshot: sample, statistics, measurements, info
+ * Takes over a complete state (init message or /api/state).
+ * @param {object} s snapshot: sample, statistics, measurements, info
  */
 function applySnapshot(s) {
   live.sample = s.sample;
@@ -144,34 +144,34 @@ function applySnapshot(s) {
 }
 
 /**
- * Anzahl der im Backend gehaltenen Messungen; der Snapshot enthält nur die letzten SNAPSHOT_MEASUREMENTS.
+ * Number of measurements held in the backend; the snapshot contains only the last SNAPSHOT_MEASUREMENTS.
  * @returns {number}
  */
 const historySize = () => live.config?.statistics?.history_size ?? DEFAULT_HISTORY_SIZE;
 
-/** Lädt alle gehaltenen Messungen über /api/measurements (neueste zuerst). */
+/** Loads all held measurements via /api/measurements (newest first). */
 async function loadMeasurements() {
   try {
     const r = await fetch('/api/measurements');
     if (r.ok) live.measurements = (await r.json()).reverse().slice(0, historySize());
   } catch {
-    /* Snapshot bleibt als Grundlage */
+    /* the snapshot remains as the basis */
   }
 }
 
-/** Lädt die Gerätebeschreibung der Klemme (einmal je Seitenaufruf). */
+/** Loads the device description of the terminal (once per page load). */
 async function loadDescription() {
   try {
     const r = await fetch('/api/device/description');
     if (r.ok) live.description = await r.json();
   } catch {
-    /* erneuter Versuch beim nächsten Verbindungsaufbau */
+    /* retry on the next connection */
   }
 }
 
 /**
- * Verarbeitet eine WebSocket-Nachricht.
- * @param {{type: string}} msg Nachricht (init, sample, measurement, measurement_deleted, ...)
+ * Processes a WebSocket message.
+ * @param {{type: string}} msg message (init, sample, measurement, measurement_deleted, ...)
  */
 function handle(msg) {
   switch (msg.type) {
@@ -223,7 +223,7 @@ function handle(msg) {
   }
 }
 
-/** Verbindet den WebSocket; bei Abbruch Wiederverbindung mit wachsendem Abstand (bis WS_RETRY_MAX_MS). */
+/** Connects the WebSocket; on abort, reconnects with a growing interval (up to WS_RETRY_MAX_MS). */
 export function connect() {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   ws = new WebSocket(`${proto}//${location.host}/ws`);
@@ -246,22 +246,22 @@ export function connect() {
   ws.onerror = () => ws.close();
 }
 
-/** Aktualisiert live.info über /api/info. */
+/** Updates live.info via /api/info. */
 export async function refreshInfo() {
   try {
     const r = await fetch('/api/info');
     if (r.ok) live.info = await r.json();
   } catch {
-    /* Verbindung wird über den WebSocket-Status angezeigt */
+    /* the connection is indicated via the WebSocket state */
   }
 }
 
 /**
- * POST mit optionalem JSON-Körper.
- * @param {string} path Pfad
- * @param {object} [body] Körper
- * @returns {Promise<object>} Antwort
- * @throws {Error} bei HTTP-Fehler oder `ok: false`
+ * POST with an optional JSON body.
+ * @param {string} path path
+ * @param {object} [body] body
+ * @returns {Promise<object>} response
+ * @throws {Error} on HTTP error or `ok: false`
  */
 async function post(path, body) {
   const r = await fetch(path, {
@@ -273,13 +273,13 @@ async function post(path, body) {
   try {
     j = await r.json();
   } catch {
-    /* leere Antwort */
+    /* empty response */
   }
   if (!r.ok || j.ok === false) throw new Error(j.error || `HTTP ${r.status}`);
   return j;
 }
 
-/** Setzt Tara; Ergebnis als Hinweis. */
+/** Sets the tare; result as a notice. */
 export async function tare() {
   try {
     await post('/api/tare');
@@ -289,7 +289,7 @@ export async function tare() {
   }
 }
 
-/** Löscht Tara; Ergebnis als Hinweis. */
+/** Clears the tare; result as a notice. */
 export async function clearTare() {
   try {
     await post('/api/tare/clear');
@@ -300,9 +300,9 @@ export async function clearTare() {
 }
 
 /**
- * Sendet ein Kalibrierkommando; Fehler als Hinweis.
- * @param {{action: string}} body Kommando (siehe README)
- * @returns {Promise<boolean>} true bei Erfolg
+ * Sends a calibration command; errors as a notice.
+ * @param {{action: string}} body command (see README)
+ * @returns {Promise<boolean>} true on success
  */
 export async function calibrate(body) {
   try {
@@ -315,8 +315,8 @@ export async function calibrate(body) {
 }
 
 /**
- * Nur Simulation: aufgelegte Masse vorgeben.
- * @param {number|null} grams Masse [g], null = automatisches Lastprofil
+ * Simulation only: set the applied mass.
+ * @param {number|null} grams mass [g], null = automatic load profile
  */
 export async function simLoad(grams) {
   try {
@@ -327,8 +327,8 @@ export async function simLoad(grams) {
 }
 
 /**
- * Vorbelegung der simulierten Masse: SIM_DEFAULT_LOAD_RATIO der Nennlast der Klemme.
- * @returns {number|null} Masse [g] oder null, solange die Konfiguration fehlt
+ * Preset of the simulated mass: SIM_DEFAULT_LOAD_RATIO of the nominal load of the terminal.
+ * @returns {number|null} mass [g] or null as long as the configuration is missing
  */
 export function simDefaultGrams() {
   const dev = live.config?.device;
@@ -337,10 +337,10 @@ export function simDefaultGrams() {
 }
 
 /**
- * GET mit JSON-Antwort.
- * @param {string} path Pfad
- * @returns {Promise<object>} Antwort
- * @throws {Error} bei HTTP-Fehler oder `ok: false`
+ * GET with a JSON response.
+ * @param {string} path path
+ * @returns {Promise<object>} response
+ * @throws {Error} on HTTP error or `ok: false`
  */
 async function getJson(path) {
   const r = await fetch(path);
@@ -348,13 +348,13 @@ async function getJson(path) {
   try {
     j = await r.json();
   } catch {
-    /* leere Antwort */
+    /* empty response */
   }
   if (!r.ok || j.ok === false) throw new Error(j.error || `HTTP ${r.status}`);
   return j;
 }
 
-/** Debug-Dialog: PDOs, Übersteuerung der Steuerbits, SDO-Zugriff, Initialisierungssequenz. */
+/** Debug dialog: PDOs, override of the control bits, SDO access, initialization sequence. */
 export const debugApi = {
   pdos: () => getJson('/api/debug/pdos'),
   init: () => getJson('/api/debug/init'),
@@ -366,8 +366,8 @@ export const debugApi = {
 };
 
 /**
- * Löscht eine gehaltene Messung; Ergebnis als Hinweis.
- * @param {number} id Nummer der Messung
+ * Deletes a held measurement; result as a notice.
+ * @param {number} id number of the measurement
  */
 export async function deleteMeasurement(id) {
   try {
@@ -380,7 +380,7 @@ export async function deleteMeasurement(id) {
   }
 }
 
-/** Setzt die Statistik zurück und löscht alle Messungen; Ergebnis als Hinweis. */
+/** Resets the statistics and deletes all measurements; result as a notice. */
 export async function resetStatistics() {
   try {
     await post('/api/statistics/reset');
@@ -391,8 +391,8 @@ export async function resetStatistics() {
 }
 
 /**
- * Speichert die Konfiguration.
- * @param {object} cfg vollständige Konfiguration
+ * Saves the configuration.
+ * @param {object} cfg complete configuration
  * @returns {Promise<{ok: boolean, errors?: string[], restart_required?: boolean}>}
  */
 export async function saveConfig(cfg) {

@@ -11,15 +11,15 @@
 namespace ew {
 
 namespace {
-constexpr int kCsvPrecision = 9;          ///< signifikante Stellen im Export
-constexpr char kAltSeparator = ',';       ///< Trennzeichen fremder CSV-Dateien (dann Dezimalpunkt)
-constexpr const char* kUtf8Bom = "\xEF\xBB\xBF";  ///< Byte Order Mark am Dateianfang
+constexpr int kCsvPrecision = 9;          ///< significant digits in the export
+constexpr char kAltSeparator = ',';       ///< separator of foreign CSV files (then decimal point)
+constexpr const char* kUtf8Bom = "\xEF\xBB\xBF";  ///< byte order mark at the start of the file
 
 /**
- * @brief Teilt eine Zeile am Trennzeichen.
- * @param line Zeile ohne Zeilenende
- * @param sep Trennzeichen
- * @return Felder ohne umgebende Leerzeichen
+ * @brief Splits a line at the separator.
+ * @param line line without line ending
+ * @param sep separator
+ * @return fields without surrounding spaces
  */
 std::vector<std::string> split(const std::string& line, char sep) {
     std::vector<std::string> out;
@@ -35,10 +35,10 @@ std::vector<std::string> split(const std::string& line, char sep) {
 }
 
 /**
- * @brief Liest eine Zahl; bei Semikolon als Trennzeichen auch mit Dezimalkomma.
- * @param s Feld
- * @param sep Trennzeichen der Datei
- * @return Wert, std::nullopt bei leerem oder ungültigem Feld
+ * @brief Reads a number; with semicolon as separator also with decimal comma.
+ * @param s field
+ * @param sep separator of the file
+ * @return value, std::nullopt for an empty or invalid field
  */
 std::optional<double> parse_num(std::string s, char sep) {
     if (sep == kCsvSeparator) std::replace(s.begin(), s.end(), ',', '.');
@@ -49,21 +49,21 @@ std::optional<double> parse_num(std::string s, char sep) {
     return v;
 }
 
-/// Spaltenpositionen einer Datei; std::nullopt = Spalte fehlt.
+/// Column positions of a file; std::nullopt = column missing.
 struct Columns {
     std::optional<size_t> t;       ///< t_s
-    std::optional<size_t> value;   ///< value_<u> bzw. einzige Spalte
+    std::optional<size_t> value;   ///< value_<u> or the only column
     std::optional<size_t> stddev;  ///< stddev_<u>
     std::optional<size_t> range;   ///< range_<u>
     std::optional<size_t> settle;  ///< settle_ms
-    std::string unit = "g";        ///< Einheit der Massenspalten
+    std::string unit = "g";        ///< unit of the mass columns
 };
 
 /**
- * @brief Ordnet die Spalten anhand der Kopfzeile zu.
- * @param head Felder der Kopfzeile
- * @return Spaltenpositionen
- * @throws std::runtime_error ohne Spalte value_<u> oder bei unbekannter Einheit
+ * @brief Assigns the columns based on the header line.
+ * @param head fields of the header line
+ * @return column positions
+ * @throws std::runtime_error without column value_<u> or for an unknown unit
  */
 Columns columns_from_header(const std::vector<std::string>& head) {
     Columns c;
@@ -91,9 +91,9 @@ Columns columns_from_header(const std::vector<std::string>& head) {
 } // namespace
 
 /**
- * @brief Kopfzeile des CSV-Exports.
- * @param unit Einheit der Massenspalten
- * @return Zeile inkl. Zeilenende
+ * @brief Header line of the CSV export.
+ * @param unit unit of the mass columns
+ * @return line incl. line ending
  */
 std::string measurements_csv_header(const std::string& unit) {
     std::ostringstream os;
@@ -104,10 +104,10 @@ std::string measurements_csv_header(const std::string& unit) {
 }
 
 /**
- * @brief Eine Zeile des CSV-Exports.
- * @param m Messung (Massen in Gramm)
- * @param unit Einheit der Massenspalten
- * @return Zeile inkl. Zeilenende
+ * @brief One line of the CSV export.
+ * @param m measurement (masses in grams)
+ * @param unit unit of the mass columns
+ * @return line incl. line ending
  */
 std::string measurement_csv_row(const Measurement& m, const std::string& unit) {
     std::ostringstream os;
@@ -120,19 +120,19 @@ std::string measurement_csv_row(const Measurement& m, const std::string& unit) {
 }
 
 /**
- * @brief Liest Messungen aus einer CSV-Datei.
+ * @brief Reads measurements from a CSV file.
  *
- * - Format des Exports (Kopfzeile, Trennzeichen ';', Dezimalpunkt oder -komma); Spalten werden
- *   über die Kopfzeile gefunden, nur value_<u> ist Pflicht, die Reihenfolge ist beliebig.
- * - Trennzeichen ',' (dann nur Dezimalpunkt).
- * - Ohne Kopfzeile: ein Wert in Gramm je Zeile.
+ * - Export format (header line, separator ';', decimal point or comma); columns are
+ *   found via the header line, only value_<u> is mandatory, the order is arbitrary.
+ * - Separator ',' (then decimal point only).
+ * - Without header line: one value in grams per line.
  *
- * Leere Zeilen werden übersprungen; id und n werden nicht übernommen (n bleibt 0). Massen werden in Gramm umgerechnet.
+ * Empty lines are skipped; id and n are not taken over (n stays 0). Masses are converted to grams.
  *
- * @param in Eingabe
- * @return Messungen in Dateireihenfolge
- * @throws std::runtime_error bei fehlender Wertspalte, unbekannter Einheit oder ungültiger Zahl
- *         (mit Zeilennummer)
+ * @param in input
+ * @return measurements in file order
+ * @throws std::runtime_error for a missing value column, unknown unit or invalid number
+ *         (with line number)
  */
 std::vector<Measurement> parse_measurements_csv(std::istream& in) {
     std::vector<Measurement> out;
@@ -149,7 +149,7 @@ std::vector<Measurement> parse_measurements_csv(std::istream& in) {
         if (!cols) {
             const auto first = split(line, kCsvSeparator);
             if (first.size() == 1 && parse_num(first.front(), kCsvSeparator)) {
-                cols = Columns{};  // keine Kopfzeile: einzige Spalte = Wert in Gramm (auch "12,5")
+                cols = Columns{};  // no header line: only column = value in grams (also "12,5")
                 cols->value = 0U;
             } else {
                 if (line.find(kCsvSeparator) == std::string::npos && line.find(kAltSeparator) != std::string::npos)

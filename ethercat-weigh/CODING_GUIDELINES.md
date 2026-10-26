@@ -83,5 +83,5 @@ Ausnahmen, die als Literal stehen bleiben dürfen:
 - Keine Verdeckung von Namen: Ein Bezeichner in einem inneren Gültigkeitsbereich darf keinen
   gleichnamigen aus einem äußeren verdecken (MISRA C:2012 Rule 5.3). Der Compiler prüft das mit
   `-Wshadow` (in `CMakeLists.txt` für alle eigenen Ziele aktiv).
-- Sprache von Kommentaren, Meldungen und Dokumentation: Deutsch; Bezeichner und Namen aus der
+- Sprache von Meldungen und Dokumentation: Deutsch; Code und Kommentare: Englisch; Bezeichner und Namen aus der
   Spezifikation (ESI) im Original.

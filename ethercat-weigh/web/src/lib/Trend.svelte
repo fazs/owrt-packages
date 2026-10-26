@@ -4,26 +4,26 @@
   import { live, trend, trendTick, TREND_SECONDS, displayUnit } from './live.svelte.js';
   import { fromG } from './format.js';
 
-  /** Abstand der senkrechten Rasterlinien [s] */
+  /** Spacing of the vertical grid lines [s] */
   const GRID_STEP_S = 5;
-  /** Strichlänge der Schwellenlinien [px, logisch] */
+  /** Dash length of the threshold lines [px, logical] */
   const DASH_PX = 5;
-  /** Radius der Markierung erfasster Messungen [px, logisch] */
+  /** Radius of the marker of captured measurements [px, logical] */
   const MARKER_RADIUS_PX = 5;
-  /** Luft über und unter der Kurve (Anteil des Wertebereichs) bzw. mindestens [Anzeigeeinheit] */
+  /** Margin above and below the curve (fraction of the value range) or at least [display unit] */
   const Y_PAD_REL = 0.08;
   const Y_PAD_MIN = 0.1;
-  /** Breite der y-Achse [px] */
+  /** Width of the y axis [px] */
   const Y_AXIS_SIZE = 56;
-  /** Linienbreite der Kurve [px] */
+  /** Line width of the curve [px] */
   const LINE_WIDTH = 1.5;
 
   let el;
   let plot = null;
-  let tNow = 0; // Zeitstempel des neuesten Werts; x-Achse relativ dazu (-TREND_SECONDS .. 0)
+  let tNow = 0; // timestamp of the newest value; x axis relative to it (-TREND_SECONDS .. 0)
 
   /**
-   * Festes Raster: Teilstriche alle GRID_STEP_S, unabhängig vom Zeitfortschritt.
+   * Fixed grid: ticks every GRID_STEP_S, independent of the time progress.
    * @returns {number[]} -TREND_SECONDS .. 0
    */
   const xSplits = () =>
@@ -32,7 +32,7 @@
   const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 
   /**
-   * uPlot-Hook: zeichnet Schwellen und erfasste Messungen direkt auf die Zeichenfläche.
+   * uPlot hook: draws thresholds and captured measurements directly onto the canvas.
    * @param {uPlot} u Plot
    */
   function drawOverlay(u) {
@@ -71,7 +71,7 @@
     ctx.restore();
   }
 
-  /** Erzeugt den Plot neu (Start und Wechsel des Farbschemas). */
+  /** Recreates the plot (start and change of the color scheme). */
   function build() {
     const ink = css('--muted');
     const grid = css('--line');
@@ -131,9 +131,9 @@
   });
 
   /**
-   * Plotdaten: Trend in Gramm gespeichert, Darstellung in der Anzeigeeinheit,
-   * Zeit relativ zum neuesten Wert.
-   * @returns {[number[], (number|null)[]]} [Zeit [s], Wert]
+   * Plot data: trend stored in grams, displayed in the display unit,
+   * time relative to the newest value.
+   * @returns {[number[], (number|null)[]]} [time [s], value]
    */
   function data() {
     const u = displayUnit();
@@ -142,8 +142,8 @@
   }
 
   $effect(() => {
-    trendTick.version; // Abhängigkeit
-    displayUnit(); // Abhängigkeit
+    trendTick.version; // dependency
+    displayUnit(); // dependency
     plot?.setData(data());
   });
 </script>
@@ -164,7 +164,7 @@
   h2 .unit {
     font-weight: 450;
   }
-  /* wächst mit der verfügbaren Höhe (App.svelte), mindestens min-height */
+  /* grows with the available height (App.svelte), at least min-height */
   section {
     flex: 1 1 auto;
     display: flex;
@@ -173,7 +173,7 @@
   .plot {
     flex: 1 1 0;
     min-height: 240px;
-    overflow: hidden; /* uPlot folgt der Größe über den ResizeObserver, darf sie aber nicht bestimmen */
+    overflow: hidden; /* uPlot follows the size via the ResizeObserver, but must not determine it */
     width: 100%;
   }
   .legend {

@@ -29,10 +29,10 @@
   const isSim = $derived(live.info?.backend === 'simulation');
   const hasTare = $derived(live.sample?.tare != null);
 
-  /** Nachkommastellen der Zykluszeit in der Fußzeile */
+  /** Decimal places of the cycle time in the footer */
   const CYCLE_MS_DECIMALS = 2;
 
-  let simGrams = $state(null); // Vorbelegung aus der Nennlast, sobald die Konfiguration da ist
+  let simGrams = $state(null); // preset from the nominal load as soon as the configuration is available
   $effect(() => {
     if (simGrams === null && live.config) simGrams = simDefaultGrams();
   });
@@ -162,7 +162,7 @@
     border-bottom: 1px solid var(--line);
     background: var(--panel);
   }
-  /* nimmt den Platz neben den Buttons; die Statusbits passen sich an, statt umzubrechen */
+  /* takes the space next to the buttons; the status bits adapt instead of wrapping */
   .title {
     display: flex;
     align-items: baseline;
@@ -227,7 +227,7 @@
     background: var(--ink);
     color: var(--panel);
   }
-  /* aktive Tara: invertiert wie die gewählte Einheit */
+  /* active tare: inverted like the selected unit */
   .actions button.primary.on {
     background: var(--ink);
     border-color: var(--ink);
@@ -250,12 +250,12 @@
     grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr);
     gap: 1rem;
     padding: 1rem clamp(0.75rem, 3vw, 1.75rem);
-    width: 100%; /* als Flex-Element von #app sonst nur so breit wie der Inhalt */
+    width: 100%; /* as a flex item of #app otherwise only as wide as its content */
     max-width: 1480px;
     margin: 0 auto;
   }
-  /* zweispaltig: restliche Bildschirmhöhe füllen; Verlauf und Verteilung wachsen mit,
-     reicht die Höhe nicht, ragt die Fußzeile über den Rand */
+  /* two columns: fill the remaining screen height; trend and distribution grow with it,
+     if the height is not sufficient, the footer extends beyond the edge */
   @media (min-width: 961px) {
     main {
       flex: 1 0 auto;

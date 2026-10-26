@@ -1,4 +1,4 @@
-"""Gemeinsame Hilfsfunktionen für die ESI-Skripte (esi_regions.py, esi_gen.py)."""
+"""Common helper functions for the ESI scripts (esi_regions.py, esi_gen.py)."""
 
 import re
 
@@ -6,10 +6,10 @@ ENC_RE = re.compile(r'''encoding\s*=\s*["']([^"']+)["']''')
 
 
 def decode(raw: bytes) -> str:
-    """Dekodiert gemäß XML-Deklaration (Default UTF-8).
+    """Decodes according to the XML declaration (default UTF-8).
 
-    @param raw Dateiinhalt
-    @return Text ohne BOM
+    @param raw file content
+    @return text without BOM
     """
     head = raw[:200].decode('ascii', errors='replace')
     m = ENC_RE.search(head.split('?>', 1)[0])
@@ -18,11 +18,11 @@ def decode(raw: bytes) -> str:
 
 
 def matches_type(dev_type: str, wanted: str) -> bool:
-    """Prüft, ob ein Gerät zum Filter gehört (exakt oder Variante mit "-").
+    """Checks whether a device matches the filter (exact or variant with "-").
 
-    @param dev_type Inhalt von Device/Type, z. B. "EL3356-0010"
-    @param wanted Filter, z. B. "EL3356"
-    @return True für "EL3356" und "EL3356-xxxx", nicht für "EL33561"
+    @param dev_type content of Device/Type, e.g. "EL3356-0010"
+    @param wanted filter, e.g. "EL3356"
+    @return True for "EL3356" and "EL3356-xxxx", not for "EL33561"
     """
     a, b = dev_type.upper(), wanted.upper()
     return a == b or a.startswith(b + '-')

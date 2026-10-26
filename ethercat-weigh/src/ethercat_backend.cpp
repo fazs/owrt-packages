@@ -13,30 +13,30 @@ namespace ew {
 
 namespace {
 
-/// Kontext für den PRE-OP -> SAFE-OP Hook (SOEM ruft eine freie Funktion auf)
+/// Context for the PRE-OP -> SAFE-OP hook (SOEM calls a free function)
 const Config* g_cfg = nullptr;
-/// Revision der Klemme für die Gerätebeschreibung (0 = neueste), für den PO2SO-Hook
+/// Revision of the terminal for the device description (0 = latest), for the PO2SO hook
 uint32_t g_revision = 0U;
 
-constexpr uint16_t kStateMask = 0x0FU;     ///< Zustandsbits ohne EC_STATE_ERROR (ETG.1000.6 AL-Status)
-constexpr int kSafeOpTimeoutFactor = 4;    ///< Wartezeit auf SAFE-OP: Vielfaches von EC_TIMEOUTSTATE
-/// WKC-Beitrag je Ausgangs-Slave: LRW zählt Schreiben und Lesen (SOEM simple_test)
+constexpr uint16_t kStateMask = 0x0FU;     ///< state bits without EC_STATE_ERROR (ETG.1000.6 AL status)
+constexpr int kSafeOpTimeoutFactor = 4;    ///< waiting time for SAFE-OP: multiple of EC_TIMEOUTSTATE
+/// WKC contribution per output slave: LRW counts write and read (SOEM simple_test)
 constexpr int kOutputWkcFactor = 2;
-constexpr int kOpRetries = 200;            ///< Versuche bis OP (je ein Prozessdatenzyklus)
-constexpr int kOpCheckTimeoutUs = 50000;   ///< Wartezeit je Zustandsprüfung auf OP [µs]
-constexpr double kCheckIntervalS = 0.5;    ///< Mindestabstand der Zustandsprüfungen bei WKC-Fehlern [s]
+constexpr int kOpRetries = 200;            ///< attempts until OP (one process data cycle each)
+constexpr int kOpCheckTimeoutUs = 50000;   ///< waiting time per state check for OP [µs]
+constexpr double kCheckIntervalS = 0.5;    ///< minimum interval of the state checks on WKC errors [s]
 constexpr int kRecoverTimeoutUs = 500;     ///< ec_reconfig_slave/ec_recover_slave [µs]
-constexpr size_t kMsgLen = 96U;            ///< Puffer für SDO-Fehlermeldungen
-constexpr size_t kStateMsgLen = 256U;      ///< Puffer je Slave in slave_states()
-constexpr size_t kObjNameLen = sizeof("0xIIII:SS");  ///< Puffer für "0xIIII:SS" inkl. Nullbyte
+constexpr size_t kMsgLen = 96U;            ///< buffer for SDO error messages
+constexpr size_t kStateMsgLen = 256U;      ///< buffer per slave in slave_states()
+constexpr size_t kObjNameLen = sizeof("0xIIII:SS");  ///< buffer for "0xIIII:SS" incl. null byte
 
 /**
- * @brief Liest ein SDO fester Größe.
- * @param slave Slave-Nummer
- * @param idx Index
- * @param sub Subindex
- * @param[out] v Wert (bei Fehler T{})
- * @return true bei Erfolg
+ * @brief Reads an SDO of fixed size.
+ * @param slave slave number
+ * @param idx index
+ * @param sub subindex
+ * @param[out] v value (T{} on error)
+ * @return true on success
  */
 template <typename T>
 bool sdo_read_v(uint16_t slave, uint16_t idx, uint8_t sub, T& v) {
@@ -46,12 +46,12 @@ bool sdo_read_v(uint16_t slave, uint16_t idx, uint8_t sub, T& v) {
 }
 
 /**
- * @brief Schreibt die Klemmenparameter; bricht beim ersten Fehler ab.
- * @param slave Slave-Nummer
- * @param dc Klemmenparameter
- * @param revision Revision für die Gerätebeschreibung, 0 = neueste
- * @param[out] err Fehlertext mit Objekt und Name
- * @return true bei Erfolg
+ * @brief Writes the terminal parameters; aborts at the first error.
+ * @param slave slave number
+ * @param dc terminal parameters
+ * @param revision revision for the device description, 0 = latest
+ * @param[out] err error text with object and name
+ * @return true on success
  */
 bool write_settings(uint16_t slave, const DeviceConfig& dc, uint32_t revision, std::string& err) {
     for (const auto& w : el3356::settings_writes(dc, revision)) {
@@ -69,13 +69,13 @@ bool write_settings(uint16_t slave, const DeviceConfig& dc, uint32_t revision, s
 }
 
 /**
- * @brief SOEM-Hook PRE-OP -> SAFE-OP: sendet die Initialisierungssequenz.
+ * @brief SOEM hook PRE-OP -> SAFE-OP: sends the initialization sequence.
  *
- * PDO-Zuordnung und CoE-Parameter gemäß el3356::init_sequence(); fehlgeschlagene
- * Schritte werden geloggt, die übrigen trotzdem gesendet.
+ * PDO assignment and CoE parameters according to el3356::init_sequence(); failed
+ * steps are logged, the remaining ones are sent anyway.
  *
- * @param slave Slave-Nummer
- * @return immer 1 (SOEM setzt den Übergang fort)
+ * @param slave slave number
+ * @return always 1 (SOEM continues the transition)
  */
 int po2so_hook(uint16 slave) {
     if (!g_cfg) return 1;
@@ -94,11 +94,11 @@ int po2so_hook(uint16 slave) {
 }
 
 /**
- * @brief Liest das Mapping eines PDOs (0x16xx/0x1Axx).
- * @param slave Slave-Nummer
- * @param pdo PDO-Index
- * @param[out] out Einträge
- * @return false, wenn das Objekt nicht existiert oder nicht lesbar ist
+ * @brief Reads the mapping of a PDO (0x16xx/0x1Axx).
+ * @param slave slave number
+ * @param pdo PDO index
+ * @param[out] out entries
+ * @return false if the object does not exist or cannot be read
  */
 bool read_pdo_mapping(uint16_t slave, uint16_t pdo, std::vector<el3356::MapEntry>& out) {
     uint8_t n = 0;
@@ -113,12 +113,12 @@ bool read_pdo_mapping(uint16_t slave, uint16_t pdo, std::vector<el3356::MapEntry
 }
 
 /**
- * @brief Liest eine PDO-Zuordnung (0x1C12/0x1C13) samt Mappings.
- * @param slave Slave-Nummer
- * @param sm_obj 0x1C12 oder 0x1C13
- * @param[out] out Mappings in Zuordnungsreihenfolge
- * @param[out] indices zugeordnete PDO-Indizes
- * @return true bei Erfolg
+ * @brief Reads a PDO assignment (0x1C12/0x1C13) including mappings.
+ * @param slave slave number
+ * @param sm_obj 0x1C12 or 0x1C13
+ * @param[out] out mappings in assignment order
+ * @param[out] indices assigned PDO indices
+ * @return true on success
  */
 bool read_assigned(uint16_t slave, uint16_t sm_obj, std::vector<std::vector<el3356::MapEntry>>& out,
                    std::vector<uint16_t>& indices) {
@@ -138,9 +138,9 @@ bool read_assigned(uint16_t slave, uint16_t sm_obj, std::vector<std::vector<el33
 }
 
 /**
- * @brief Name eines EtherCAT-Zustands (ohne Fehlerbit).
- * @param st Zustand aus ec_slave[].state
- * @return "INIT", "PRE-OP", "BOOT", "SAFE-OP", "OP" oder "NONE"
+ * @brief Name of an EtherCAT state (without error bit).
+ * @param st state from ec_slave[].state
+ * @return "INIT", "PRE-OP", "BOOT", "SAFE-OP", "OP" or "NONE"
  */
 const char* state_name(uint16_t st) {
     switch (st & kStateMask) {
@@ -154,12 +154,12 @@ const char* state_name(uint16_t st) {
 }
 
 /**
- * @brief Zustand, Fehlerbit und AL-Statuscode aller Slaves, die @p expected nicht erreicht haben.
+ * @brief State, error bit and AL status code of all slaves that have not reached @p expected.
  *
- * Voraussetzung: ec_readstate() wurde unmittelbar zuvor aufgerufen.
+ * Precondition: ec_readstate() was called immediately before.
  *
- * @param expected erwarteter Zustand
- * @return Beschreibung für die Fehlermeldung
+ * @param expected expected state
+ * @return description for the error message
  */
 std::string slave_states(uint16_t expected) {
     std::string out;
@@ -176,12 +176,12 @@ std::string slave_states(uint16_t expected) {
     return out.empty() ? "Gruppenzustand abweichend" : out;
 }
 
-/// @brief Verschiebt eine gemappte Lage um @p bits (Startbit des Slaves im IOmap).
+/// @brief Shifts a mapped position by @p bits (start bit of the slave in the IOmap).
 void shift(el3356::EntryLoc& l, uint32_t bits) {
     if (l.present) l.bit_offset += bits;
 }
 
-/// Namen und Datentypen per SDO-Information (falls die Klemme sie unterstützt).
+/// Names and data types via SDO information (if the terminal supports it).
 struct SdoInfo {
     uint16_t slave;
     bool supported;
@@ -189,10 +189,10 @@ struct SdoInfo {
     ec_OElistt oe{};
 
     /**
-     * @brief Name eines Objekts (ODdescription).
-     * @param index Objektindex
-     * @param[out] name Name
-     * @return false ohne SDO-Information oder bei Fehler
+     * @brief Name of an object (ODdescription).
+     * @param index object index
+     * @param[out] name name
+     * @return false without SDO information or on error
      */
     bool object_name(uint16_t index, std::string& name) {
         if (!supported) return false;
@@ -204,12 +204,12 @@ struct SdoInfo {
         return true;
     }
     /**
-     * @brief Name und Datentyp eines Eintrags (OEsingle).
-     * @param index Objektindex
-     * @param sub Subindex
-     * @param[out] name Name
-     * @param[out] type CoE-Datentypcode (ECT_*)
-     * @return false ohne SDO-Information oder bei Fehler
+     * @brief Name and data type of an entry (OEsingle).
+     * @param index object index
+     * @param sub subindex
+     * @param[out] name name
+     * @param[out] type CoE data type code (ECT_*)
+     * @return false without SDO information or on error
      */
     bool entry(uint16_t index, uint8_t sub, std::string& name, uint16_t& type) {
         if (!supported) return false;
@@ -226,13 +226,13 @@ struct SdoInfo {
 } // namespace
 
 /**
- * @brief Initialisiert SOEM, sucht die EL3356 und fährt alle Slaves nach OP.
+ * @brief Initializes SOEM, finds the EL3356 and brings all slaves to OP.
  *
- * Die Initialisierungssequenz läuft im PO2SO-Hook; nach SAFE-OP werden Mapping und
- * PDO-Katalog eingelesen.
+ * The initialization sequence runs in the PO2SO hook; after SAFE-OP, mapping and
+ * PDO catalog are read.
  *
- * @param cfg Konfiguration (Interface, Slave-Name, Klemmenparameter)
- * @param[out] err Ursache bei false, inkl. Zustand und AL-Status der Slaves
+ * @param cfg configuration (interface, slave name, terminal parameters)
+ * @param[out] err cause on false, incl. state and AL status of the slaves
  * @return true in OP
  */
 bool EthercatBackend::open(const Config& cfg, std::string& err) {
@@ -263,7 +263,7 @@ bool EthercatBackend::open(const Config& cfg, std::string& err) {
         err = "Slave '" + cfg.ethercat.slave_name + "' nicht gefunden";
         return false;
     }
-    // Revision aus der SII; nicht in der Gerätebeschreibung enthaltene: neueste verwenden
+    // Revision from the SII; for one not contained in the device description, use the latest
     const auto& desc = DeviceDescription::el3356_0010();
     const uint32_t rev = ec_slave[slave_].eep_rev;
     const auto& revs = desc.revisions();
@@ -279,8 +279,8 @@ bool EthercatBackend::open(const Config& cfg, std::string& err) {
         err = "ec_config_map fehlgeschlagen";
         return false;
     }
-    // ec_statecheck(0, ...) aktualisiert nur ec_slave[0].state (Gruppenzustand per BRD);
-    // die Einzelzustände liefert erst ec_readstate().
+    // ec_statecheck(0, ...) only updates ec_slave[0].state (group state via BRD);
+    // the individual states are only provided by ec_readstate().
     ec_statecheck(0, EC_STATE_SAFE_OP, EC_TIMEOUTSTATE * kSafeOpTimeoutFactor);
     ec_readstate();
     if (ec_slave[slave_].state != EC_STATE_SAFE_OP) {
@@ -312,9 +312,9 @@ bool EthercatBackend::open(const Config& cfg, std::string& err) {
 }
 
 /**
- * @brief Liest die PDO-Zuordnung und berechnet die Lage der Ein- und Ausgänge.
- * @param[out] err Fehlertext
- * @return false, wenn das Mapping nicht lesbar ist oder Value (Real) fehlt
+ * @brief Reads the PDO assignment and computes the position of the inputs and outputs.
+ * @param[out] err error text
+ * @return false if the mapping cannot be read or Value (Real) is missing
  */
 bool EthercatBackend::read_layout(std::string& err) {
     std::vector<std::vector<el3356::MapEntry>> in, out;
@@ -342,12 +342,12 @@ bool EthercatBackend::read_layout(std::string& err) {
 }
 
 /**
- * @brief Liest alle PDO-Mapping-Objekte 0x1600..0x1607 und 0x1A00..0x1A07 (nur beim Hochlauf).
+ * @brief Reads all PDO mapping objects 0x1600..0x1607 and 0x1A00..0x1A07 (only during startup).
  *
- * Namen und Typen per SDO-Information, sonst aus der ESI; Exclude-Listen aus der ESI.
+ * Names and types via SDO information, otherwise from the ESI; exclude lists from the ESI.
  *
- * @param rx_assign Inhalt von 0x1C12
- * @param tx_assign Inhalt von 0x1C13
+ * @param rx_assign content of 0x1C12
+ * @param tx_assign content of 0x1C13
  */
 void EthercatBackend::discover_pdos(const std::vector<uint16_t>& rx_assign,
                                     const std::vector<uint16_t>& tx_assign) {
@@ -391,7 +391,7 @@ void EthercatBackend::discover_pdos(const std::vector<uint16_t>& rx_assign,
     for (auto& p : pdos_)
         for (auto& e : p.entries)
             shift(e.loc, p.rx ? ec_slave[slave_].Ostartbit : ec_slave[slave_].Istartbit);
-    // SDO-Abbrüche der nicht vorhandenen Objekte nicht als Fehler stehen lassen
+    // Do not leave SDO aborts of non-existent objects standing as errors
     while (ec_iserror()) {
         ec_errort e;
         if (!ec_poperror(&e)) break;
@@ -405,7 +405,7 @@ void EthercatBackend::process_image(std::vector<uint8_t>& in, std::vector<uint8_
     out.clear();
     if (!opened_ || slave_ == 0) return;
     const ec_slavet& sl = ec_slave[slave_];
-    // Ibytes/Obytes sind 0 bei weniger als 8 Bit
+    // Ibytes/Obytes are 0 for fewer than 8 bits
     const size_t ib = sl.Ibytes ? sl.Ibytes : (sl.Ibits ? 1 : 0);
     const size_t ob = sl.Obytes ? sl.Obytes : (sl.Obits ? 1 : 0);
     if (sl.inputs) in.assign(sl.inputs, sl.inputs + ib);
@@ -413,10 +413,10 @@ void EthercatBackend::process_image(std::vector<uint8_t>& in, std::vector<uint8_
 }
 
 /**
- * @brief Prozessdatenzyklus; nach wkc_fault_cycles WKC-Fehlern folgt check_and_recover().
- * @param t Zeit seit Start [s]
- * @param ctrl Steuerbits
- * @param[out] out Sample
+ * @brief Process data cycle; after wkc_fault_cycles WKC errors, check_and_recover() follows.
+ * @param t time since start [s]
+ * @param ctrl control bits
+ * @param[out] out sample
  */
 void EthercatBackend::cycle(double t, const El3356Control& ctrl, Sample& out) {
     out = {};
@@ -440,12 +440,12 @@ void EthercatBackend::cycle(double t, const El3356Control& ctrl, Sample& out) {
 }
 
 /**
- * @brief Zustandsprüfung und Wiederanlauf (angelehnt an SOEM simple_test/ecatcheck).
+ * @brief State check and restart (based on SOEM simple_test/ecatcheck).
  *
- * Höchstens alle 0,5 s: Fehler quittieren, SAFE-OP -> OP, Slaves rekonfigurieren
- * oder wiederherstellen.
+ * At most every 0.5 s: acknowledge errors, SAFE-OP -> OP, reconfigure slaves
+ * or recover them.
  *
- * @param t Zeit seit Start [s]
+ * @param t time since start [s]
  */
 void EthercatBackend::check_and_recover(double t) {
     if (last_check_t_ != kNoCheck && t - last_check_t_ < kCheckIntervalS) return;
@@ -534,7 +534,7 @@ bool EthercatBackend::sdo_read(uint16_t index, uint8_t sub, size_t size, std::ve
     return true;
 }
 
-/// @brief Alle Slaves nach INIT, SOEM schließen, PDO-Katalog verwerfen.
+/// @brief All slaves to INIT, close SOEM, discard the PDO catalog.
 void EthercatBackend::close() {
     if (!opened_) return;
     ec_slave[0].state = EC_STATE_INIT;

@@ -7,14 +7,14 @@
 namespace ew {
 
 namespace {
-/// Mindestanzahl Samples im Fenster (Spannweite und Standardabweichung brauchen zwei Werte)
+/// Minimum number of samples in the window (range and standard deviation need two values)
 constexpr size_t kMinWindowSamples = 2U;
 } // namespace
 
 /**
- * @brief Name eines Zustands für JSON und Anzeige.
- * @param s Zustand
- * @return "fault", "idle", "settling" oder "wait_unload"
+ * @brief Name of a state for JSON and display.
+ * @param s state
+ * @return "fault", "idle", "settling" or "wait_unload"
  */
 const char* to_string(MeasState s) {
     switch (s) {
@@ -26,12 +26,12 @@ const char* to_string(MeasState s) {
     return "unknown";
 }
 
-/// @param p Parameter (Massen in Gramm)
+/// @param p parameters (masses in grams)
 MeasurementEngine::MeasurementEngine(const MeasurementConfig& p) : p_(p) {}
 
 /**
- * @brief Übernimmt neue Parameter und leert das Fenster.
- * @param p Parameter (Massen in Gramm)
+ * @brief Takes over new parameters and clears the window.
+ * @param p parameters (masses in grams)
  */
 void MeasurementEngine::set_params(const MeasurementConfig& p) {
     p_ = p;
@@ -39,7 +39,7 @@ void MeasurementEngine::set_params(const MeasurementConfig& p) {
     win_ = {};
 }
 
-/// @brief Zurück in Idle: Fenster leeren, Freigabe setzen (z. B. nach Tara).
+/// @brief Back to Idle: clear the window, re-arm (e.g. after tare).
 void MeasurementEngine::reset() {
     state_ = MeasState::Idle;
     fault_reason_.clear();
@@ -50,12 +50,12 @@ void MeasurementEngine::reset() {
 }
 
 /**
- * @brief Vergibt die nächste Nummer, z. B. für importierte Messungen.
- * @return Nummer; folgende Messungen zählen danach weiter
+ * @brief Assigns the next number, e.g. for imported measurements.
+ * @return number; following measurements continue counting from it
  */
 uint64_t MeasurementEngine::get_next_id() { return next_id_++; }
 
-/// @brief Berechnet win_ aus buf_ (Welford über das Fenster).
+/// @brief Computes win_ from buf_ (Welford over the window).
 void MeasurementEngine::compute_window() {
     win_ = {};
     if (buf_.empty()) return;
@@ -63,7 +63,7 @@ void MeasurementEngine::compute_window() {
     win_.span_ms = (buf_.back().t - buf_.front().t) * kMsPerS;
     double mn = buf_.front().v, mx = mn, mean = 0.0, m2 = 0.0;
     uint32_t k = 0;
-    for (const auto& p : buf_) {  // Welford über das Fenster
+    for (const auto& p : buf_) {  // Welford over the window
         ++k;
         const double d = p.v - mean;
         mean += d / k;
@@ -79,9 +79,9 @@ void MeasurementEngine::compute_window() {
 }
 
 /**
- * @brief Verarbeitet ein Sample (einmal je Zyklus).
- * @param s Sample mit Nettowert value [g]
- * @return Messung genau im Übernahmezyklus, sonst std::nullopt
+ * @brief Processes a sample (once per cycle).
+ * @param s sample with net value value [g]
+ * @return measurement exactly in the capture cycle, otherwise std::nullopt
  */
 std::optional<Measurement> MeasurementEngine::process(const Sample& s) {
     std::string reason;
@@ -115,7 +115,7 @@ std::optional<Measurement> MeasurementEngine::process(const Sample& s) {
 
     state_ = MeasState::Settling;
     buf_.push_back({s.t, v});
-    // Kleinstes Fenster behalten, dessen Spannweite >= stable_time ist
+    // Keep the smallest window whose span is >= stable_time
     const double tw = p_.stable_time_ms / kMsPerS;
     while (buf_.size() > kMinWindowSamples && (buf_.back().t - buf_[1].t) >= tw) buf_.pop_front();
     compute_window();

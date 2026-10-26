@@ -11,27 +11,27 @@
 namespace ew {
 
 /**
- * @brief Führt Kommandos der Gerätebeschreibung aus (Tara, Restore, …).
+ * @brief Executes commands of the device description (tare, restore, …).
  *
- * Wird ausschließlich im Acquisition-Thread verwendet. Kommandos über 0xFB00:01 werden
- * zyklisch über 0xFB00:02 abgefragt (step()), ohne den Prozessdatenzyklus zu blockieren;
- * danach wird 0xFB00:01 auf kCmdNone zurückgesetzt.
+ * Used exclusively in the acquisition thread. Commands via 0xFB00:01 are
+ * polled cyclically via 0xFB00:02 (step()) without blocking the process data cycle;
+ * afterwards 0xFB00:01 is reset to kCmdNone.
  */
 class DeviceCommandRunner {
 public:
-    static constexpr double kTimeoutS = 30.0;  ///< Zeit bis zum Abbruch eines Kommandos [s]
+    static constexpr double kTimeoutS = 30.0;  ///< time until a command is aborted [s]
 
-    /// true, solange ein Kommando auf seinen Abschluss wartet
+    /// true while a command is waiting for completion
     [[nodiscard]] bool active() const { return !id_.empty(); }
-    /// Kennung des laufenden Kommandos, leer ohne Kommando
+    /// identifier of the running command, empty without a command
     [[nodiscard]] const std::string& id() const { return id_; }
 
     CalResult start(const std::string& id, IoBackend& io, double t, bool& finished);
     std::optional<CalResult> step(IoBackend& io, double t);
 
 private:
-    std::string id_;       ///< laufendes Kommando
-    double started_ = 0.0; ///< Startzeit [s]
+    std::string id_;       ///< running command
+    double started_ = 0.0; ///< start time [s]
 };
 
 nlohmann::json read_diagnostics(IoBackend& io);

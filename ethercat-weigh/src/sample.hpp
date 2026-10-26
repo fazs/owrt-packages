@@ -6,26 +6,26 @@
 
 namespace ew {
 
-/// Ein Prozessdatenzyklus: Rohwert der Klemme und daraus abgeleitete Massen.
+/// One process data cycle: raw value of the terminal and the masses derived from it.
 struct Sample {
-    double t = 0.0;        ///< Sekunden seit Start (monoton)
-    double raw = 0.0;      ///< Value der Klemme (REAL bzw. INT32), unverändert
-    double gross = 0.0;    ///< Brutto [g] nach Kennlinie
-    double value = 0.0;    ///< Netto [g] = gross - Tara (Software)
-    El3356Status status;   ///< Statusbits der Klemme
-    bool wkc_ok = false;      ///< Working Counter wie erwartet
+    double t = 0.0;        ///< seconds since start (monotonic)
+    double raw = 0.0;      ///< value of the terminal (REAL or INT32), unchanged
+    double gross = 0.0;    ///< gross [g] after the characteristic
+    double value = 0.0;    ///< net [g] = gross - tare (software)
+    El3356Status status;   ///< status bits of the terminal
+    bool wkc_ok = false;      ///< working counter as expected
     bool link_ok = false;     ///< Slave in OP
-    bool calibrated = true;   ///< Kennlinie gültig
-    bool calibrating = false; ///< Kalibriervorgang aktiv
+    bool calibrated = true;   ///< characteristic valid
+    bool calibrating = false; ///< calibration in progress
 };
 
 /**
- * @brief Prüft die Gültigkeit eines Samples.
+ * @brief Checks whether a sample is valid.
  * @param s Sample
- * @param[out] reason Fehlergrund ("link", "wkc", "error", "overrange", "data_invalid",
- *             "calibration", "calibrating", "uncalibrated"), leer bei gültigem Sample;
- *             darf nullptr sein
- * @return true, wenn das Sample für die Messung verwendet werden darf
+ * @param[out] reason reason for failure ("link", "wkc", "error", "overrange", "data_invalid",
+ *             "calibration", "calibrating", "uncalibrated"), empty for a valid sample;
+ *             may be nullptr
+ * @return true if the sample may be used for the measurement
  */
 inline bool sample_valid(const Sample& s, std::string* reason = nullptr) {
     auto fail = [&](const char* r) {

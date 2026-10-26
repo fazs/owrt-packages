@@ -3,16 +3,16 @@
   import { UNITS, fmt, fromG, toG } from './format.js';
   import { DEFAULT_STABLE_TIME_S, MIN_CAL_POINTS, MIN_REFERENCE_RATIO, PERCENT } from './constants.js';
 
-  /** Signifikante Stellen der Standardabweichung des Rohwerts */
+  /** Significant digits of the standard deviation of the raw value */
   const SIG_DIGITS = 3;
-  /** Nachkommastellen von Rohwerten und Stützpunktmassen */
+  /** Decimal places of raw values and calibration point masses */
   const RAW_DECIMALS = 4;
-  /** Nachkommastellen von Rated output und Zero balance [mV/V] */
+  /** Decimal places of rated output and zero balance [mV/V] */
   const MVV_DECIMALS = 6;
-  /** Nachkommastellen der Mindestreferenz im Hinweis */
+  /** Decimal places of the minimum reference in the hint */
   const REF_DECIMALS = 3;
 
-  /** @type {{open?: boolean}} Dialog geöffnet (bindbar) */
+  /** @type {{open?: boolean}} dialog open (bindable) */
   let { open = $bindable(false) } = $props();
 
   let dialog;
@@ -22,14 +22,14 @@
   const cfgCal = $derived(live.config?.calibration);
   const cfgDev = $derived(live.config?.device);
 
-  // Eingaben
+  // Inputs
   let devNominal = $state(null);
   let devUnit = $state('g');
   let pointMass = $state(0);
   let pointUnit = $state(displayUnit());
   let refMass = $state(null);
   let refUnit = $state(displayUnit());
-  let simGrams = $state(null); // Vorbelegung: simDefaultGrams()
+  let simGrams = $state(null); // preset: simDefaultGrams()
   let busy = $state(false);
 
   $effect(() => {
@@ -44,10 +44,10 @@
   });
 
   /**
-   * Sendet ein Kalibrierkommando und sperrt dabei die Bedienung.
-   * @param {{action: string}} body Kommando
-   * @param {string} [okText] Hinweis bei Erfolg
-   * @returns {Promise<boolean>} true bei Erfolg
+   * Sends a calibration command and locks the controls meanwhile.
+   * @param {{action: string}} body command
+   * @param {string} [okText] notice on success
+   * @returns {Promise<boolean>} true on success
    */
   async function act(body, okText) {
     busy = true;
@@ -58,23 +58,23 @@
   }
 
   /**
-   * Formatiert mit SIG_DIGITS signifikanten Stellen (Standardabweichung des Rohwerts).
-   * @param {number|null} v Wert
+   * Formats with SIG_DIGITS significant digits (standard deviation of the raw value).
+   * @param {number|null} v value
    * @returns {string}
    */
   const sig = (v) => (v == null ? '–' : Number(v.toPrecision(SIG_DIGITS)).toLocaleString('de-DE'));
   /**
-   * Anzeigename einer Einheit.
-   * @param {string} id Einheit
+   * Display name of a unit.
+   * @param {string} id unit
    * @returns {string}
    */
   const unitName = (id) => UNITS.find((u) => u.id === id)?.label ?? id;
 
-  // --- Anwendung
+  // --- Application
   const points = $derived(cal?.kind === 'application' ? cal.points ?? [] : []);
   const canCommitApp = $derived(points.length >= MIN_CAL_POINTS && !cal?.capturing);
 
-  // --- Klemme
+  // --- Terminal
   const devPhase = $derived(cal?.kind === 'device' ? cal.phase : null);
   const stableTime = $derived(cal?.stable_time_s || DEFAULT_STABLE_TIME_S);
   const stableOk = $derived((cal?.stable_s ?? 0) >= stableTime);
@@ -89,7 +89,7 @@
     cal?.kind === 'device' ? toG(MIN_REFERENCE_RATIO * cal.nominal_load, cal.device_unit) : 0,
   );
 
-  /** Übernimmt das Kalibrierergebnis und schließt den Dialog bei Erfolg. */
+  /** Takes over the calibration result and closes the dialog on success. */
   async function commit() {
     if (await act({ action: 'commit' }, 'Kalibrierung übernommen')) open = false;
   }
@@ -271,7 +271,7 @@
       {/if}
 
       {#if isSim}
-        <!-- Formular, damit Enter im Eingabefeld „Auflegen“ auslöst -->
+        <!-- form so that Enter in the input field triggers „Auflegen“ -->
         <form
           class="sim"
           onsubmit={(e) => {

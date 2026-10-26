@@ -9,49 +9,49 @@
 
 namespace ew {
 
-/// Eintrag des Objektverzeichnisses laut Gerätebeschreibung.
+/// Entry of the object dictionary according to the device description.
 struct DescEntry {
-    uint16_t index = 0;               ///< Objektindex
-    uint8_t sub = 0;                  ///< Subindex
-    std::string name;                 ///< Name laut ESI
-    std::string type;                 ///< Kurzname (dtype_name()), "string" oder "bytes"
-    uint16_t bits = 0;                ///< Länge in Bit
-    std::vector<uint32_t> revisions;  ///< Revisionen mit diesem Eintrag; leer = alle
-    nlohmann::json raw;               ///< vollständiger Eintrag (Default, Grenzen, Labels, …)
+    uint16_t index = 0;               ///< object index
+    uint8_t sub = 0;                  ///< subindex
+    std::string name;                 ///< name according to the ESI
+    std::string type;                 ///< short name (dtype_name()), "string" or "bytes"
+    uint16_t bits = 0;                ///< length in bits
+    std::vector<uint32_t> revisions;  ///< revisions with this entry; empty = all
+    nlohmann::json raw;               ///< complete entry (default, limits, labels, …)
 };
 
-/// Eintrag eines PDO-Mappings laut Gerätebeschreibung.
+/// Entry of a PDO mapping according to the device description.
 struct DescPdoEntry {
-    uint16_t index = 0;  ///< Objektindex, 0 = Lücke
-    uint8_t sub = 0;     ///< Subindex
-    uint8_t bits = 0;    ///< Länge in Bit
-    std::string name;    ///< Name im Mapping (ESI, z. B. "Status__Overrange"), leer bei Lücken
-    std::string type;    ///< Kurzname, leer bei Lücken
+    uint16_t index = 0;  ///< object index, 0 = gap
+    uint8_t sub = 0;     ///< subindex
+    uint8_t bits = 0;    ///< length in bits
+    std::string name;    ///< name in the mapping (ESI, e.g. "Status__Overrange"), empty for gaps
+    std::string type;    ///< short name, empty for gaps
 };
 
-/// Mapping eines PDOs für eine Gruppe von Revisionen.
+/// Mapping of a PDO for a group of revisions.
 struct DescPdoLayout {
-    std::vector<uint32_t> revisions;     ///< leer = alle Revisionen des PDOs
-    std::vector<DescPdoEntry> entries;   ///< Einträge in Mapping-Reihenfolge
+    std::vector<uint32_t> revisions;     ///< empty = all revisions of the PDO
+    std::vector<DescPdoEntry> entries;   ///< entries in mapping order
 };
 
-/// RxPDO bzw. TxPDO laut Gerätebeschreibung.
+/// RxPDO or TxPDO according to the device description.
 struct DescPdo {
-    uint16_t index = 0;                  ///< 0x16xx bzw. 0x1Axx
-    std::string name;                    ///< Name laut ESI
-    bool rx = false;                     ///< RxPDO (Ausgänge)
-    int sm = -1;                         ///< Sync-Manager laut ESI, -1 = ohne Angabe
-    bool fixed = false;                  ///< Mapping nicht änderbar
-    std::vector<uint16_t> exclude;       ///< nicht gemeinsam zuordenbar
-    std::vector<uint32_t> revisions;     ///< Revisionen mit diesem PDO; leer = alle
-    std::vector<DescPdoLayout> layouts;  ///< Mapping je Revisionsgruppe
+    uint16_t index = 0;                  ///< 0x16xx or 0x1Axx
+    std::string name;                    ///< name according to the ESI
+    bool rx = false;                     ///< RxPDO (outputs)
+    int sm = -1;                         ///< sync manager according to the ESI, -1 = not specified
+    bool fixed = false;                  ///< mapping cannot be changed
+    std::vector<uint16_t> exclude;       ///< cannot be assigned together
+    std::vector<uint32_t> revisions;     ///< revisions with this PDO; empty = all
+    std::vector<DescPdoLayout> layouts;  ///< mapping per revision group
 };
 
 /**
- * @brief Aus der ESI erzeugte Gerätebeschreibung (src/generated/el3356_0010.json, scripts/esi_gen.py).
+ * @brief Device description generated from the ESI (src/generated/el3356_0010.json, scripts/esi_gen.py).
  *
- * Hält das JSON und daraus typisierte Objekteinträge und PDOs. Revision 0 bei Abfragen
- * bedeutet die neueste Revision der Beschreibung.
+ * Holds the JSON and the typed object entries and PDOs derived from it. Revision 0 in queries
+ * means the latest revision of the description.
  */
 class DeviceDescription {
 public:
@@ -59,12 +59,12 @@ public:
 
     static const DeviceDescription& el3356_0010();
 
-    [[nodiscard]] const nlohmann::json& json() const { return json_; }      ///< vollständige Beschreibung
-    [[nodiscard]] const std::string& text() const { return text_; }         ///< JSON-Text wie eingebettet
-    [[nodiscard]] uint32_t newest_revision() const { return revisions_.back(); }  ///< neueste Revision
-    [[nodiscard]] const std::vector<uint32_t>& revisions() const { return revisions_; }  ///< alle Revisionen
-    [[nodiscard]] const std::vector<DescEntry>& entries() const { return entries_; }     ///< alle Einträge
-    [[nodiscard]] const std::vector<DescPdo>& pdos() const { return pdos_; }             ///< alle PDOs
+    [[nodiscard]] const nlohmann::json& json() const { return json_; }      ///< complete description
+    [[nodiscard]] const std::string& text() const { return text_; }         ///< JSON text as embedded
+    [[nodiscard]] uint32_t newest_revision() const { return revisions_.back(); }  ///< latest revision
+    [[nodiscard]] const std::vector<uint32_t>& revisions() const { return revisions_; }  ///< all revisions
+    [[nodiscard]] const std::vector<DescEntry>& entries() const { return entries_; }     ///< all entries
+    [[nodiscard]] const std::vector<DescPdo>& pdos() const { return pdos_; }             ///< all PDOs
 
     [[nodiscard]] const DescEntry* entry(uint16_t index, uint8_t sub) const;
     [[nodiscard]] const DescPdo* pdo(uint16_t index) const;
@@ -72,11 +72,11 @@ public:
     [[nodiscard]] bool in_revision(const std::vector<uint32_t>& revisions, uint32_t revision = 0U) const;
 
 private:
-    std::string text_;                 ///< JSON-Text
-    nlohmann::json json_;              ///< geparste Beschreibung
-    std::vector<uint32_t> revisions_;  ///< Revisionen, aufsteigend
-    std::vector<DescEntry> entries_;   ///< Einträge nach Index, Subindex
-    std::vector<DescPdo> pdos_;        ///< PDOs nach Index
+    std::string text_;                 ///< JSON text
+    nlohmann::json json_;              ///< parsed description
+    std::vector<uint32_t> revisions_;  ///< revisions, ascending
+    std::vector<DescEntry> entries_;   ///< entries by index, subindex
+    std::vector<DescPdo> pdos_;        ///< PDOs by index
 };
 
 } // namespace ew

@@ -12,7 +12,7 @@
   const unit = $derived(displayUnit());
   const dec = $derived(decimalsFor(live.config?.measurement?.tolerance, unit));
   const nowT = $derived(live.sample?.t ?? 0);
-  // pos: lückenlose Nummer der angezeigten Zeilen, älteste = 1 (Liste ist neueste zuerst)
+  // pos: gapless number of the displayed rows, oldest = 1 (the list is newest first)
   const rows = $derived(
     live.measurements.slice(0, VISIBLE_MEASUREMENTS).map((m, i, shown) => ({ ...m, pos: shown.length - i })),
   );
@@ -24,8 +24,8 @@
   let sortDir = $state('desc');
 
   /**
-   * Sortiert nach @p key; erneuter Klick auf dieselbe Spalte kehrt die Richtung um.
-   * @param {{key: string, dir: 'asc'|'desc'}} col Spalte aus MEASUREMENT_COLUMNS
+   * Sorts by @p key; clicking the same column again reverses the direction.
+   * @param {{key: string, dir: 'asc'|'desc'}} col column from MEASUREMENT_COLUMNS
    */
   function sortBy(col) {
     if (sortKey === col.key) {
@@ -36,30 +36,30 @@
     }
   }
 
-  // erst auf VISIBLE_MEASUREMENTS kürzen, dann sortieren: die Tabelle zeigt immer die letzten Messungen
+  // first truncate to VISIBLE_MEASUREMENTS, then sort: the table always shows the latest measurements
   const sorted = $derived.by(() => {
-    // ausgeblendete Sortierspalte: Messreihenfolge, neueste zuerst
+    // hidden sort column: measurement order, newest first
     const shown = columns.some((c) => c.key === sortKey);
     const key = shown ? sortKey : 'id';
     const sign = shown && sortDir === 'asc' ? 1 : -1;
-    // id als zweites Kriterium, damit gleiche Werte in Messreihenfolge bleiben
+    // id as second criterion so that equal values stay in measurement order
     return [...rows].sort((a, b) => sign * (a[key] - b[key]) || b.id - a.id);
   });
 
   /**
-   * @param {string} key Spalte
-   * @returns {'ascending'|'descending'|'none'} Wert für aria-sort
+   * @param {string} key column
+   * @returns {'ascending'|'descending'|'none'} value for aria-sort
    */
   function ariaSort(key) {
     if (sortKey !== key) return 'none';
     return sortDir === 'asc' ? 'ascending' : 'descending';
   }
 
-  let confirmId = $state(null); // Messung, deren Löschen auf Bestätigung wartet
+  let confirmId = $state(null); // measurement whose deletion awaits confirmation
   let confirmTimer;
   /**
-   * Löschen mit Bestätigung: erster Klick markiert die Zeile (CONFIRM_MS), zweiter löscht.
-   * @param {number} id Nummer der Messung
+   * Delete with confirmation: the first click marks the row (CONFIRM_MS), the second deletes.
+   * @param {number} id number of the measurement
    */
   function del(id) {
     clearTimeout(confirmTimer);
@@ -73,9 +73,9 @@
   }
 
   /**
-   * Alter einer Messung relativ zum letzten Sample.
-   * @param {number} t Zeitpunkt der Messung [s]
-   * @returns {string} z. B. "vor 12 s"
+   * Age of a measurement relative to the last sample.
+   * @param {number} t time of the measurement [s]
+   * @returns {string} e.g. "vor 12 s"
    */
   function ago(t) {
     const s = Math.max(0, Math.round(nowT - t));
@@ -151,19 +151,19 @@
 </section>
 
 <style>
-  /* füllt die rechte Spalte bis zur Unterkante der linken; die Tabelle scrollt darin */
+  /* fills the right column down to the bottom edge of the left one; the table scrolls inside */
   .measurements {
     flex: 1 1 auto;
     display: flex;
     flex-direction: column;
   }
   .scroll {
-    flex: 1 1 0; /* Höhe kommt aus der linken Spalte, nicht aus der Zeilenzahl */
+    flex: 1 1 0; /* the height comes from the left column, not from the number of rows */
     min-height: 200px;
     overflow-y: auto;
-    overflow-x: hidden; /* Tabelle ist 100 % breit; Rundungsreste sonst als Scrollleiste */
+    overflow-x: hidden; /* the table is 100 % wide; rounding remainders would otherwise show as a scrollbar */
   }
-  /* einspaltig (Umbruch wie in App.svelte): keine linke Spalte, an der sich die Höhe ausrichten kann */
+  /* single column (breakpoint as in App.svelte): no left column to align the height with */
   @media (max-width: 960px) {
     .scroll {
       flex: none;
@@ -197,7 +197,7 @@
   }
   .arrow {
     display: inline-block;
-    width: 1em; /* reserviert Platz, damit die Spalte beim Umschalten nicht springt */
+    width: 1em; /* reserves space so that the column does not jump when toggling */
     font-size: 0.7em;
     text-align: center;
   }

@@ -10,21 +10,21 @@ namespace ew {
 
 /**
  * @file
- * @brief CSV-Format der Messungen: Export (/api/measurements.csv) und Import (--sim-csv).
+ * @brief CSV format of the measurements: export (/api/measurements.csv) and import (--sim-csv).
  *
- * Kopfzeile: id;t_s;value_<u>;stddev_<u>;range_<u>;n;settle_ms (u = mg, g, kg, gr).
+ * Header line: id;t_s;value_<u>;stddev_<u>;range_<u>;n;settle_ms (u = mg, g, kg, gr).
  */
 
-/// @name Spalten und Trennzeichen
+/// @name Columns and separator
 /// @{
-constexpr char kCsvSeparator = ';';                    ///< Trennzeichen des Exports
-constexpr const char* kCsvColId = "id";                ///< fortlaufende Nummer
-constexpr const char* kCsvColTime = "t_s";             ///< Zeitpunkt [s]
-constexpr const char* kCsvColValue = "value_";         ///< Wert, Präfix vor der Einheit
-constexpr const char* kCsvColStddev = "stddev_";       ///< Standardabweichung, Präfix vor der Einheit
-constexpr const char* kCsvColRange = "range_";         ///< Spannweite, Präfix vor der Einheit
-constexpr const char* kCsvColSamples = "n";            ///< Samples im Fenster (nur Export)
-constexpr const char* kCsvColSettle = "settle_ms";     ///< Einschwingzeit [ms]
+constexpr char kCsvSeparator = ';';                    ///< separator of the export
+constexpr const char* kCsvColId = "id";                ///< sequential number
+constexpr const char* kCsvColTime = "t_s";             ///< time [s]
+constexpr const char* kCsvColValue = "value_";         ///< value, prefix before the unit
+constexpr const char* kCsvColStddev = "stddev_";       ///< standard deviation, prefix before the unit
+constexpr const char* kCsvColRange = "range_";         ///< range, prefix before the unit
+constexpr const char* kCsvColSamples = "n";            ///< samples in the window (export only)
+constexpr const char* kCsvColSettle = "settle_ms";     ///< settling time [ms]
 /// @}
 
 std::string measurements_csv_header(const std::string& unit);

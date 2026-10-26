@@ -14,20 +14,20 @@ namespace ew::el3356 {
 
 namespace {
 
-constexpr uint32_t kBitsPerByte = 8U;                                    ///< Bits je Byte
-constexpr uint8_t kMaxFieldBits = std::numeric_limits<uint64_t>::digits;  ///< längstes Bitfeld
-constexpr uint32_t kMapIndexShift = 16U;   ///< Mapping-Eintrag: Index in Bit 16..31
-constexpr uint32_t kMapSubShift = 8U;      ///< Mapping-Eintrag: Subindex in Bit 8..15
-constexpr uint32_t kMapByteMask = 0xFFU;   ///< Maske für Subindex bzw. Bitlänge
-constexpr size_t kObjNameLen = sizeof("0xIIII:SS");  ///< Puffer für "0xIIII:SS" inkl. Nullbyte
-constexpr size_t kPdoNameLen = sizeof("0xIIII");     ///< Puffer für "0xIIII" inkl. Nullbyte
+constexpr uint32_t kBitsPerByte = 8U;                                    ///< bits per byte
+constexpr uint8_t kMaxFieldBits = std::numeric_limits<uint64_t>::digits;  ///< longest bit field
+constexpr uint32_t kMapIndexShift = 16U;   ///< mapping entry: index in bits 16..31
+constexpr uint32_t kMapSubShift = 8U;      ///< mapping entry: subindex in bits 8..15
+constexpr uint32_t kMapByteMask = 0xFFU;   ///< mask for subindex or bit length
+constexpr size_t kObjNameLen = sizeof("0xIIII:SS");  ///< buffer for "0xIIII:SS" incl. null byte
+constexpr size_t kPdoNameLen = sizeof("0xIIII");     ///< buffer for "0xIIII" incl. null byte
 
 } // namespace
 
 /**
- * @brief Zerlegt einen Mapping-Eintrag aus 0x16xx/0x1Axx.
+ * @brief Splits a mapping entry from 0x16xx/0x1Axx.
  * @param raw UINT32: index<<16 | sub<<8 | bitlen
- * @return Index, Subindex, Bitlänge
+ * @return index, subindex, bit length
  */
 MapEntry decode_map_entry(uint32_t raw) {
     return {static_cast<uint16_t>(raw >> kMapIndexShift),
@@ -36,8 +36,8 @@ MapEntry decode_map_entry(uint32_t raw) {
 }
 
 /**
- * @brief Setzt einen Mapping-Eintrag für 0x16xx/0x1Axx zusammen (Umkehrung von decode_map_entry()).
- * @param e Index, Subindex, Bitlänge
+ * @brief Composes a mapping entry for 0x16xx/0x1Axx (inverse of decode_map_entry()).
+ * @param e index, subindex, bit length
  * @return UINT32: index<<16 | sub<<8 | bitlen
  */
 uint32_t encode_map_entry(const MapEntry& e) {
@@ -46,9 +46,9 @@ uint32_t encode_map_entry(const MapEntry& e) {
 }
 
 /**
- * @brief Prüft, ob ein Index ein PDO-Mapping-Objekt ist (0x16xx oder 0x1Axx).
- * @param index Objektindex
- * @return true für RxPDO- und TxPDO-Mapping-Objekte
+ * @brief Checks whether an index is a PDO mapping object (0x16xx or 0x1Axx).
+ * @param index object index
+ * @return true for RxPDO and TxPDO mapping objects
  */
 bool is_pdo_mapping(uint16_t index) {
     const uint16_t group = index & kPdoGroupMask;
@@ -56,9 +56,9 @@ bool is_pdo_mapping(uint16_t index) {
 }
 
 /**
- * @brief Anzahl Bytes für ein Abbild von @p bits Bit.
- * @param bits Länge in Bit
- * @return aufgerundete Bytezahl
+ * @brief Number of bytes for an image of @p bits bits.
+ * @param bits length in bits
+ * @return rounded-up byte count
  */
 size_t bytes_for_bits(uint32_t bits) {
     return (bits + kBitsPerByte - 1U) / kBitsPerByte;
@@ -67,9 +67,9 @@ size_t bytes_for_bits(uint32_t bits) {
 namespace {
 
 /**
- * @brief Durchläuft alle Einträge der PDOs in Zuordnungsreihenfolge.
- * @param pdos Mappings je PDO
- * @param on_entry Aufruf (Eintrag, Bitoffset ab Beginn des Abbilds)
+ * @brief Iterates over all entries of the PDOs in assignment order.
+ * @param pdos mappings per PDO
+ * @param on_entry callback (entry, bit offset from the start of the image)
  */
 template <typename F>
 void walk(const std::vector<std::vector<MapEntry>>& pdos, F&& on_entry) {
@@ -82,11 +82,11 @@ void walk(const std::vector<std::vector<MapEntry>>& pdos, F&& on_entry) {
 }
 
 /**
- * @brief Liest ein Bitfeld (little endian, bis 64 Bit).
- * @param img Prozessabbild
- * @param off Bitoffset
- * @param len Länge in Bit
- * @return Rohwert
+ * @brief Reads a bit field (little endian, up to 64 bits).
+ * @param img process image
+ * @param off bit offset
+ * @param len length in bits
+ * @return raw value
  */
 uint64_t get_bits(const uint8_t* img, uint32_t off, uint8_t len) {
     uint64_t v = 0U;
@@ -96,11 +96,11 @@ uint64_t get_bits(const uint8_t* img, uint32_t off, uint8_t len) {
 }
 
 /**
- * @brief Schreibt ein Bitfeld (little endian, bis 64 Bit).
- * @param img Prozessabbild
- * @param off Bitoffset
- * @param len Länge in Bit
- * @param v Rohwert
+ * @brief Writes a bit field (little endian, up to 64 bits).
+ * @param img process image
+ * @param off bit offset
+ * @param len length in bits
+ * @param v raw value
  */
 void set_bits(uint8_t* img, uint32_t off, uint8_t len, uint64_t v) {
     for (uint8_t i = 0U; i < len && i < kMaxFieldBits; ++i, ++off) {
@@ -112,31 +112,31 @@ void set_bits(uint8_t* img, uint32_t off, uint8_t len, uint64_t v) {
     }
 }
 
-/// @brief Liest ein Bit; false, wenn der Eintrag nicht gemappt ist.
+/// @brief Reads a bit; false if the entry is not mapped.
 bool get_bit(const uint8_t* img, const EntryLoc& l) {
     if (!l.present) return false;
     return (img[l.bit_offset / kBitsPerByte] >> (l.bit_offset % kBitsPerByte)) & 1U;
 }
 
-/// @brief Setzt oder löscht ein Bit; ohne Wirkung, wenn der Eintrag nicht gemappt ist.
+/// @brief Sets or clears a bit; no effect if the entry is not mapped.
 void set_bit(uint8_t* img, const EntryLoc& l, bool v) {
     if (!l.present) return;
     set_bits(img, l.bit_offset, kBitsBool, v ? 1U : 0U);
 }
 
-/// @brief Bytes eines Werts in Speicherreihenfolge (Zielplattformen sind little endian).
+/// @brief Bytes of a value in memory order (target platforms are little endian).
 template <typename T>
 std::vector<uint8_t> le(T v) {
     std::vector<uint8_t> out(sizeof(T));
-    std::memcpy(out.data(), &v, sizeof(T));  // Zielplattformen sind little endian
+    std::memcpy(out.data(), &v, sizeof(T));  // target platforms are little endian
     return out;
 }
 
 /**
- * @brief Rohwert (bis 64 Bit, little endian) als Zahl gemäß Typ.
- * @param t Datentyp
- * @param raw Rohbits
- * @return Wert; U64 als double gerundet
+ * @brief Raw value (up to 64 bits, little endian) as a number according to the type.
+ * @param t data type
+ * @param raw raw bits
+ * @return value; U64 rounded as double
  */
 double from_raw(DType t, uint64_t raw) {
     switch (t) {
@@ -155,10 +155,10 @@ double from_raw(DType t, uint64_t raw) {
 }
 
 /**
- * @brief Zahl als Rohwert gemäß Typ (Ganzzahlen gerundet, vorzeichenlose ab 0).
- * @param t Datentyp
- * @param v Wert
- * @return Rohbits
+ * @brief Number as raw value according to the type (integers rounded, unsigned from 0).
+ * @param t data type
+ * @param v value
+ * @return raw bits
  */
 uint64_t to_raw(DType t, double v) {
     switch (t) {
@@ -177,13 +177,13 @@ uint64_t to_raw(DType t, double v) {
     }
 }
 
-constexpr std::string_view kPdoNamePrefixSep = "__";  ///< ESI-Mappingnamen: "Status__Overrange"
+constexpr std::string_view kPdoNamePrefixSep = "__";  ///< ESI mapping names: "Status__Overrange"
 
 /**
- * @brief Datentyp eines Eintrags der Gerätebeschreibung.
- * @param type Kurzname laut Beschreibung
- * @param bits Bitlänge, Rückfall für "string"/"bytes" und unbekannte Namen
- * @return Datentyp
+ * @brief Data type of an entry of the device description.
+ * @param type short name according to the description
+ * @param bits bit length, fallback for "string"/"bytes" and unknown names
+ * @return data type
  */
 DType desc_type(const std::string& type, uint16_t bits) {
     DType t = DType::None;
@@ -192,11 +192,11 @@ DType desc_type(const std::string& type, uint16_t bits) {
 }
 
 /**
- * @brief PDO-Eintrag mit Name und Typ aus der Gerätebeschreibung.
- * @param index Objektindex (kObjGap = Lücke)
- * @param sub Subindex
- * @param bits Länge in Bit
- * @return Eintrag; unbekannte Objekte heißen "0xIIII:SS", Typ nach Bitlänge
+ * @brief PDO entry with name and type from the device description.
+ * @param index object index (kObjGap = gap)
+ * @param sub subindex
+ * @param bits length in bits
+ * @return entry; unknown objects are named "0xIIII:SS", type by bit length
  */
 PdoEntry known(uint16_t index, uint8_t sub, uint8_t bits) {
     PdoEntry e;
@@ -213,9 +213,9 @@ PdoEntry known(uint16_t index, uint8_t sub, uint8_t bits) {
 } // namespace
 
 /**
- * @brief Kurzname eines Datentyps für JSON.
- * @param t Datentyp
- * @return "bool", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "f32" bzw. "" für None
+ * @brief Short name of a data type for JSON.
+ * @param t data type
+ * @return "bool", "u8", "u16", "u32", "u64", "i8", "i16", "i32", "f32" or "" for None
  */
 const char* dtype_name(DType t) {
     switch (t) {
@@ -233,10 +233,10 @@ const char* dtype_name(DType t) {
 }
 
 /**
- * @brief Datentyp aus seinem Kurznamen.
- * @param s Kurzname (siehe dtype_name())
- * @param[out] t Datentyp
- * @return false bei unbekanntem Namen
+ * @brief Data type from its short name.
+ * @param s short name (see dtype_name())
+ * @param[out] t data type
+ * @return false for an unknown name
  */
 bool dtype_from_name(const std::string& s, DType& t) {
     for (DType c : kValueTypes)
@@ -248,10 +248,10 @@ bool dtype_from_name(const std::string& s, DType& t) {
 }
 
 /**
- * @brief Datentyp aus dem CoE-Datentypcode (ETG.1000.6).
- * @param coe ECT_*-Code aus der SDO-Information, kCoeUnknown = unbekannt
- * @param bits Bitlänge, Rückfall bei unbekanntem Code
- * @return Datentyp
+ * @brief Data type from the CoE data type code (ETG.1000.6).
+ * @param coe ECT_* code from the SDO information, kCoeUnknown = unknown
+ * @param bits bit length, fallback for an unknown code
+ * @return data type
  */
 DType dtype_from_coe(uint16_t coe, uint8_t bits) {
     switch (coe) {
@@ -274,9 +274,9 @@ DType dtype_from_coe(uint16_t coe, uint8_t bits) {
 }
 
 /**
- * @brief Größe für SDO-Zugriffe.
- * @param t Datentyp
- * @return Bytes, 0 für None
+ * @brief Size for SDO accesses.
+ * @param t data type
+ * @return bytes, 0 for None
  */
 size_t dtype_size(DType t) {
     switch (t) {
@@ -294,10 +294,10 @@ size_t dtype_size(DType t) {
 }
 
 /**
- * @brief Kodiert einen Wert für einen SDO-Schreibzugriff.
- * @param t Datentyp
- * @param v Wert
- * @return dtype_size(t) Bytes, little endian
+ * @brief Encodes a value for an SDO write access.
+ * @param t data type
+ * @param v value
+ * @return dtype_size(t) bytes, little endian
  */
 std::vector<uint8_t> encode_value(DType t, double v) {
     const uint64_t raw = to_raw(t, v);
@@ -307,10 +307,10 @@ std::vector<uint8_t> encode_value(DType t, double v) {
 }
 
 /**
- * @brief Dekodiert SDO-Daten.
- * @param t Datentyp
- * @param d Daten, little endian; überzählige Bytes werden ignoriert
- * @return Wert
+ * @brief Decodes SDO data.
+ * @param t data type
+ * @param d data, little endian; surplus bytes are ignored
+ * @return value
  */
 double decode_value(DType t, const std::vector<uint8_t>& d) {
     uint64_t raw = 0U;
@@ -321,13 +321,13 @@ double decode_value(DType t, const std::vector<uint8_t>& d) {
 }
 
 /**
- * @brief Berechnet die Lage der ausgewerteten Eingänge.
+ * @brief Computes the position of the evaluated inputs.
  *
- * Erkennt Sync error und TxPDO Toggle sowohl in 0x6000 als auch (bis Revision 0x0014)
- * in 0x1C32:20 bzw. 0x1800:09.
+ * Detects sync error and TxPDO toggle both in 0x6000 and (up to revision 0x0014)
+ * in 0x1C32:20 or 0x1800:09.
  *
- * @param pdos Mappings der TxPDOs in Reihenfolge von 0x1C13
- * @return Lage relativ zum Beginn des Eingangsabbilds
+ * @param pdos mappings of the TxPDOs in the order of 0x1C13
+ * @return position relative to the start of the input image
  */
 InputLayout layout_inputs(const std::vector<std::vector<MapEntry>>& pdos) {
     InputLayout l;
@@ -353,9 +353,9 @@ InputLayout layout_inputs(const std::vector<std::vector<MapEntry>>& pdos) {
 }
 
 /**
- * @brief Berechnet die Lage der Steuerbits 0x7000.
- * @param pdos Mappings der RxPDOs in Reihenfolge von 0x1C12
- * @return Lage relativ zum Beginn des Ausgangsabbilds
+ * @brief Computes the position of the control bits 0x7000.
+ * @param pdos mappings of the RxPDOs in the order of 0x1C12
+ * @return position relative to the start of the output image
  */
 OutputLayout layout_outputs(const std::vector<std::vector<MapEntry>>& pdos) {
     OutputLayout l;
@@ -376,10 +376,10 @@ OutputLayout layout_outputs(const std::vector<std::vector<MapEntry>>& pdos) {
 }
 
 /**
- * @brief Liest die Statusbits aus dem Eingangsabbild.
- * @param img Eingangsabbild des Slaves
- * @param l Lage der Einträge
- * @return Statusbits; nicht gemappte Bits sind false
+ * @brief Reads the status bits from the input image.
+ * @param img input image of the slave
+ * @param l position of the entries
+ * @return status bits; unmapped bits are false
  */
 El3356Status decode_status(const uint8_t* img, const InputLayout& l) {
     El3356Status s;
@@ -394,10 +394,10 @@ El3356Status decode_status(const uint8_t* img, const InputLayout& l) {
 }
 
 /**
- * @brief Liest Value (Real) 0x6000:12 aus dem Eingangsabbild.
- * @param img Eingangsabbild des Slaves
- * @param l Lage der Einträge
- * @return Wert, 0 wenn nicht byteweise mit 32 Bit gemappt
+ * @brief Reads Value (Real) 0x6000:12 from the input image.
+ * @param img input image of the slave
+ * @param l position of the entries
+ * @return value, 0 if not mapped byte-aligned with 32 bits
  */
 float decode_value_real(const uint8_t* img, const InputLayout& l) {
     float f = 0.0F;
@@ -409,10 +409,10 @@ float decode_value_real(const uint8_t* img, const InputLayout& l) {
 }
 
 /**
- * @brief Messwert der Klemme: Value (Real) 0x6000:12, sonst Value (INT32) 0x6000:11.
- * @param img Eingangsabbild des Slaves
- * @param l Lage der Einträge
- * @return Wert, 0 wenn keiner byteweise mit 32 Bit gemappt ist
+ * @brief Measured value of the terminal: Value (Real) 0x6000:12, otherwise Value (INT32) 0x6000:11.
+ * @param img input image of the slave
+ * @param l position of the entries
+ * @return value, 0 if neither is mapped byte-aligned with 32 bits
  */
 double decode_measurement(const uint8_t* img, const InputLayout& l) {
     if (l.value_real.present) return decode_value_real(img, l);
@@ -422,10 +422,10 @@ double decode_measurement(const uint8_t* img, const InputLayout& l) {
 }
 
 /**
- * @brief Schreibt die Steuerbits in das Ausgangsabbild.
- * @param img Ausgangsabbild des Slaves
- * @param l Lage der Steuerbits
- * @param c Steuerbits
+ * @brief Writes the control bits into the output image.
+ * @param img output image of the slave
+ * @param l position of the control bits
+ * @param c control bits
  */
 void encode_control(uint8_t* img, const OutputLayout& l, const El3356Control& c) {
     set_bit(img, l.start_calibration, c.start_calibration);
@@ -438,11 +438,11 @@ void encode_control(uint8_t* img, const OutputLayout& l, const El3356Control& c)
 }
 
 /**
- * @brief Schreibt Statusbits und Messwert in ein Eingangsabbild (Simulation).
- * @param img Eingangsabbild
- * @param l Lage der Einträge
- * @param s Statusbits
- * @param value_real Messwert; Value (INT32) gerundet
+ * @brief Writes status bits and measured value into an input image (simulation).
+ * @param img input image
+ * @param l position of the entries
+ * @param s status bits
+ * @param value_real measured value; Value (INT32) rounded
  */
 void encode_inputs(uint8_t* img, const InputLayout& l, const El3356Status& s, float value_real) {
     set_bit(img, l.overrange, s.overrange);
@@ -459,10 +459,10 @@ void encode_inputs(uint8_t* img, const InputLayout& l, const El3356Status& s, fl
 }
 
 /**
- * @brief Zugriff auf das Steuerbit 0x7000:@p sub.
- * @param c Steuerbits
- * @param sub Subindex kSubCtrlStartCalibration..kSubCtrlTare
- * @return Zeiger auf das Feld in @p c, nullptr bei unbekanntem Subindex
+ * @brief Access to the control bit 0x7000:@p sub.
+ * @param c control bits
+ * @param sub subindex kSubCtrlStartCalibration..kSubCtrlTare
+ * @return pointer to the field in @p c, nullptr for an unknown subindex
  */
 bool* control_bit(El3356Control& c, uint8_t sub) {
     switch (sub) {
@@ -476,16 +476,16 @@ bool* control_bit(El3356Control& c, uint8_t sub) {
 }
 
 /**
- * @brief Name und Typ eines Eintrags laut Gerätebeschreibung.
+ * @brief Name and type of an entry according to the device description.
  *
- * Gesucht wird im Objektverzeichnis, danach in den PDO-Mappings aller Revisionen (z. B.
- * 0x1800:09 bis Revision 0x0014, das kein Objekteintrag ist); dort ohne Präfix "Status__".
+ * The object dictionary is searched first, then the PDO mappings of all revisions (e.g.
+ * 0x1800:09 up to revision 0x0014, which is not an object entry); there without the prefix "Status__".
  *
- * @param index Objektindex
- * @param sub Subindex
- * @param[out] name Name
- * @param[out] type Datentyp
- * @return false, wenn der Eintrag unbekannt ist
+ * @param index object index
+ * @param sub subindex
+ * @param[out] name name
+ * @param[out] type data type
+ * @return false if the entry is unknown
  */
 bool known_entry(uint16_t index, uint8_t sub, std::string& name, DType& type) {
     const auto& d = DeviceDescription::el3356_0010();
@@ -508,9 +508,9 @@ bool known_entry(uint16_t index, uint8_t sub, std::string& name, DType& type) {
 }
 
 /**
- * @brief Name eines PDOs laut Gerätebeschreibung.
- * @param pdo Index 0x16xx/0x1Axx
- * @return Name, sonst "0xIIII"
+ * @brief Name of a PDO according to the device description.
+ * @param pdo index 0x16xx/0x1Axx
+ * @return name, otherwise "0xIIII"
  */
 std::string known_pdo_name(uint16_t pdo) {
     if (const auto* p = DeviceDescription::el3356_0010().pdo(pdo)) return p->name;
@@ -520,12 +520,12 @@ std::string known_pdo_name(uint16_t pdo) {
 }
 
 /**
- * @brief PDOs der EL3356-0010 laut Gerätebeschreibung mit Mapping und Exclude-Listen.
+ * @brief PDOs of the EL3356-0010 according to the device description with mapping and exclude lists.
  *
- * Mapping der neuesten Revision. Grundlage für die Simulation und Rückfall für Namen ohne
- * SDO-Information.
+ * Mapping of the latest revision. Basis for the simulation and fallback for names without
+ * SDO information.
  *
- * @return alle PDOs der neuesten Revision, nicht zugeordnet
+ * @return all PDOs of the latest revision, not assigned
  */
 std::vector<PdoInfo> known_pdos() {
     const auto& d = DeviceDescription::el3356_0010();
@@ -541,10 +541,10 @@ std::vector<PdoInfo> known_pdos() {
 }
 
 /**
- * @brief Setzt assigned und die Lage der Einträge gemäß Zuordnungsreihenfolge.
- * @param pdos PDO-Katalog
- * @param rx_assign Inhalt von 0x1C12
- * @param tx_assign Inhalt von 0x1C13
+ * @brief Sets assigned and the position of the entries according to the assignment order.
+ * @param pdos PDO catalog
+ * @param rx_assign content of 0x1C12
+ * @param tx_assign content of 0x1C13
  */
 void locate_pdos(std::vector<PdoInfo>& pdos, const std::vector<uint16_t>& rx_assign,
                  const std::vector<uint16_t>& tx_assign) {
@@ -567,10 +567,10 @@ void locate_pdos(std::vector<PdoInfo>& pdos, const std::vector<uint16_t>& rx_ass
 }
 
 /**
- * @brief Wert eines zugeordneten Eintrags aus dem Abbild.
- * @param img Ein- bzw. Ausgangsabbild des Slaves
- * @param e Eintrag mit Lage
- * @return Wert (Bitfeld bis 64 Bit; U64 als double gerundet), 0 für Lücken
+ * @brief Value of an assigned entry from the image.
+ * @param img input or output image of the slave
+ * @param e entry with position
+ * @return value (bit field up to 64 bits; U64 rounded as double), 0 for gaps
  */
 double entry_value(const uint8_t* img, const PdoEntry& e) {
     if (!e.loc.present || e.type == DType::None) return 0.0;
@@ -579,19 +579,19 @@ double entry_value(const uint8_t* img, const PdoEntry& e) {
 
 namespace {
 
-/// @name Konfigurationsbereich des Objektverzeichnisses (ETG.5001 Modular Device Profile)
+/// @name Configuration area of the object dictionary (ETG.5001 Modular Device Profile)
 /// @{
-constexpr uint16_t kObjConfigFirst = 0x8000U;  ///< erstes Konfigurationsobjekt
-constexpr uint16_t kObjConfigLast = 0x8FFFU;   ///< letztes Konfigurationsobjekt
+constexpr uint16_t kObjConfigFirst = 0x8000U;  ///< first configuration object
+constexpr uint16_t kObjConfigLast = 0x8FFFU;   ///< last configuration object
 /// @}
-constexpr size_t kNumTextLen = 32U;  ///< Puffer für eine formatierte Zahl
-constexpr int kHexBase = 16;         ///< Basis der Adressen "0xIIII" der Gerätebeschreibung
+constexpr size_t kNumTextLen = 32U;  ///< buffer for a formatted number
+constexpr int kHexBase = 16;         ///< base of the addresses "0xIIII" of the device description
 
 /**
- * @brief Adresse als "0xIIII:SS" (Schlüssel in DeviceConfig::coe und der Gerätebeschreibung).
- * @param index Objektindex
- * @param sub Subindex
- * @return Adresse
+ * @brief Address as "0xIIII:SS" (key in DeviceConfig::coe and the device description).
+ * @param index object index
+ * @param sub subindex
+ * @return address
  */
 std::string obj_key(uint16_t index, uint8_t sub) {
     char b[kObjNameLen];
@@ -600,9 +600,9 @@ std::string obj_key(uint16_t index, uint8_t sub) {
 }
 
 /**
- * @brief Zahl für Meldungen (Dezimalkomma, ohne überflüssige Stellen).
- * @param v Wert
- * @return Text
+ * @brief Number for messages (decimal comma, without superfluous digits).
+ * @param v value
+ * @return text
  */
 std::string num_text(double v) {
     char b[kNumTextLen];
@@ -613,18 +613,18 @@ std::string num_text(double v) {
 }
 
 /**
- * @brief JSON-Wert (Zahl oder bool) als Zahl.
- * @param j Wert
- * @return Zahl; bool als 0/1
+ * @brief JSON value (number or bool) as a number.
+ * @param j value
+ * @return number; bool as 0/1
  */
 double json_number(const nlohmann::json& j) {
     return j.is_boolean() ? (j.get<bool>() ? 1.0 : 0.0) : j.get<double>();
 }
 
 /**
- * @brief Prüft, ob ein Eintrag ein schreibbarer Klemmenparameter ist.
- * @param e Eintrag der Gerätebeschreibung
- * @return true für rw-Einträge 0x8000..0x8FFF mit Zahlentyp, ohne Subindex 0 und ohne never_write
+ * @brief Checks whether an entry is a writable terminal parameter.
+ * @param e entry of the device description
+ * @return true for rw entries 0x8000..0x8FFF with a numeric type, without subindex 0 and without never_write
  */
 bool is_setting(const DescEntry& e) {
     if (e.index < kObjConfigFirst || e.index > kObjConfigLast || e.sub == kSubCount) return false;
@@ -634,11 +634,11 @@ bool is_setting(const DescEntry& e) {
 }
 
 /**
- * @brief Prüft einen Wert gegen Datentyp, Grenzen und Aufzählung laut Gerätebeschreibung.
- * @param e Eintrag
- * @param t Datentyp
- * @param v Wert (CoE-Rohwert)
- * @return Fehlertext, leer = gültig
+ * @brief Checks a value against data type, limits and enumeration according to the device description.
+ * @param e entry
+ * @param t data type
+ * @param v value (CoE raw value)
+ * @return error text, empty = valid
  */
 std::string check_value(const DescEntry& e, DType t, double v) {
     auto range = [](double lo, double hi) { return "zulässig " + num_text(lo) + ".." + num_text(hi); };
@@ -683,14 +683,14 @@ std::string check_value(const DescEntry& e, DType t, double v) {
 } // namespace
 
 /**
- * @brief Schreibbare Klemmenparameter laut Gerätebeschreibung mit dem wirksamen Wert.
+ * @brief Writable terminal parameters according to the device description with the effective value.
  *
- * Wert: typisiertes Feld von DeviceConfig (config_key), sonst DeviceConfig::coe, sonst Default
- * der ESI. Einträge ohne Wert und Einträge, die in der Revision fehlen, entfallen.
+ * Value: typed field of DeviceConfig (config_key), otherwise DeviceConfig::coe, otherwise the ESI
+ * default. Entries without a value and entries missing in the revision are skipped.
  *
- * @param dc Klemmenparameter
- * @param revision Revision der Klemme, 0 = neueste der Beschreibung
- * @return Parameter nach Index und Subindex
+ * @param dc terminal parameters
+ * @param revision revision of the terminal, 0 = latest of the description
+ * @return parameters by index and subindex
  */
 std::vector<DeviceSetting> device_settings(const DeviceConfig& dc, uint32_t revision) {
     const auto& d = DeviceDescription::el3356_0010();
@@ -721,13 +721,13 @@ std::vector<DeviceSetting> device_settings(const DeviceConfig& dc, uint32_t revi
 }
 
 /**
- * @brief Prüft die Klemmenparameter gegen die Gerätebeschreibung.
+ * @brief Checks the terminal parameters against the device description.
  *
- * Schlüssel in DeviceConfig::coe müssen schreibbare Klemmenparameter ohne typisiertes Feld
- * sein; alle konfigurierten Werte werden gegen Datentyp, Grenzen und Aufzählung geprüft.
+ * Keys in DeviceConfig::coe must be writable terminal parameters without a typed field;
+ * all configured values are checked against data type, limits and enumeration.
  *
- * @param dc Klemmenparameter
- * @return Fehlermeldungen; leer = gültig
+ * @param dc terminal parameters
+ * @return error messages; empty = valid
  */
 std::vector<std::string> validate_device(const DeviceConfig& dc) {
     const auto& d = DeviceDescription::el3356_0010();
@@ -770,10 +770,10 @@ std::vector<std::string> validate_device(const DeviceConfig& dc) {
 }
 
 /**
- * @brief Schreibliste aller Klemmenparameter (wie eine Startup-Liste in TwinCAT).
- * @param dc Klemmenparameter
- * @param revision Revision der Klemme, 0 = neueste der Beschreibung
- * @return SDO-Schreibzugriffe nach Index und Subindex (auch in OP zulässig)
+ * @brief Write list of all terminal parameters (like a startup list in TwinCAT).
+ * @param dc terminal parameters
+ * @param revision revision of the terminal, 0 = latest of the description
+ * @return SDO write accesses by index and subindex (also allowed in OP)
  */
 std::vector<SdoWrite> settings_writes(const DeviceConfig& dc, uint32_t revision) {
     std::vector<SdoWrite> out;
@@ -783,9 +783,9 @@ std::vector<SdoWrite> settings_writes(const DeviceConfig& dc, uint32_t revision)
 }
 
 /**
- * @brief ESI-Name der Prozessdaten-Variante.
+ * @brief ESI name of the process data variant.
  * @param variant DeviceConfig::pdo_variant
- * @return Name der AlternativeSmMapping, nullptr bei unbekannter Variante
+ * @return name of the AlternativeSmMapping, nullptr for an unknown variant
  */
 const char* variant_name(const std::string& variant) {
     if (variant == kVariantReal) return kVariantRealName;
@@ -794,15 +794,15 @@ const char* variant_name(const std::string& variant) {
 }
 
 /**
- * @brief PDO-Zuordnung laut Gerätebeschreibung.
+ * @brief PDO assignment according to the device description.
  *
- * Grundlage ist die Variante (AlternativeSmMapping); PDOs aus pdo_rules (0x1601 bei Filter
- * „PDO Filter frequency“) kommen hinzu, wenn eine Bedingung erfüllt ist. PDOs, die in der
- * Revision fehlen, entfallen.
+ * The basis is the variant (AlternativeSmMapping); PDOs from pdo_rules (0x1601 for filter
+ * "PDO Filter frequency") are added when a condition is met. PDOs missing in the
+ * revision are skipped.
  *
- * @param dc Klemmenparameter (Variante, Filtereinstellungen)
- * @param revision Revision der Klemme, 0 = neueste der Beschreibung
- * @return Zuordnung; leer bei unbekannter Variante
+ * @param dc terminal parameters (variant, filter settings)
+ * @param revision revision of the terminal, 0 = latest of the description
+ * @return assignment; empty for an unknown variant
  */
 PdoAssignment pdo_assignment(const DeviceConfig& dc, uint32_t revision) {
     const auto& d = DeviceDescription::el3356_0010();
@@ -836,10 +836,10 @@ PdoAssignment pdo_assignment(const DeviceConfig& dc, uint32_t revision) {
 }
 
 /**
- * @brief Prüft eine Zuordnung gegen die Exclude-Listen und die Revision der Gerätebeschreibung.
- * @param a Zuordnung
- * @param revision Revision der Klemme, 0 = neueste der Beschreibung
- * @return Fehlermeldungen; leer = gültig
+ * @brief Checks an assignment against the exclude lists and the revision of the device description.
+ * @param a assignment
+ * @param revision revision of the terminal, 0 = latest of the description
+ * @return error messages; empty = valid
  */
 std::vector<std::string> check_assignment(const PdoAssignment& a, uint32_t revision) {
     const auto& d = DeviceDescription::el3356_0010();
@@ -861,10 +861,10 @@ std::vector<std::string> check_assignment(const PdoAssignment& a, uint32_t revis
 }
 
 /**
- * @brief Schreibliste für eine PDO-Zuordnung: Anzahl 0, Einträge, Anzahl.
- * @param sm_obj 0x1C12 oder 0x1C13
- * @param pdos zuzuordnende PDOs in Reihenfolge
- * @return pdos.size() + 2 SDO-Schreibzugriffe (nur in PRE-OP zulässig)
+ * @brief Write list for a PDO assignment: count 0, entries, count.
+ * @param sm_obj 0x1C12 or 0x1C13
+ * @param pdos PDOs to assign, in order
+ * @return pdos.size() + 2 SDO write accesses (only allowed in PRE-OP)
  */
 std::vector<SdoWrite> assign_writes(uint16_t sm_obj, const std::vector<uint16_t>& pdos) {
     const char* what = sm_obj == kSm2Assign ? "RxPDO assign" : "TxPDO assign";
@@ -880,10 +880,10 @@ std::vector<SdoWrite> assign_writes(uint16_t sm_obj, const std::vector<uint16_t>
 }
 
 /**
- * @brief Vollständige Sequenz des Übergangs PRE-OP -> SAFE-OP.
- * @param dc Klemmenparameter (Variante, Filter); 0x8000.. nur bei write_on_start
- * @param revision Revision der Klemme, 0 = neueste der Beschreibung
- * @return PDO-Zuordnung 0x1C12/0x1C13, danach ggf. 0x8000
+ * @brief Complete sequence of the transition PRE-OP -> SAFE-OP.
+ * @param dc terminal parameters (variant, filter); 0x8000.. only with write_on_start
+ * @param revision revision of the terminal, 0 = latest of the description
+ * @return PDO assignment 0x1C12/0x1C13, then 0x8000 if applicable
  */
 std::vector<SdoWrite> init_sequence(const DeviceConfig& dc, uint32_t revision) {
     const auto a = pdo_assignment(dc, revision);
@@ -894,11 +894,11 @@ std::vector<SdoWrite> init_sequence(const DeviceConfig& dc, uint32_t revision) {
     return seq;
 }
 
-/// @brief UINT16 als Bytes, little endian.
+/// @brief UINT16 as bytes, little endian.
 std::vector<uint8_t> le_u16(uint16_t v) { return le<uint16_t>(v); }
-/// @brief REAL32 als Bytes, little endian.
+/// @brief REAL32 as bytes, little endian.
 std::vector<uint8_t> le_f32(float v) { return le<float>(v); }
-/// @brief REAL32 aus Bytes, little endian; 0 bei weniger als 4 Byte.
+/// @brief REAL32 from bytes, little endian; 0 for fewer than 4 bytes.
 float f32_from_le(const std::vector<uint8_t>& d) {
     float f = 0.0F;
     if (d.size() >= sizeof(f)) std::memcpy(&f, d.data(), sizeof(f));

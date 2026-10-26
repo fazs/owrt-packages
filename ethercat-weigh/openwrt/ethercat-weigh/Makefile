@@ -17,17 +17,17 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=ethercat-weigh
 PKG_VERSION:=0.2.1
-PKG_RELEASE:=15
+PKG_RELEASE:=16
 
 PKG_MAINTAINER:=Fabian <fabiannd@gmail.com>
 
-# Quellen liegen im selben Repository (zwei Ebenen über diesem Makefile)
+# Sources live in the same repository (two levels above this Makefile)
 EW_SOURCE_ROOT:=$(abspath $(CURDIR)/../..)
 
 include $(INCLUDE_DIR)/package.mk
 include $(INCLUDE_DIR)/cmake.mk
 
-# Version für CMake (EW_VERSION); PKG_VERSION ist die einzige Quelle
+# Version for CMake (EW_VERSION); PKG_VERSION is the single source
 CMAKE_OPTIONS += -DEW_BUILD_TESTS=OFF -DEW_PKG_VERSION=$(PKG_VERSION)
 
 define Package/ethercat-weigh

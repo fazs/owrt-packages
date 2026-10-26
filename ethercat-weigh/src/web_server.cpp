@@ -16,22 +16,22 @@ namespace ew {
 
 namespace {
 
-/// @name HTTP-Statuscodes (RFC 9110)
+/// @name HTTP status codes (RFC 9110)
 /// @{
 constexpr int kHttpOk = 200;          ///< OK
-constexpr int kHttpBadRequest = 400;  ///< ungültige Anfrage
-constexpr int kHttpNotFound = 404;    ///< nicht gefunden
-constexpr int kHttpConflict = 409;    ///< Kommando im aktuellen Zustand nicht ausführbar
+constexpr int kHttpBadRequest = 400;  ///< invalid request
+constexpr int kHttpNotFound = 404;    ///< not found
+constexpr int kHttpConflict = 409;    ///< command cannot be executed in the current state
 /// @}
 
-/// Cache-Dauer statischer Dateien des Frontends [s] (1 Tag)
+/// Cache duration of static frontend files [s] (1 day)
 constexpr int kStaticMaxAgeS = 24 * 60 * 60;
 
 /**
- * @brief JSON-Antwort ohne Caching.
- * @param code HTTP-Statuscode
- * @param j Antwortkörper
- * @return Crow-Antwort mit Content-Type application/json
+ * @brief JSON response without caching.
+ * @param code HTTP status code
+ * @param j response body
+ * @return Crow response with content type application/json
  */
 crow::response json_response(int code, const nlohmann::json& j) {
     crow::response r(code, j.dump());
@@ -41,9 +41,9 @@ crow::response json_response(int code, const nlohmann::json& j) {
 }
 
 /**
- * @brief Content-Type anhand der Dateiendung.
- * @param path Dateipfad
- * @return MIME-Typ, application/octet-stream bei unbekannter Endung
+ * @brief Content type based on the file extension.
+ * @param path file path
+ * @return MIME type, application/octet-stream for an unknown extension
  */
 std::string mime_type(const std::string& path) {
     auto ends = [&](const char* ext) {
@@ -62,14 +62,14 @@ std::string mime_type(const std::string& path) {
 }
 
 /**
- * @brief Liefert eine Datei des statischen Frontends aus.
+ * @brief Serves a file of the static frontend.
  *
- * Pfade mit ".." oder führendem "/" werden abgewiesen. Unbekannte Pfade ohne
- * Dateiendung liefern index.html (SPA-Fallback).
+ * Paths with ".." or a leading "/" are rejected. Unknown paths without
+ * file extension return index.html (SPA fallback).
  *
- * @param root Frontend-Verzeichnis (http.web_root)
- * @param rel Pfad relativ zu @p root; leer = index.html
- * @return Datei, kHttpBadRequest oder kHttpNotFound
+ * @param root frontend directory (http.web_root)
+ * @param rel path relative to @p root; empty = index.html
+ * @return file, kHttpBadRequest or kHttpNotFound
  */
 crow::response serve_file(const std::string& root, std::string rel) {
     if (rel.empty()) rel = "index.html";
@@ -77,7 +77,7 @@ crow::response serve_file(const std::string& root, std::string rel) {
         return crow::response(kHttpBadRequest);
     std::ifstream f(root + "/" + rel, std::ios::binary);
     if (!f) {
-        // SPA-Fallback: unbekannte Pfade ohne Dateiendung -> index.html
+        // SPA fallback: unknown paths without file extension -> index.html
         if (rel.find('.') == std::string::npos) return serve_file(root, "index.html");
         return crow::response(kHttpNotFound);
     }
@@ -90,7 +90,7 @@ crow::response serve_file(const std::string& root, std::string rel) {
     return r;
 }
 
-/// Leitet Crow-Meldungen in das eigene Logging um (Level bleibt erhalten).
+/// Redirects Crow messages to our own logging (the level is preserved).
 class CrowLogHandler : public crow::ILogHandler {
 public:
     void log(std::string message, crow::LogLevel level) override {
@@ -103,36 +103,36 @@ public:
     }
 };
 
-/// Offene WebSocket-Verbindungen.
+/// Open WebSocket connections.
 struct WsHub {
-    std::mutex m;                                            ///< schützt conns
-    std::unordered_set<crow::websocket::connection*> conns;  ///< offene Verbindungen
+    std::mutex m;                                            ///< protects conns
+    std::unordered_set<crow::websocket::connection*> conns;  ///< open connections
 
-    /// Sendet @p msg an alle offenen Verbindungen.
+    /// Sends @p msg to all open connections.
     void broadcast(const std::string& msg) {
         std::lock_guard<std::mutex> lk(m);
         for (auto* c : conns) c->send_text(msg);
     }
 };
 
-/// Beschreibung der API (info.description der OpenAPI-Spec)
+/// Description of the API (info.description of the OpenAPI spec)
 constexpr const char* kApiDescription =
-    "REST-API von ethercat-weigh. Ereignisse (sample, measurement, config, ...) kommen über den "
-    "WebSocket /ws; die erste Nachricht nach dem Verbindungsaufbau ist {\"type\": \"init\", "
+    "REST API of ethercat-weigh. Events (sample, measurement, config, ...) are sent via the "
+    "WebSocket /ws; the first message after connecting is {\"type\": \"init\", "
     "\"snapshot\", \"config\"}.";
 
-/// @name OpenAPI-Tags (Gruppen der Routen)
+/// @name OpenAPI tags (groups of the routes)
 /// @{
-constexpr const char* kTagState = "Zustand";
-constexpr const char* kTagConfig = "Konfiguration";
-constexpr const char* kTagMeasurement = "Messungen";
-constexpr const char* kTagCalibration = "Kalibrierung";
-constexpr const char* kTagDevice = "Klemme";
+constexpr const char* kTagState = "State";
+constexpr const char* kTagConfig = "Configuration";
+constexpr const char* kTagMeasurement = "Measurements";
+constexpr const char* kTagCalibration = "Calibration";
+constexpr const char* kTagDevice = "Terminal";
 constexpr const char* kTagDebug = "Debug";
 constexpr const char* kTagSim = "Simulation";
 /// @}
 
-/// @name Namen der Schema-Komponenten
+/// @name Names of the schema components
 /// @{
 constexpr const char* kSchemaResult = "Result";
 constexpr const char* kSchemaConfigResult = "ConfigResult";
@@ -142,20 +142,20 @@ constexpr const char* kSchemaMeasurement = "Measurement";
 /// @}
 
 /**
- * @brief Schema eines einfachen Typs.
- * @param type JSON-Schema-Typ ("boolean", "integer", "number", "string", "object")
+ * @brief Schema of a simple type.
+ * @param type JSON schema type ("boolean", "integer", "number", "string", "object")
  */
 nlohmann::json schema_type(const char* type) { return {{"type", type}}; }
 
 /**
- * @brief Schema einer Ganzzahl mit Wertebereich.
- * @param max Obergrenze (Untergrenze 0)
+ * @brief Schema of an integer with value range.
+ * @param max upper limit (lower limit 0)
  */
 nlohmann::json schema_uint(uint64_t max) { return {{"type", "integer"}, {"minimum", 0}, {"maximum", max}}; }
 
 /**
- * @brief Schema eines Strings mit festen Werten.
- * @param values erlaubte Werte
+ * @brief Schema of a string with fixed values.
+ * @param values permitted values
  */
 nlohmann::json schema_enum(const std::vector<std::string>& values) {
     return {{"type", "string"}, {"enum", values}};
@@ -164,14 +164,14 @@ nlohmann::json schema_enum(const std::vector<std::string>& values) {
 } // namespace
 
 /**
- * @brief Registriert alle REST-Routen mit ihrer Beschreibung.
+ * @brief Registers all REST routes with their description.
  *
- * Antwortschemas werden, wo möglich, aus Beispielwerten von @p acq abgeleitet
- * (schema_from()), damit sie den Datenstrukturen folgen.
+ * Response schemas are derived, where possible, from example values of @p acq
+ * (schema_from()), so that they follow the data structures.
  *
- * @param api Registry (Crow-Anwendung)
- * @param acq Acquisition (Datenquelle und Kommandoziel)
- * @param spec OpenAPI-Spec, die GET /api/openapi.json ausliefert
+ * @param api registry (Crow application)
+ * @param acq acquisition (data source and command target)
+ * @param spec OpenAPI spec served by GET /api/openapi.json
  */
 void register_api(ApiRegistry& api, Acquisition& acq, const nlohmann::json& spec) {
     using crow::HTTPMethod;
@@ -202,26 +202,26 @@ void register_api(ApiRegistry& api, Acquisition& acq, const nlohmann::json& spec
         return json_response(r.ok ? kHttpOk : kHttpConflict, {{"ok", r.ok}, {"error", r.error}});
     };
 
-    // --- Zustand und Konfiguration ---------------------------------------------
+    // --- State and configuration -------------------------------------------------
     api.add(HTTPMethod::Get, "/api/openapi.json",
-            {kTagState, "Diese OpenAPI-Spec", {}, {{kHttpOk, schema_type("object")}}},
+            {kTagState, "This OpenAPI spec", {}, {{kHttpOk, schema_type("object")}}},
             [&spec] { return json_response(kHttpOk, spec); });
 
     api.add(HTTPMethod::Get, "/api/info",
-            {kTagState, "Version, Backend-Zustand, Zyklen, Überläufe, max. Zykluszeit", {},
+            {kTagState, "Version, backend state, cycles, overruns, max. cycle time", {},
              {{kHttpOk, schema_ref(kSchemaInfo)}}},
             [&] { return json_response(kHttpOk, acq.info()); });
 
     api.add(HTTPMethod::Get, "/api/state",
-            {kTagState, "Snapshot: letztes Sample, Statistik, letzte Messungen, info", {}, {{kHttpOk, snapshot}}},
+            {kTagState, "Snapshot: last sample, statistics, latest measurements, info", {}, {{kHttpOk, snapshot}}},
             [&] { return json_response(kHttpOk, acq.snapshot()); });
 
     api.add(HTTPMethod::Get, "/api/config",
-            {kTagConfig, "Gespeicherte Konfiguration", {}, {{kHttpOk, schema_ref(kSchemaConfig)}}},
+            {kTagConfig, "Saved configuration", {}, {{kHttpOk, schema_ref(kSchemaConfig)}}},
             [&] { return json_response(kHttpOk, nlohmann::json(acq.config())); });
 
     api.add(HTTPMethod::Put, "/api/config",
-            {kTagConfig, "Konfiguration validieren, speichern und anwenden", schema_ref(kSchemaConfig),
+            {kTagConfig, "Validate, save and apply the configuration", schema_ref(kSchemaConfig),
              {{kHttpOk, schema_ref(kSchemaConfigResult)}, {kHttpBadRequest, schema_ref(kSchemaConfigResult)}}},
             [&](const crow::request& req) {
                 Config next;
@@ -235,14 +235,14 @@ void register_api(ApiRegistry& api, Acquisition& acq, const nlohmann::json& spec
                                      {{"ok", r.ok}, {"restart_required", r.restart_required}, {"errors", r.errors}});
             });
 
-    // --- Messungen ---------------------------------------------------------------
+    // --- Measurements -------------------------------------------------------------
     api.add(HTTPMethod::Get, "/api/measurements",
-            {kTagMeasurement, "Gehaltene Messungen (Massen in g)", {},
+            {kTagMeasurement, "Held measurements (masses in g)", {},
              {{kHttpOk, {{"type", "array"}, {"items", schema_ref(kSchemaMeasurement)}}}}},
             [&] { return json_response(kHttpOk, acq.measurements_json()); });
 
     {
-        ApiDoc doc{kTagMeasurement, "Gehaltene Messungen als CSV (Trennzeichen ';')", {},
+        ApiDoc doc{kTagMeasurement, "Held measurements as CSV (separator ';')", {},
                    {{kHttpOk, schema_type("string")}}};
         doc.query = {{"unit", schema_type("string")}};
         doc.media = "text/csv";
@@ -256,7 +256,7 @@ void register_api(ApiRegistry& api, Acquisition& acq, const nlohmann::json& spec
     }
 
     {
-        ApiDoc doc{kTagMeasurement, "Messung löschen", {}, {{kHttpOk, result}, {kHttpNotFound, result}}};
+        ApiDoc doc{kTagMeasurement, "Delete a measurement", {}, {{kHttpOk, result}, {kHttpNotFound, result}}};
         doc.params = {"id"};
         api.add(HTTPMethod::Delete, "/api/measurements/<uint>", doc, [&](uint64_t id) {
             if (!acq.delete_measurement(id))
@@ -266,23 +266,23 @@ void register_api(ApiRegistry& api, Acquisition& acq, const nlohmann::json& spec
     }
 
     api.add(HTTPMethod::Post, "/api/statistics/reset",
-            {kTagMeasurement, "Statistik und Messungen löschen", {}, {{kHttpOk, result}}}, [&] {
+            {kTagMeasurement, "Delete statistics and measurements", {}, {{kHttpOk, result}}}, [&] {
                 acq.reset_statistics();
                 return json_response(kHttpOk, {{"ok", true}});
             });
 
-    // --- Tara und Kalibrierung -----------------------------------------------------
+    // --- Tare and calibration -------------------------------------------------------
     api.add(HTTPMethod::Post, "/api/tare",
-            {kTagCalibration, "Tara (Software) aus dem Mittel der letzten 0,5 s setzen", {},
+            {kTagCalibration, "Set the tare (software) from the mean of the last 0.5 s", {},
              {{kHttpOk, result}, {kHttpConflict, result}}},
             [&] { return cal_result(acq.tare()); });
 
     api.add(HTTPMethod::Post, "/api/tare/clear",
-            {kTagCalibration, "Tara (Software) löschen", {}, {{kHttpOk, result}, {kHttpConflict, result}}},
+            {kTagCalibration, "Clear the tare (software)", {}, {{kHttpOk, result}, {kHttpConflict, result}}},
             [&] { return cal_result(acq.clear_tare()); });
 
     api.add(HTTPMethod::Post, "/api/calibration",
-            {kTagCalibration, "Kalibrierschritt ausführen (Aktionen siehe README)",
+            {kTagCalibration, "Execute a calibration step (actions see README)",
              schema_object({{"action", schema_type("string")},
                             {"mass", schema_type("number")},
                             {"unit", schema_type("string")},
@@ -301,7 +301,7 @@ void register_api(ApiRegistry& api, Acquisition& acq, const nlohmann::json& spec
             });
 
     api.add(HTTPMethod::Post, "/api/sim/load",
-            {kTagSim, "Nur Simulation: Last in g auflegen; null = automatisches Profil",
+            {kTagSim, "Simulation only: apply a load in g; null = automatic profile",
              schema_object({{"grams", {{"type", {"number", "null"}}}}}),
              {{kHttpOk, result}, {kHttpBadRequest, result}, {kHttpConflict, result}}},
             [&](const crow::request& req) {
@@ -315,9 +315,9 @@ void register_api(ApiRegistry& api, Acquisition& acq, const nlohmann::json& spec
                 return cal_result(acq.set_sim_load(g));
             });
 
-    // --- Klemme --------------------------------------------------------------------
+    // --- Terminal -------------------------------------------------------------------
     api.add(HTTPMethod::Get, "/api/device/description",
-            {kTagDevice, "Gerätebeschreibung der Klemme (aus der ESI erzeugt)", {},
+            {kTagDevice, "Device description of the terminal (generated from the ESI)", {},
              {{kHttpOk, schema_type("object")}}},
             [] {
                 crow::response r(kHttpOk, DeviceDescription::el3356_0010().text());
@@ -327,7 +327,7 @@ void register_api(ApiRegistry& api, Acquisition& acq, const nlohmann::json& spec
             });
 
     api.add(HTTPMethod::Post, "/api/device/command",
-            {kTagDevice, "Kommando der Gerätebeschreibung starten; Abschluss als WebSocket-Ereignis device_command",
+            {kTagDevice, "Start a command of the device description; completion as WebSocket event device_command",
              schema_object({{"id", {{"type", "string"}, {"enum", command_ids}}}}, {"id"}),
              {{kHttpOk, result}, {kHttpBadRequest, result}, {kHttpConflict, result}}},
             [&](const crow::request& req) {
@@ -347,12 +347,12 @@ void register_api(ApiRegistry& api, Acquisition& acq, const nlohmann::json& spec
                                      {"items", {{"type", "array"}, {"items", diag_item}}}},
                                     {"ok"});
     api.add(HTTPMethod::Get, "/api/device/diag",
-            {kTagDevice, "Diagnose per SDO (nur auf Anfrage)", {}, {{kHttpOk, diag}, {kHttpConflict, diag}}}, [&] {
+            {kTagDevice, "Diagnostics via SDO (on request only)", {}, {{kHttpOk, diag}, {kHttpConflict, diag}}}, [&] {
                 const auto j = acq.device_diagnostics();
                 return json_response(j.value("ok", false) ? kHttpOk : kHttpConflict, j);
             });
 
-    // --- Debug (PDOs, Initialisierungssequenz) -----------------------------------
+    // --- Debug (PDOs, initialization sequence) -----------------------------------
     const auto pdo_entry = schema_object({{"index", schema_type("integer")},
                                           {"sub", schema_type("integer")},
                                           {"bits", schema_type("integer")},
@@ -374,7 +374,7 @@ void register_api(ApiRegistry& api, Acquisition& acq, const nlohmann::json& spec
                                      {"outputs", schema_type("string")}},
                                     {"ok"});
     api.add(HTTPMethod::Get, "/api/debug/pdos",
-            {kTagDebug, "PDO-Katalog mit Zuordnung, Bitlage, Werten, Übersteuerungen und Prozessabbild (Hex)", {},
+            {kTagDebug, "PDO catalog with assignment, bit position, values, overrides and process image (hex)", {},
              {{kHttpOk, pdos}, {kHttpConflict, pdos}}},
             [&] {
                 const auto j = acq.debug_pdos();
@@ -382,7 +382,7 @@ void register_api(ApiRegistry& api, Acquisition& acq, const nlohmann::json& spec
             });
 
     api.add(HTTPMethod::Post, "/api/debug/override",
-            {kTagDebug, "Steuerbit 0x7000 übersteuern; value null hebt auf, clear hebt alle auf",
+            {kTagDebug, "Override control bit 0x7000; value null removes the override, clear removes all",
              schema_object({{"sub", schema_uint(std::numeric_limits<uint8_t>::max())},
                             {"value", {{"type", {"boolean", "null"}}}},
                             {"clear", schema_type("boolean")}}),
@@ -411,7 +411,7 @@ void register_api(ApiRegistry& api, Acquisition& acq, const nlohmann::json& spec
                                            {"hex", schema_type("string")}},
                                           {"ok"});
     api.add(HTTPMethod::Post, "/api/debug/sdo",
-            {kTagDebug, "Einzelner SDO-Zugriff",
+            {kTagDebug, "Single SDO access",
              schema_object({{"op", schema_enum({"read", "write"})},
                             {"index", schema_uint(std::numeric_limits<uint16_t>::max())},
                             {"sub", schema_uint(std::numeric_limits<uint8_t>::max())},
@@ -430,23 +430,23 @@ void register_api(ApiRegistry& api, Acquisition& acq, const nlohmann::json& spec
             });
 
     api.add(HTTPMethod::Get, "/api/debug/init",
-            {kTagDebug, "Initialisierungssequenz mit den Werten der aktuellen Konfiguration", {},
+            {kTagDebug, "Initialization sequence with the values of the current configuration", {},
              {{kHttpOk, schema_from(acq.debug_init_sequence())}}},
             [&] { return json_response(kHttpOk, acq.debug_init_sequence()); });
 
     api.add(HTTPMethod::Post, "/api/debug/reinit",
-            {kTagDebug, "Prozessdatenquelle schließen und neu initialisieren", {}, {{kHttpOk, result}}}, [&] {
+            {kTagDebug, "Close the process data source and initialize it again", {}, {{kHttpOk, result}}}, [&] {
                 acq.reinit();
                 return json_response(kHttpOk, {{"ok", true}});
             });
 }
 
 /**
- * @brief OpenAPI-Spec der REST-API.
+ * @brief OpenAPI spec of the REST API.
  *
- * Unabhängig vom laufenden Betrieb: Die Routen werden an einer eigenen Crow-Anwendung mit
- * einer nicht gestarteten Simulation (Default-Konfiguration, eine Beispielmessung) registriert.
- * Endpoint und --write-openapi liefern dadurch dasselbe Dokument.
+ * Independent of the running operation: the routes are registered on a separate Crow application
+ * with a simulation that is not started (default configuration, one example measurement).
+ * The endpoint and --write-openapi therefore deliver the same document.
  *
  * @return OpenAPI 3.1
  */
@@ -461,13 +461,13 @@ nlohmann::json openapi_spec() {
 }
 
 /**
- * @brief HTTP-Server (Crow): REST-API, WebSocket /ws und statisches Frontend.
+ * @brief HTTP server (Crow): REST API, WebSocket /ws and static frontend.
  *
- * Registriert sich als Publisher der Acquisition und verteilt deren Ereignisse
- * an alle WebSocket-Clients. Blockiert bis SIGINT/SIGTERM.
+ * Registers itself as publisher of the acquisition and distributes its events
+ * to all WebSocket clients. Blocks until SIGINT/SIGTERM.
  *
- * @param acq Acquisition (Datenquelle und Kommandoziel)
- * @param http Adresse, Port, Threads und Frontend-Verzeichnis
+ * @param acq acquisition (data source and command target)
+ * @param http address, port, threads and frontend directory
  */
 void run_web_server(Acquisition& acq, const HttpConfig& http) {
     static CrowLogHandler crow_log;
@@ -485,7 +485,7 @@ void run_web_server(Acquisition& acq, const HttpConfig& http) {
     // --- WebSocket -------------------------------------------------------------
     CROW_WEBSOCKET_ROUTE(app, "/ws")
         .onopen([&](crow::websocket::connection& conn) {
-            // Erste Nachricht nach dem Connect: vollständiger Zustand zur Initialisierung des Clients
+            // First message after connect: complete state for initializing the client
             nlohmann::json initial_state = {{"type", "init"},
                                             {"snapshot", acq.snapshot()},
                                             {"config", acq.config()}};
@@ -499,7 +499,7 @@ void run_web_server(Acquisition& acq, const HttpConfig& http) {
         })
         .onmessage([](crow::websocket::connection&, const std::string&, bool) {});
 
-    // --- Statisches Frontend ---------------------------------------------------
+    // --- Static frontend ----------------------------------------------------------
     const std::string root = http.web_root;
     CROW_ROUTE(app, "/")([root] { return serve_file(root, "index.html"); });
     CROW_ROUTE(app, "/<path>")([root](const std::string& p) { return serve_file(root, p); });

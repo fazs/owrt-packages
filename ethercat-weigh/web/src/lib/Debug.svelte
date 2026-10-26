@@ -3,28 +3,28 @@
   import { hex, objKey, enumFor, asNum, formatValue, parseValue, INDEX_HEX_DIGITS, F32_DIGITS, OBJ_CONTROL, OBJ_RX_ASSIGN, OBJ_TX_ASSIGN } from './coe.js';
   import { DEBUG_POLL_MS } from './constants.js';
 
-  /** @type {{open?: boolean}} Dialog geöffnet (bindbar) */
+  /** @type {{open?: boolean}} dialog open (bindable) */
   let { open = $bindable(false) } = $props();
 
   let dialog;
   let tab = $state('pdo');
 
-  // --- Prozessdaten
+  // --- Process data
   let pdo = $state(null); // {pdos, inputs, outputs}
   let pdoError = $state('');
   let sdoVals = $state({}); // objKey -> {value, error}
-  let edits = $state({}); // objKey -> Eingabe (Zahl bei Auswahlliste, sonst Text)
-  let busy = $state({}); // objKey bzw. 'init:<i>' -> true
+  let edits = $state({}); // objKey -> input (number for a selection list, otherwise text)
+  let busy = $state({}); // objKey or 'init:<i>' -> true
 
-  // --- Kommandos und Diagnose der Klemme
+  // --- Commands and diagnostics of the terminal
   let diag = $state(null); // {items: [...]}
   let diagError = $state('');
-  let armed = $state(null); // Kommando, das auf Bestätigung wartet
+  let armed = $state(null); // command awaiting confirmation
   const commands = $derived(live.description?.commands ?? []);
 
   /**
-   * Kommando auslösen; der erste Klick fordert die Bestätigung an, der zweite führt aus.
-   * @param {{id: string}} c Kommando der Gerätebeschreibung
+   * Triggers a command; the first click requests confirmation, the second executes it.
+   * @param {{id: string}} c command of the device description
    */
   async function command(c) {
     if (armed !== c.id) {
@@ -42,7 +42,7 @@
     });
   }
 
-  /** Liest die Diagnoseeinträge der Klemme. */
+  /** Reads the diagnostic entries of the terminal. */
   async function loadDiag() {
     await run('diag', async () => {
       try {
@@ -55,13 +55,13 @@
   }
 
   /**
-   * Schreibzugriffe eines Kommandos als Text.
-   * @param {{writes: Array<{obj: string, data: string}>}} c Kommando
-   * @returns {string} z. B. "0xFB00:01 ← 01 00"
+   * Write accesses of a command as text.
+   * @param {{writes: Array<{obj: string, data: string}>}} c command
+   * @returns {string} e.g. "0xFB00:01 ← 01 00"
    */
   const writesText = (c) => c.writes.map((w) => `${w.obj} ← ${w.data.match(/../g).join(' ')}`).join(', ');
 
-  // --- Initialisierungssequenz
+  // --- Initialization sequence
   let steps = $state([]); // {index, sub, name, type, value, pre_op_only, target, actual, error}
   let seqBusy = $state(false);
 
@@ -74,21 +74,21 @@
     if (open && dialog && !dialog.open) {
       sdoVals = {};
       edits = {};
-      loadPdos().then(loadInit); // Auswahllisten der PDO-Zuordnung kommen aus dem Katalog
+      loadPdos().then(loadInit); // selection lists of the PDO assignment come from the catalog
       dialog.showModal();
     } else if (!open && dialog?.open) {
       dialog.close();
     }
   });
 
-  // Live-Werte aus dem Prozessabbild, solange die PDO-Ansicht offen ist
+  // Live values from the process image while the PDO view is open
   $effect(() => {
     if (!open || tab !== 'pdo') return;
     const id = setInterval(loadPdos, DEBUG_POLL_MS);
     return () => clearInterval(id);
   });
 
-  /** Lädt PDO-Katalog, Werte und Prozessabbild. */
+  /** Loads PDO catalog, values and process image. */
   async function loadPdos() {
     try {
       pdo = await debugApi.pdos();
@@ -98,7 +98,7 @@
     }
   }
 
-  /** Lädt die Initialisierungssequenz und setzt die Sollwerte auf die Konfiguration. */
+  /** Loads the initialization sequence and sets the target values to the configuration. */
   async function loadInit() {
     try {
       const j = await debugApi.init();
@@ -109,9 +109,9 @@
   }
 
   /**
-   * Startwert des Sollwert-Editors für einen Schritt.
-   * @param {{index: number, sub: number, type: string, value: boolean|number}} s Schritt
-   * @returns {number|string} Zahl bei Auswahlliste, sonst Text
+   * Initial value of the target value editor for a step.
+   * @param {{index: number, sub: number, type: string, value: boolean|number}} s step
+   * @returns {number|string} number for a selection list, otherwise text
    */
   function initialTarget(s) {
     if (enumFor(s.index, s.sub, s.type, pdo?.pdos, live.description)) return asNum(s.value);
@@ -119,12 +119,12 @@
   }
 
   /**
-   * Wandelt eine Eingabe in den zu sendenden JSON-Wert.
-   * @param {number|string} raw Eingabe (Zahl bei Auswahlliste, sonst Text)
-   * @param {string} type Datentyp
-   * @param {Array<[number, string]>|null} opts Auswahlliste
+   * Converts an input into the JSON value to send.
+   * @param {number|string} raw input (number for a selection list, otherwise text)
+   * @param {string} type data type
+   * @param {Array<[number, string]>|null} opts selection list
    * @returns {number|boolean}
-   * @throws {Error} bei ungültiger freier Eingabe
+   * @throws {Error} for an invalid free input
    */
   function outValue(raw, type, opts) {
     if (opts) return type === 'bool' ? Number(raw) !== 0 : Number(raw);
@@ -132,10 +132,10 @@
   }
 
   /**
-   * Führt eine Aktion aus und markiert sie solange als laufend.
-   * @param {string} key Kennung (objKey bzw. "init:<i>")
-   * @param {() => Promise<any>} fn Aktion
-   * @returns {Promise<any>} Ergebnis von `fn`
+   * Executes an action and marks it as running meanwhile.
+   * @param {string} key identifier (objKey or "init:<i>")
+   * @param {() => Promise<any>} fn action
+   * @returns {Promise<any>} result of `fn`
    */
   async function run(key, fn) {
     busy = { ...busy, [key]: true };
@@ -147,24 +147,24 @@
     }
   }
 
-  // --- PDO-Aktionen
-  /** @param {{index: number, sub: number}} e Eintrag @returns {string} "0xIIII:SS" */
+  // --- PDO actions
+  /** @param {{index: number, sub: number}} e entry @returns {string} "0xIIII:SS" */
   const entryKey = (e) => objKey(e.index, e.sub);
-  /** @param {{index: number}} e Eintrag @returns {boolean} true für Lücken im Mapping */
+  /** @param {{index: number}} e entry @returns {boolean} true for gaps in the mapping */
   const isGap = (e) => e.index === 0;
   /**
-   * Zugeordnete Steuerbits werden im Prozessabbild übersteuert, alles andere per SDO.
+   * Assigned control bits are overridden in the process image, everything else via SDO.
    * @param {{rx: boolean, assigned: boolean}} p PDO
-   * @param {{index: number}} e Eintrag
+   * @param {{index: number}} e entry
    * @returns {boolean}
    */
   const viaImage = (p, e) => p.rx && p.assigned && e.index === OBJ_CONTROL;
 
   /**
-   * Aktueller Wert des Sollwert-Editors: Eingabe, sonst Übersteuerung, Live- oder SDO-Wert.
+   * Current value of the target value editor: input, otherwise override, live or SDO value.
    * @param {object} p PDO
-   * @param {object} e Eintrag
-   * @param {Array<[number, string]>|null} opts Auswahlliste
+   * @param {object} e entry
+   * @param {Array<[number, string]>|null} opts selection list
    * @returns {number|string}
    */
   function editValue(p, e, opts) {
@@ -176,8 +176,8 @@
   }
 
   /**
-   * Liest einen Eintrag per SDO.
-   * @param {object} e Eintrag
+   * Reads an entry via SDO.
+   * @param {object} e entry
    */
   async function readEntry(e) {
     const k = entryKey(e);
@@ -192,10 +192,10 @@
   }
 
   /**
-   * Sendet den Sollwert: Übersteuerung im Prozessabbild bzw. SDO-Schreibzugriff.
+   * Sends the target value: override in the process image or SDO write access.
    * @param {object} p PDO
-   * @param {object} e Eintrag
-   * @param {Array<[number, string]>|null} opts Auswahlliste
+   * @param {object} e entry
+   * @param {Array<[number, string]>|null} opts selection list
    */
   async function sendEntry(p, e, opts) {
     const k = entryKey(e);
@@ -222,8 +222,8 @@
   }
 
   /**
-   * Hebt die Übersteuerung eines Steuerbits auf.
-   * @param {object} e Eintrag
+   * Removes the override of a control bit.
+   * @param {object} e entry
    */
   async function release(e) {
     const k = entryKey(e);
@@ -239,7 +239,7 @@
     });
   }
 
-  /** Hebt alle Übersteuerungen auf. */
+  /** Removes all overrides. */
   async function releaseAll() {
     try {
       await debugApi.override({ clear: true });
@@ -250,10 +250,10 @@
     }
   }
 
-  // --- Initialisierungssequenz
+  // --- Initialization sequence
   /**
-   * Liest das Objekt eines Sequenzschritts per SDO.
-   * @param {number} i Schritt
+   * Reads the object of a sequence step via SDO.
+   * @param {number} i step
    */
   async function readStep(i) {
     const s = steps[i];
@@ -268,8 +268,8 @@
   }
 
   /**
-   * Schreibt den Sollwert eines Sequenzschritts per SDO.
-   * @param {number} i Schritt
+   * Writes the target value of a sequence step via SDO.
+   * @param {number} i step
    */
   async function sendStep(i) {
     const s = steps[i];
@@ -286,9 +286,9 @@
   }
 
   /**
-   * Führt eine Aktion nacheinander für alle Schritte aus und meldet das Ergebnis.
-   * @param {(i: number) => Promise<void>} fn readStep oder sendStep
-   * @param {string} okText Hinweis, wenn alle Schritte erfolgreich waren
+   * Executes an action for all steps one after another and reports the result.
+   * @param {(i: number) => Promise<void>} fn readStep or sendStep
+   * @param {string} okText notice if all steps were successful
    */
   async function all(fn, okText) {
     seqBusy = true;
@@ -299,7 +299,7 @@
     else notify('ok', okText);
   }
 
-  /** Fordert die Neuinitialisierung der Klemme an (INIT -> OP). */
+  /** Requests the reinitialization of the terminal (INIT -> OP). */
   async function reinit() {
     try {
       await debugApi.reinit();
@@ -309,7 +309,7 @@
     }
   }
 
-  /** Schließt den Dialog und hebt verbliebene Übersteuerungen auf. */
+  /** Closes the dialog and removes remaining overrides. */
   async function onClose() {
     open = false;
     if (hasOverride) {

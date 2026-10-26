@@ -1,9 +1,9 @@
 /**
  * @file
- * @brief Unit-Tests ohne externes Framework: ew_tests liefert Exit-Code != 0 bei Fehlern.
+ * @brief Unit tests without an external framework: ew_tests returns exit code != 0 on failures.
  *
- * Zahlenwerte stehen als benannte Konstanten: aus dem Produktivcode übernommen (Simulation,
- * Kalibrierung, Objektverzeichnis), aus der Spezifikation (Bitlage laut ESI) oder als Testdaten.
+ * Numeric values are named constants: taken from the production code (simulation,
+ * calibration, object dictionary), from the specification (bit position according to the ESI) or as test data.
  */
 #include <algorithm>
 #include <cmath>
@@ -31,10 +31,10 @@
 
 namespace {
 
-int g_fail = 0;    ///< fehlgeschlagene Prüfungen
-int g_checks = 0;  ///< ausgeführte Prüfungen
+int g_fail = 0;    ///< failed checks
+int g_checks = 0;  ///< executed checks
 
-/// Prüft @p cond und zählt Fehler, ohne den Test abzubrechen.
+/// Checks @p cond and counts failures without aborting the test.
 #define CHECK(cond)                                                              \
     do {                                                                         \
         ++g_checks;                                                              \
@@ -44,59 +44,59 @@ int g_checks = 0;  ///< ausgeführte Prüfungen
         }                                                                        \
     } while (0)
 
-/// Prüft |a - b| <= eps.
+/// Checks |a - b| <= eps.
 #define CHECK_NEAR(a, b, eps) CHECK(std::fabs((a) - (b)) <= (eps))
 
-/// Registrierter Test.
+/// Registered test.
 struct TestCase {
     const char* name;          ///< Name
-    std::function<void()> fn;  ///< Testfunktion
+    std::function<void()> fn;  ///< test function
 };
-/// @brief Liste aller registrierten Tests.
+/// @brief List of all registered tests.
 std::vector<TestCase>& registry() {
     static std::vector<TestCase> r;
     return r;
 }
-/// Registriert einen Test bei der statischen Initialisierung.
+/// Registers a test during static initialization.
 struct Reg {
     Reg(const char* n, std::function<void()> f) { registry().push_back({n, std::move(f)}); }
 };
-/// Definiert und registriert einen Test.
+/// Defines and registers a test.
 #define TEST(name)                         \
     void name();                           \
     Reg reg_##name(#name, name);           \
     void name()
 
-// --- Gemeinsame Konstanten ---------------------------------------------------------
+// --- Common constants ------------------------------------------------------------
 
-constexpr double kMsPerS = 1000.0;  ///< Millisekunden je Sekunde
+constexpr double kMsPerS = 1000.0;  ///< milliseconds per second
 
-/// Zykluszeit der Default-Konfiguration [s]
+/// Cycle time of the default configuration [s]
 const double kCycleS = ew::Config{}.ethercat.cycle_ms / kMsPerS;
 
-constexpr double kEps = 1e-12;       ///< Toleranz für exakt berechenbare Werte
-constexpr double kEpsCoarse = 1e-9;  ///< Toleranz bei Rundung über mehrere Rechenschritte
-constexpr double kEpsFloat = 1e-6;   ///< Toleranz für REAL32-Werte
-constexpr double kExact = 0.0;       ///< bitgenauer Vergleich
+constexpr double kEps = 1e-12;       ///< tolerance for exactly computable values
+constexpr double kEpsCoarse = 1e-9;  ///< tolerance for rounding over several computation steps
+constexpr double kEpsFloat = 1e-6;   ///< tolerance for REAL32 values
+constexpr double kExact = 0.0;       ///< bit-exact comparison
 
 /**
- * @brief Anzahl Zyklen für eine Dauer.
- * @param seconds Dauer [s]
- * @return gerundete Zyklenzahl bei kCycleS
+ * @brief Number of cycles for a duration.
+ * @param seconds duration [s]
+ * @return rounded number of cycles at kCycleS
  */
 int cycles_for(double seconds) {
     return static_cast<int>(std::lround(seconds / kCycleS));
 }
 
-/// @brief Ausgelieferte Konfiguration (openwrt/ethercat-weigh/files/config.json).
+/// @brief Shipped configuration (openwrt/ethercat-weigh/files/config.json).
 ew::Config package_config() { return ew::load_config(EW_PACKAGE_CONFIG); }
 
-/// @brief Kapazität des simulierten Sensors in Gramm.
+/// @brief Capacity of the simulated sensor in grams.
 double capacity_g(const ew::Config& cfg) {
     return ew::SimBackend::sensor_for(cfg).capacity_kg * ew::kGramsPerKg;
 }
 
-/// @brief Gültiges Sample mit Nettowert @p v [g] zum Zeitpunkt @p t [s].
+/// @brief Valid sample with net value @p v [g] at time @p t [s].
 ew::Sample valid_sample(double t, double v) {
     ew::Sample s;
     s.t = t;
@@ -106,33 +106,33 @@ ew::Sample valid_sample(double t, double v) {
     return s;
 }
 
-/// @name Messparameter und Testlasten für die Engine-Tests [g]
+/// @name Measurement parameters and test loads for the engine tests [g]
 /// @{
 constexpr double kMinLoad = 0.1;         ///< min_load
 constexpr double kZeroThreshold = 0.02;  ///< zero_threshold
 constexpr uint32_t kStableTimeMs = 500U; ///< stable_time_ms
 constexpr double kTolerance = 0.002;     ///< tolerance
 constexpr double kSigmaMax = 0.001;      ///< sigma_max
-constexpr double kLoadA = 1.234;         ///< erste Last
-constexpr double kLoadB = 1.0;           ///< Last nach Teilentlastung (ohne Freigabe)
-constexpr double kLoadC = 2.5;           ///< Last nach vollständiger Entlastung
-/// Teilentlastung: zwischen zero_threshold und min_load, gibt keine neue Messung frei
+constexpr double kLoadA = 1.234;         ///< first load
+constexpr double kLoadB = 1.0;           ///< load after partial unloading (without re-arming)
+constexpr double kLoadC = 2.5;           ///< load after complete unloading
+/// Partial unloading: between zero_threshold and min_load, does not arm a new measurement
 constexpr double kPartialUnload = (kZeroThreshold + kMinLoad) / 2.0;
-/// Rauschamplitude: Spannweite 2 · Amplitude liegt über tolerance
+/// Noise amplitude: range 2 · amplitude is above tolerance
 constexpr double kUnstableAmplitude = 1.5 * kTolerance;
 /// @}
 
-/// @name Dauern in den Engine-Tests [s]
+/// @name Durations in the engine tests [s]
 /// @{
-constexpr double kEmptyS = 1.0;          ///< unbelastet vor der ersten Last
-constexpr double kHoldS = 2.0;           ///< Last halten (deutlich länger als stable_time_ms)
-constexpr double kUnloadS = 0.2;         ///< Teil- bzw. vollständige Entlastung
-constexpr double kUnstableS = 5.0;       ///< instabile Last
-constexpr double kShortS = 0.3;          ///< kürzer als stable_time_ms
-constexpr double kSteadyBitS = 1.0;      ///< Last mit gesetztem Steady-state-Bit
+constexpr double kEmptyS = 1.0;          ///< unloaded before the first load
+constexpr double kHoldS = 2.0;           ///< hold the load (much longer than stable_time_ms)
+constexpr double kUnloadS = 0.2;         ///< partial or complete unloading
+constexpr double kUnstableS = 5.0;       ///< unstable load
+constexpr double kShortS = 0.3;          ///< shorter than stable_time_ms
+constexpr double kSteadyBitS = 1.0;      ///< load with the steady state bit set
 /// @}
 
-/// @brief Messparameter für die Engine-Tests.
+/// @brief Measurement parameters for the engine tests.
 ew::MeasurementConfig mparams() {
     ew::MeasurementConfig p;
     p.min_load = kMinLoad;
@@ -145,7 +145,7 @@ ew::MeasurementConfig mparams() {
 
 // ---------------------------------------------------------------------------
 TEST(running_stats_basic) {
-    // Testreihe 1..5: Mittelwert 3, Varianz (n-1) 2,5
+    // Test series 1..5: mean 3, variance (n-1) 2.5
     const std::vector<double> series = {1.0, 2.0, 3.0, 4.0, 5.0};
     constexpr double kMean = 3.0;
     constexpr double kVariance = 2.5;
@@ -167,12 +167,12 @@ TEST(statistics_remove_measurement) {
     constexpr uint32_t kWindow = 3U;
     const std::vector<double> all = {10.0, 12.0, 11.0, 30.0, 13.0};
     constexpr double kOutlier = 30.0;
-    const std::vector<double> held = {10.0, 12.0, 11.0, 13.0};  // all ohne kOutlier
+    const std::vector<double> held = {10.0, 12.0, 11.0, 13.0};  // all without kOutlier
     constexpr double kHeldMean = 11.5;
     constexpr double kHeldMax = 13.0;
-    constexpr double kWindowMean = 12.0;  // letzte kWindow Werte: 12, 11, 13
+    constexpr double kWindowMean = 12.0;  // last kWindow values: 12, 11, 13
 
-    // Alle Werte gehalten: Ergebnis identisch zur Neuberechnung ohne den Wert
+    // All values held: result identical to the recomputation without the value
     ew::TemporaryStatistics st(kWindow);
     for (double x : all) st.add(x);
     st.remove(kOutlier, held);
@@ -183,9 +183,9 @@ TEST(statistics_remove_measurement) {
     CHECK(j["rolling"]["n"] == kWindow);
     CHECK_NEAR(j["rolling"]["mean"].get<double>(), kWindowMean, kEps);
 
-    // Nur ein Teil gehalten: n/Mittelwert/Standardabweichung exakt per Welford rückwärts
+    // Only a part held: n/mean/standard deviation exact via Welford backwards
     constexpr double kRemoved = 11.0;
-    const std::vector<double> ref_values = {10.0, 12.0, 30.0, 13.0};  // all ohne kRemoved
+    const std::vector<double> ref_values = {10.0, 12.0, 30.0, 13.0};  // all without kRemoved
     const std::vector<double> partly_held = {30.0, 13.0};
     ew::RunningStats r, ref;
     for (double x : all) r.add(x);
@@ -234,12 +234,12 @@ TEST(measurement_single_capture_and_rearm) {
     CHECK(captures == 1);
     CHECK_NEAR(captured, kLoadA, kEps);
     CHECK(e.state() == ew::MeasState::WaitUnload);
-    // Teilentlastung über zero_threshold: keine Freigabe
+    // Partial unloading above zero_threshold: no re-arming
     for (int i = 0; i < cycles_for(kUnloadS); ++i, t += kCycleS) e.process(valid_sample(t, kPartialUnload));
     for (int i = 0; i < cycles_for(kHoldS); ++i, t += kCycleS)
         if (e.process(valid_sample(t, kLoadB))) ++captures;
     CHECK(captures == 1);
-    // Entlastung unter zero_threshold: Freigabe
+    // Unloading below zero_threshold: re-armed
     for (int i = 0; i < cycles_for(kUnloadS); ++i, t += kCycleS) e.process(valid_sample(t, 0.0));
     CHECK(e.armed());
     for (int i = 0; i < cycles_for(kHoldS); ++i, t += kCycleS)
@@ -300,14 +300,14 @@ TEST(measurement_device_steady_state_required) {
 }
 
 TEST(config_validation_and_json) {
-    constexpr double kNegativeRated = -1.5;   // negatives Vorzeichen zulässig
+    constexpr double kNegativeRated = -1.5;   // negative sign allowed
     constexpr double kJsonMinLoad = 300.0;
     constexpr double kChangedTolerance = 0.01;
     constexpr double kNominalFactor = 2.0;
 
     ew::Config c;
     CHECK(c.validate().empty());
-    c.measurement.zero_threshold = c.measurement.min_load * kNominalFactor;  // Nullschwelle > Mindestlast
+    c.measurement.zero_threshold = c.measurement.min_load * kNominalFactor;  // zero threshold > minimum load
     CHECK(!c.validate().empty());
 
     ew::Config cr;
@@ -324,7 +324,7 @@ TEST(config_validation_and_json) {
     CHECK(!cu.validate().empty());
 
     ew::Config cd;
-    cd.ui.display_average = 1U;  // ohne Glättung
+    cd.ui.display_average = 1U;  // without smoothing
     CHECK(cd.validate().empty());
     cd.ui.display_average = 0U;
     CHECK(!cd.validate().empty());
@@ -332,7 +332,7 @@ TEST(config_validation_and_json) {
     const nlohmann::json j = {{"measurement", {{"min_load", kJsonMinLoad}}}, {"unknown", 1}};
     const auto c2 = ew::config_from_json(j);
     CHECK_NEAR(c2.measurement.min_load, kJsonMinLoad, kEps);
-    CHECK(c2.ethercat.cycle_ms == ew::Config{}.ethercat.cycle_ms);  // Default bleibt erhalten
+    CHECK(c2.ethercat.cycle_ms == ew::Config{}.ethercat.cycle_ms);  // default is kept
     const auto c3 = ew::config_from_json(nlohmann::json(c2));
     CHECK(nlohmann::json(c3) == nlohmann::json(c2));
 
@@ -346,23 +346,23 @@ TEST(config_validation_and_json) {
     CHECK(ew::device_config_changed(a, b));
 }
 
-/// @name Bitlage in RMB Status 0x1A00 und RMB Value (Real) 0x1A02 laut ESI
+/// @name Bit position in RMB Status 0x1A00 and RMB Value (Real) 0x1A02 according to the ESI
 /// @{
 constexpr uint32_t kBitOverrange = 1U;      ///< 0x6000:02
 constexpr uint32_t kBitError = 6U;          ///< 0x6000:07
 constexpr uint32_t kBitSteadyState = 8U;    ///< 0x6000:09
-constexpr uint32_t kBitSyncError = 13U;     ///< 0x6000:0E bzw. 0x1C32:20
-constexpr uint32_t kBitToggle = 15U;        ///< 0x6000:10 bzw. 0x1800:09
-constexpr uint32_t kBitValueReal = 16U;     ///< 0x6000:12, direkt hinter 0x1A00 (2 Byte)
+constexpr uint32_t kBitSyncError = 13U;     ///< 0x6000:0E or 0x1C32:20
+constexpr uint32_t kBitToggle = 15U;        ///< 0x6000:10 or 0x1800:09
+constexpr uint32_t kBitValueReal = 16U;     ///< 0x6000:12, directly after 0x1A00 (2 bytes)
 constexpr uint32_t kBitTare = 4U;           ///< 0x7000:05 in RMB Control 0x1600
-constexpr uint32_t kBitsPerByte = 8U;       ///< Bits je Byte
+constexpr uint32_t kBitsPerByte = 8U;       ///< bits per byte
 /// @}
 
 /**
- * @brief Mapping von RMB Status 0x1A00 laut ESI; Lücken mit ihrer Breite.
- * @param sync_error Eintrag für Sync error (Revision bis 0x0014: 0x1C32:20)
- * @param toggle Eintrag für TxPDO Toggle (Revision bis 0x0014: 0x1800:09)
- * @return Mapping-Einträge
+ * @brief Mapping of RMB Status 0x1A00 according to the ESI; gaps with their width.
+ * @param sync_error entry for sync error (revision up to 0x0014: 0x1C32:20)
+ * @param toggle entry for TxPDO toggle (revision up to 0x0014: 0x1800:09)
+ * @return mapping entries
  */
 std::vector<ew::el3356::MapEntry> status_mapping(ew::el3356::MapEntry sync_error, ew::el3356::MapEntry toggle) {
     using namespace ew::el3356;
@@ -411,7 +411,7 @@ TEST(el3356_layout_and_decode) {
     const auto back = decode_map_entry(encode_map_entry(me));
     CHECK(back.index == me.index && back.sub == me.sub && back.bits == me.bits);
 
-    // Klemmenparameter aus der Gerätebeschreibung: Default-Config schreibt alle 0x8000-Einträge
+    // Terminal parameters from the device description: the default config writes all 0x8000 entries
     const auto writes = settings_writes(ew::DeviceConfig{});
     CHECK(std::any_of(writes.begin(), writes.end(),
                       [](const SdoWrite& w) { return w.index == kObjSettings && w.sub == kSubRatedOutput; }));
@@ -419,14 +419,14 @@ TEST(el3356_layout_and_decode) {
                        [](const SdoWrite& w) { return w.index == kObjSettings && w.sub == kSubTara; }));
 }
 
-constexpr int kHexBase = 16;  ///< Basis der Hex-Texte der Gerätebeschreibung
+constexpr int kHexBase = 16;  ///< base of the hex texts of the device description
 
 /**
- * @brief Bitfeld aus einem Init-Block der ESI (Hex-Text, little endian).
- * @param hex Daten
- * @param off Bitoffset
- * @param len Länge in Bit
- * @return Bytes des Felds, little endian
+ * @brief Bit field from an init block of the ESI (hex text, little endian).
+ * @param hex data
+ * @param off bit offset
+ * @param len length in bits
+ * @return bytes of the field, little endian
  */
 std::vector<uint8_t> init_field(const std::string& hex, uint32_t off, uint32_t len) {
     constexpr size_t kHexPerByte = 2U;
@@ -442,12 +442,12 @@ std::vector<uint8_t> init_field(const std::string& hex, uint32_t off, uint32_t l
 
 TEST(device_settings_from_description) {
     using namespace ew::el3356;
-    constexpr uint32_t kBitsSubCount = 16U;  ///< Init-Block ab Subindex 1: SubIndex 000 + Lücke
+    constexpr uint32_t kBitsSubCount = 16U;  ///< init block from subindex 1: SubIndex 000 + gap
     constexpr uint8_t kSubDynChangeTime = 0x13U;
-    constexpr double kDynChangeTimeMax = 100.0;  ///< laut ESI
+    constexpr double kDynChangeTimeMax = 100.0;  ///< according to the ESI
     const auto& d = ew::DeviceDescription::el3356_0010();
 
-    // Typisierte Felder auf die ESI-Defaults setzen: Schreibliste = Init-Block der Variante REAL
+    // Set the typed fields to the ESI defaults: write list = init block of the variant REAL
     nlohmann::json typed = ew::device_json(ew::DeviceConfig{});
     for (const auto& e : d.entries())
         if (e.raw.contains("config_key") && e.raw.contains("default"))
@@ -471,7 +471,7 @@ TEST(device_settings_from_description) {
     }
     CHECK(compared > 0U);
 
-    // Validierung: Bereich, never_write, typisierte Felder, unbekannte Schlüssel
+    // Validation: range, never_write, typed fields, unknown keys
     ew::Config c;
     c.device.coe["0x8000:13"] = kDynChangeTimeMax;
     CHECK(c.validate().empty());
@@ -497,8 +497,8 @@ TEST(el3356_debug_catalog_and_init_sequence) {
     constexpr float kValueReal = -12.25F;
     constexpr double kLargeU64 = 1e12;
     constexpr int16_t kNegativeI16 = -2;
-    constexpr uint8_t kSubCtrlInvalid = kSubCtrlTare + 1U;  // erster nicht belegter Subindex
-    constexpr size_t kAssignFrame = 2U;  // je Zuordnung: Anzahl löschen + Anzahl setzen
+    constexpr uint8_t kSubCtrlInvalid = kSubCtrlTare + 1U;  // first unused subindex
+    constexpr size_t kAssignFrame = 2U;  // per assignment: clear count + set count
 
     const auto assign = pdo_assignment(ew::DeviceConfig{});
     auto pdos = known_pdos();
@@ -520,7 +520,7 @@ TEST(el3356_debug_catalog_and_init_sequence) {
     for (const auto& e : status->entries) status_bits += e.map.bits;
     CHECK(real->entries.front().loc.bit_offset == status_bits && real->entries.front().type == DType::F32);
 
-    // Statusbits + Value (Real) schreiben und über Layout und Katalog zurücklesen
+    // Write status bits + Value (Real) and read them back via layout and catalog
     std::vector<std::vector<MapEntry>> tx;
     for (const auto* p : {status, real}) {
         std::vector<MapEntry> m;
@@ -541,13 +541,13 @@ TEST(el3356_debug_catalog_and_init_sequence) {
     });
     CHECK(steady != status->entries.end() && entry_value(img.data(), *steady) == 1.0);
 
-    // Bis Revision 0x0014 (ESI): Sync error 0x1C32:20, TxPDO Toggle 0x1800:09
+    // Up to revision 0x0014 (ESI): sync error 0x1C32:20, TxPDO toggle 0x1800:09
     const auto old = layout_inputs({status_mapping({kObjSmOutParam, kSubSmOutSyncError, kBitsBool},
                                                    {kObjTxPdoPar, kSubTxPdoParToggle, kBitsBool})});
     CHECK(old.sync_error.present && old.sync_error.bit_offset == kBitSyncError);
     CHECK(old.toggle.present && old.toggle.bit_offset == kBitToggle);
 
-    // Typ-Kodierung
+    // Type encoding
     const auto pdo_bytes = encode_value(DType::U16, kPdoValueReal);
     CHECK(pdo_bytes.size() == sizeof(uint16_t) && decode_value(DType::U16, pdo_bytes) == kPdoValueReal);
     CHECK(decode_value(DType::I16, encode_value(DType::I16, kNegativeI16)) == kNegativeI16);
@@ -577,8 +577,8 @@ TEST(el3356_debug_catalog_and_init_sequence) {
 
 TEST(device_description_el3356) {
     using namespace ew::el3356;
-    constexpr uint32_t kRevNewest = 0x0019000AU;     ///< neueste Revision der ESI
-    constexpr uint32_t kRevBefore1601 = 0x0014000AU; ///< letzte Revision ohne 0x1601
+    constexpr uint32_t kRevNewest = 0x0019000AU;     ///< latest revision of the ESI
+    constexpr uint32_t kRevBefore1601 = 0x0014000AU; ///< last revision without 0x1601
     constexpr uint8_t kSubDynChangeTime = 0x13U;     ///< 0x8000:13 Dynamic filter change time
     constexpr double kDynChangeTimeFactor = 0.01;    ///< ConvertValue: 1/100 s
     constexpr uint16_t kFilterDynamicIir = 10U;      ///< DT0800EN16: Dynamic IIR
@@ -597,7 +597,7 @@ TEST(device_description_el3356) {
     const auto* rated = d.entry(kObjSettings, kSubRatedOutput);
     CHECK(rated && rated->raw.at("config_key") == "rated_output_mv_v");
 
-    // 0x1601 erst ab Revision 0x0015; Mapping von 0x1A00 bis 0x0014 mit 0x1C32:20 und 0x1800:09
+    // 0x1601 only from revision 0x0015; mapping of 0x1A00 up to 0x0014 with 0x1C32:20 and 0x1800:09
     const auto* ff = d.pdo(kPdoFilterFrequency);
     CHECK(ff && d.layout(*ff) != nullptr && d.layout(*ff, kRevBefore1601) == nullptr);
     const auto* status = d.pdo(kPdoStatus);
@@ -606,7 +606,7 @@ TEST(device_description_el3356) {
               return e.index == kObjTxPdoPar && e.sub == kSubTxPdoParToggle;
           }));
 
-    // Katalog aus der Beschreibung: Namen und Typen wie im Objektverzeichnis
+    // Catalog from the description: names and types as in the object dictionary
     std::string name;
     DType type = DType::None;
     CHECK(known_entry(kObjTxPdoPar, kSubTxPdoParToggle, name, type) && name == "TxPDO Toggle" &&
@@ -621,9 +621,9 @@ TEST(device_description_el3356) {
 
 TEST(pdo_assignment_variants) {
     using namespace ew::el3356;
-    constexpr uint32_t kRevBefore1601 = 0x0014000AU;  ///< letzte Revision ohne 0x1601
-    constexpr uint16_t kFrequency = 500U;             ///< 50 Hz in 0,1 Hz
-    constexpr uint16_t kFrequencyTooHigh = 2001U;     ///< oberhalb des Wertebereichs 1..2000
+    constexpr uint32_t kRevBefore1601 = 0x0014000AU;  ///< last revision without 0x1601
+    constexpr uint16_t kFrequency = 500U;             ///< 50 Hz in 0.1 Hz
+    constexpr uint16_t kFrequencyTooHigh = 2001U;     ///< above the value range 1..2000
     constexpr int32_t kValueInt = -1234;
 
     ew::DeviceConfig dc;
@@ -636,14 +636,14 @@ TEST(pdo_assignment_variants) {
     CHECK(check_assignment(a).empty());
     CHECK(!check_assignment({{kPdoControl}, {kPdoStatus, kPdoValueInt, kPdoValueReal}}).empty());
 
-    // Filter 11 (PDO Filter frequency): 0x1601 zusätzlich, ab Revision 0x0015
+    // Filter 11 (PDO Filter frequency): 0x1601 additionally, from revision 0x0015
     dc.mode0_filter_settings = kFilterPdoFrequency;
     a = pdo_assignment(dc);
     CHECK((a.rx == std::vector<uint16_t>{kPdoControl, kPdoFilterFrequency}));
     CHECK(pdo_assignment(dc, kRevBefore1601).rx == std::vector<uint16_t>{kPdoControl});
     ew::Config c;
     c.device = dc;
-    CHECK(!c.validate().empty());  // filter_frequency 0 außerhalb 1..2000
+    CHECK(!c.validate().empty());  // filter_frequency 0 outside 1..2000
     c.device.filter_frequency = kFrequency;
     CHECK(c.validate().empty());
     c.device.filter_frequency = kFrequencyTooHigh;
@@ -652,7 +652,7 @@ TEST(pdo_assignment_variants) {
     c.device.pdo_variant = "x";
     CHECK(!c.validate().empty());
 
-    // Layout: INT32-Wert und Filterfrequenz im Prozessabbild
+    // Layout: INT32 value and filter frequency in the process image
     ew::Config a_cfg, b_cfg;
     b_cfg.device = dc;
     CHECK(ew::pdo_config_changed(a_cfg, b_cfg) && !ew::device_config_changed(b_cfg, [&] {
@@ -692,9 +692,9 @@ TEST(pdo_assignment_variants) {
 }
 
 TEST(device_commands_and_diagnostics) {
-    constexpr double kStepS = 0.01;      ///< Zeitschritt der Statusabfragen [s]
+    constexpr double kStepS = 0.01;      ///< time step of the status polls [s]
     constexpr int kMaxSteps = 100;       ///< > SimBackend::kCmdBusyReads
-    constexpr double kTareTolRel = 1e-3; ///< Restwert nach Tara (Anteil der Nennlast · Scale factor)
+    constexpr double kTareTolRel = 1e-3; ///< residual value after tare (fraction of nominal load · scale factor)
     static_assert(kMaxSteps > ew::SimBackend::kCmdBusyReads, "Statusabfragen bis zum Abschluss");
 
     ew::SimBackend sim;
@@ -702,13 +702,13 @@ TEST(device_commands_and_diagnostics) {
     std::string err;
     CHECK(sim.open(cfg, err));
     ew::Sample s;
-    sim.cycle(0.0, ew::El3356Control{}, s);  // Lastprofil beginnt unbelastet: Tara auf den Nullpunkt
+    sim.cycle(0.0, ew::El3356Control{}, s);  // load profile starts unloaded: tare to the zero point
 
     ew::DeviceCommandRunner r;
     bool finished = false;
     CHECK(!r.start("unbekannt", sim, 0.0, finished).ok);
     CHECK(r.start("tare_temporary", sim, 0.0, finished).ok && !finished && r.active());
-    CHECK(!r.start("tare_temporary", sim, 0.0, finished).ok);  // läuft noch
+    CHECK(!r.start("tare_temporary", sim, 0.0, finished).ok);  // still running
     std::optional<ew::CalResult> done;
     double t = 0.0;
     for (int i = 0; i < kMaxSteps && !done; ++i) done = r.step(sim, t += kStepS);
@@ -718,7 +718,7 @@ TEST(device_commands_and_diagnostics) {
     const double tol = kTareTolRel * cfg.device.nominal_load * cfg.device.scale_factor;
     CHECK(std::fabs(s.raw) < tol);
 
-    // Tara Reset (ESI, CmdObjectButton) schreibt 0x8000:22 ohne Statusabfrage
+    // Tare reset (ESI, CmdObjectButton) writes 0x8000:22 without status polling
     std::string reset_id;
     for (const auto& c : ew::DeviceDescription::el3356_0010().json().at("commands"))
         if (c.at("writes").size() == 1U && c.at("writes").at(0).at("obj") == "0x8000:22") reset_id = c.at("id");
@@ -731,29 +731,29 @@ TEST(device_commands_and_diagnostics) {
 
 /// @name Simulation
 /// @{
-constexpr unsigned kSeedEndToEnd = 42U;    ///< Zufallsstart: Lastprofil
-constexpr unsigned kSeedAppCal = 7U;       ///< Zufallsstart: Kalibrierung in der Anwendung
-constexpr unsigned kSeedAbort = 3U;        ///< Zufallsstart: Abbruch durch Overrange
-constexpr unsigned kSeedDeviceCal = 9U;    ///< Zufallsstart: Kalibrierung in der Klemme
-constexpr int kEndToEndPeriods = 4;        ///< Perioden des Lastprofils im Ende-zu-Ende-Test
-constexpr double kPeriodMargin = 0.3;      ///< zusätzliche Laufzeit (Anteil einer Periode)
-constexpr double kLoadMargin = 0.01;       ///< Toleranz der erfassten Last (Anteil der Kapazität)
-/// Einschwingen der Simulation: 10 Zeitkonstanten (Restschwingung < 5e-5)
+constexpr unsigned kSeedEndToEnd = 42U;    ///< random seed: load profile
+constexpr unsigned kSeedAppCal = 7U;       ///< random seed: calibration in the application
+constexpr unsigned kSeedAbort = 3U;        ///< random seed: abort by overrange
+constexpr unsigned kSeedDeviceCal = 9U;    ///< random seed: calibration in the terminal
+constexpr int kEndToEndPeriods = 4;        ///< periods of the load profile in the end-to-end test
+constexpr double kPeriodMargin = 0.3;      ///< additional run time (fraction of a period)
+constexpr double kLoadMargin = 0.01;       ///< tolerance of the captured load (fraction of capacity)
+/// Settling of the simulation: 10 time constants (residual oscillation < 5e-5)
 constexpr double kSettleS = 10.0 * ew::SimBackend::kSettleTauS;
-constexpr double kMarginS = 0.5;           ///< Sicherheitszuschlag auf Wartezeiten [s]
-constexpr double kCmdWaitS = 1.0;          ///< > SimBackend::kCmdBusyReads Statusabfragen
-constexpr double kAccuracyRel = 1e-3;      ///< Genauigkeit nach Kalibrierung (Anteil der Kapazität)
-constexpr double kZeroAccuracyRel = 1e-4;  ///< Genauigkeit Zero balance (Anteil des Kennwerts)
-constexpr double kRatedAccuracyRel = 2e-3; ///< Genauigkeit Rated output (Anteil des Kennwerts)
+constexpr double kMarginS = 0.5;           ///< safety margin on waiting times [s]
+constexpr double kCmdWaitS = 1.0;          ///< > SimBackend::kCmdBusyReads status polls
+constexpr double kAccuracyRel = 1e-3;      ///< accuracy after calibration (fraction of capacity)
+constexpr double kZeroAccuracyRel = 1e-4;  ///< accuracy of zero balance (fraction of the rated value)
+constexpr double kRatedAccuracyRel = 2e-3; ///< accuracy of rated output (fraction of the rated value)
 /// @}
 
-/// @name Testlasten als Anteil der Kapazität
+/// @name Test loads as a fraction of capacity
 /// @{
-constexpr double kRefRatio = 2.0 * ew::CalibrationController::kMinReferenceRatio;  ///< zulässige Referenz
-constexpr double kSmallRefRatio = ew::CalibrationController::kMinReferenceRatio / 2.0;  ///< zu kleine Referenz
-constexpr double kCheckRatio = 0.6;      ///< Prüflast nach der Kalibrierung in der Klemme
-constexpr double kAppCheckRatio = 0.2;   ///< Prüflast nach der Kalibrierung in der Anwendung
-constexpr double kOverloadRatio = 1.5;   ///< Last im Overrange
+constexpr double kRefRatio = 2.0 * ew::CalibrationController::kMinReferenceRatio;  ///< permitted reference
+constexpr double kSmallRefRatio = ew::CalibrationController::kMinReferenceRatio / 2.0;  ///< reference too small
+constexpr double kCheckRatio = 0.6;      ///< check load after the calibration in the terminal
+constexpr double kAppCheckRatio = 0.2;   ///< check load after the calibration in the application
+constexpr double kOverloadRatio = 1.5;   ///< load in overrange
 static_assert(kOverloadRatio > ew::SimBackend::kOverrangeFactor, "Last muss im Overrange liegen");
 static_assert(kCheckRatio < 1.0 && kAppCheckRatio < 1.0, "Prüflasten innerhalb der Nennlast");
 /// @}
@@ -762,7 +762,7 @@ TEST(simulation_end_to_end) {
     ew::Config cfg = package_config();
     const auto sensor = ew::SimBackend::sensor_for(cfg);
     const double cap = capacity_g(cfg);
-    cfg.device.zero_balance = sensor.zero_mv_v;  // Klemme als kalibriert annehmen
+    cfg.device.zero_balance = sensor.zero_mv_v;  // assume the terminal is calibrated
     cfg.device.rated_output_mv_v = sensor.rated_mv_v;
     ew::SimBackend sim(kSeedEndToEnd);
     std::string err;
@@ -788,7 +788,7 @@ TEST(simulation_end_to_end) {
 }
 
 TEST(units_conversion) {
-    // Unabhängige Referenzwerte: 1 gr = 64,79891 mg (Definition), 1 kg = 1000 g, 1 g = 1000 mg
+    // Independent reference values: 1 gr = 64.79891 mg (definition), 1 kg = 1000 g, 1 g = 1000 mg
     constexpr double kGrainG = 0.06479891;
     constexpr double kThousandGrainG = 64.79891;
     constexpr double kThousand = 1000.0;
@@ -807,17 +807,17 @@ TEST(measurement_csv_roundtrip_and_formats) {
     constexpr uint32_t kSamples = 50U;
     constexpr double kSettleMs = 1210.0;
     constexpr double kTimeS = 12.5;
-    constexpr double kPlainG = 12.5;   // einzelne Spalte mit Dezimalkomma
-    constexpr double kCommaG = 7.25;   // Komma als Trennzeichen
+    constexpr double kPlainG = 12.5;   // single column with decimal comma
+    constexpr double kCommaG = 7.25;   // comma as separator
 
-    // Export -> Import in Milligramm: gleiche Werte in Gramm
+    // Export -> import in milligrams: same values in grams
     ew::Measurement m;
     m.id = 1U;
     m.t = kTimeS;
     m.value = kValueG;
     m.stddev = kStddevG;
     m.range = kRangeG;
-    m.n = kSamples;  // wird exportiert, beim Import ignoriert
+    m.n = kSamples;  // is exported, ignored on import
     m.settle_ms = kSettleMs;
     std::istringstream exp(ew::measurements_csv_header("mg") + ew::measurement_csv_row(m, "mg") + "\r\n");
     const auto r = ew::parse_measurements_csv(exp);
@@ -828,7 +828,7 @@ TEST(measurement_csv_roundtrip_and_formats) {
         CHECK_NEAR(r[0].range, kRangeG, kEps);
         CHECK_NEAR(r[0].settle_ms, kSettleMs, kEps);
         CHECK_NEAR(r[0].t, kTimeS, kEps);
-        CHECK(r[0].n == 0U);  // Spalte n wird beim Import ignoriert
+        CHECK(r[0].n == 0U);  // column n is ignored on import
     }
     CHECK(ew::measurements_csv_header("g").find(std::string(";") + ew::kCsvColSamples + ";") != std::string::npos);
 
@@ -853,13 +853,13 @@ TEST(measurement_csv_roundtrip_and_formats) {
         }
         return false;
     };
-    CHECK(fails("id;t_s\n1;2\n"));         // Wertspalte fehlt
-    CHECK(fails("value_lb\n1\n"));          // unbekannte Einheit
-    CHECK(fails("value_g\nabc\n"));         // ungültige Zahl
+    CHECK(fails("id;t_s\n1;2\n"));         // value column missing
+    CHECK(fails("value_lb\n1\n"));          // unknown unit
+    CHECK(fails("value_g\nabc\n"));         // invalid number
 }
 
 TEST(characteristic_device) {
-    constexpr double kScaleKg = 1000.0;  // Value = Last[kg] · 1000 -> Value entspricht Gramm
+    constexpr double kScaleKg = 1000.0;  // Value = load[kg] · 1000 -> Value corresponds to grams
     constexpr double kRaw = 1234.0;
     constexpr double kGrainRaw = 1000.0;
     ew::CalibrationConfig cal;
@@ -877,16 +877,16 @@ TEST(characteristic_device) {
 }
 
 TEST(characteristic_application_piecewise) {
-    // Stützpunkte (raw, g), unsortiert; Steigung 0,5 g bis raw 1000, danach 0,55 g
+    // Calibration points (raw, g), unsorted; slope 0.5 g up to raw 1000, then 0.55 g
     const std::vector<ew::CalPoint> pts = {{1000.0, 500.0}, {0.0, 0.0}, {3000.0, 1600.0}};
     struct Expect {
-        double raw;  ///< Rohwert
-        double g;    ///< erwartete Masse
+        double raw;  ///< raw value
+        double g;    ///< expected mass
     };
     const std::vector<Expect> expect = {
         {0.0, 0.0}, {500.0, 250.0}, {2000.0, 1050.0},
-        {-100.0, -50.0},   // Extrapolation erstes Segment
-        {4000.0, 2150.0},  // Extrapolation letztes Segment
+        {-100.0, -50.0},   // extrapolation first segment
+        {4000.0, 2150.0},  // extrapolation last segment
     };
     ew::CalibrationConfig cal;
     cal.mode = "application";
@@ -900,23 +900,23 @@ TEST(characteristic_application_piecewise) {
 }
 
 TEST(validate_points_rules) {
-    // Stützpunkte (raw, g) als Testdaten
-    CHECK(!ew::validate_points({{0, 0}}).empty());                     // nur ein Punkt
-    CHECK(!ew::validate_points({{0, 0}, {0, 100}}).empty());           // gleicher Rohwert
-    CHECK(!ew::validate_points({{0, 0}, {1, 100}, {2, 50}}).empty());  // nicht monoton
-    CHECK(ew::validate_points({{0, 0}, {-1, 100}}).empty());           // fallende Kennlinie zulässig
+    // Calibration points (raw, g) as test data
+    CHECK(!ew::validate_points({{0, 0}}).empty());                     // only one point
+    CHECK(!ew::validate_points({{0, 0}, {0, 100}}).empty());           // same raw value
+    CHECK(!ew::validate_points({{0, 0}, {1, 100}, {2, 50}}).empty());  // not monotonic
+    CHECK(ew::validate_points({{0, 0}, {-1, 100}}).empty());           // falling characteristic allowed
     CHECK(ew::validate_points({{0, 0}, {1, 100}, {3, 300}}).empty());
 }
 
 /**
- * @brief Führt Zyklen (kCycleS) mit Simulation und Kalibriersteuerung aus.
- * @param sim Simulation
- * @param cc Kalibriersteuerung
- * @param cfg Konfiguration
- * @param t Startzeit [s]
- * @param seconds Dauer [s]
- * @param[out] last letztes Sample (optional)
- * @return Endzeit [s]
+ * @brief Runs cycles (kCycleS) with simulation and calibration control.
+ * @param sim simulation
+ * @param cc calibration control
+ * @param cfg configuration
+ * @param t start time [s]
+ * @param seconds duration [s]
+ * @param[out] last last sample (optional)
+ * @return end time [s]
  */
 static double run_cycles(ew::SimBackend& sim, ew::CalibrationController& cc, const ew::Config& cfg,
                          double t, double seconds, ew::Sample* last = nullptr) {
@@ -931,13 +931,13 @@ static double run_cycles(ew::SimBackend& sim, ew::CalibrationController& cc, con
     return t;
 }
 
-/// @brief Wartezeit für einen Kalibrierpunkt: Erfassungszeit der Config plus Zuschlag [s].
+/// @brief Waiting time for a calibration point: capture time of the config plus margin [s].
 double capture_wait_s(const ew::Config& cfg) {
     return cfg.calibration.capture_time_ms / kMsPerS + kMarginS;
 }
 
 TEST(calibration_application_flow) {
-    constexpr double kRefLoadRatio = 0.4;  // zweiter Stützpunkt
+    constexpr double kRefLoadRatio = 0.4;  // second calibration point
     const ew::Config cfg = package_config();
     const double cap = capacity_g(cfg);
     ew::SimBackend sim(kSeedAppCal);
@@ -952,13 +952,13 @@ TEST(calibration_application_flow) {
     t = run_cycles(sim, cc, cfg, t, capture_wait_s(cfg));
     CHECK(cc.points().size() == 1U);
     const double m2 = kRefLoadRatio * cap;
-    const double m2_gr = ew::from_grams(m2, "gr");  // Masse in Grain angeben
+    const double m2_gr = ew::from_grams(m2, "gr");  // specify the mass in grains
     sim.set_sim_load(m2);
     t = run_cycles(sim, cc, cfg, t, kSettleS);
     CHECK(cc.capture(ew::to_grams(m2_gr, "gr"), t).ok);
     t = run_cycles(sim, cc, cfg, t, capture_wait_s(cfg));
     CHECK(cc.points().size() == 2U);
-    CHECK(cc.remove_point(cc.points().size()).ok == false);  // Index hinter dem letzten Punkt
+    CHECK(cc.remove_point(cc.points().size()).ok == false);  // index after the last point
     ew::Config out;
     CHECK(cc.commit(cfg, out).ok);
     CHECK(!cc.active());
@@ -990,7 +990,7 @@ TEST(calibration_capture_abort_reason) {
 }
 
 TEST(calibration_device_flow) {
-    const ew::Config cfg = package_config();  // Klemme mit Nennwerten der Config (unkalibriert)
+    const ew::Config cfg = package_config();  // terminal with nominal values of the config (uncalibrated)
     const auto sensor = ew::SimBackend::sensor_for(cfg);
     const double cap = capacity_g(cfg);
     const double stable_s = cfg.calibration.stable_time_s;
@@ -1002,7 +1002,7 @@ TEST(calibration_device_flow) {
     double t = 0.0;
     sim.set_sim_load(0.0);
     t = run_cycles(sim, cc, cfg, t, kSettleS);
-    CHECK(!cc.device_zero(sim, t).ok);       // noch nicht stable_time_s stabil
+    CHECK(!cc.device_zero(sim, t).ok);       // not yet stable for stable_time_s
     t = run_cycles(sim, cc, cfg, t, stable_s);
     CHECK(cc.device_zero(sim, t).ok);
     t = run_cycles(sim, cc, cfg, t, kCmdWaitS);
@@ -1018,17 +1018,17 @@ TEST(calibration_device_flow) {
     ew::Config out;
     CHECK(cc.commit(cfg, out).ok);
     CHECK(out.calibration.mode == "device" && out.calibration.device_unit == "g");
-    // Ergebnis trifft den simulierten Sensor (nicht die Nennwerte der Config)
+    // Result matches the simulated sensor (not the nominal values of the config)
     const double rated = std::fabs(sensor.rated_mv_v);
     CHECK(std::fabs(sensor.rated_mv_v - cfg.device.rated_output_mv_v) > ew::SimBackend::kRatedDev / 2.0 * rated);
     CHECK_NEAR(out.device.zero_balance, sensor.zero_mv_v, kZeroAccuracyRel * rated);
     CHECK_NEAR(out.device.rated_output_mv_v, sensor.rated_mv_v, kRatedAccuracyRel * rated);
-    // Gespeicherte Kalibrierung verschiebt den simulierten Sensor nicht
+    // A saved calibration does not shift the simulated sensor
     const auto again = ew::SimBackend::sensor_for(out);
     CHECK_NEAR(again.rated_mv_v, sensor.rated_mv_v, kEps);
     CHECK_NEAR(again.zero_mv_v, sensor.zero_mv_v, kEps);
 
-    // Nach dem Abschluss gilt wieder der Scale factor der Config
+    // After completion, the scale factor of the config applies again
     const auto ch = ew::Characteristic::from_config(out.calibration, out.device);
     sim.set_sim_load(kCheckRatio * cap);
     ew::Sample s;
@@ -1041,11 +1041,11 @@ TEST(api_registry_openapi) {
     const auto ok = [] { return crow::response(crow::status::OK); };
     crow::SimpleApp app;
     ew::ApiRegistry api(app);
-    ew::ApiDoc del{"t", "Löschen", nullptr, {{crow::status::OK, nullptr}}};
+    ew::ApiDoc del{"t", "Delete", nullptr, {{crow::status::OK, nullptr}}};
     del.params = {"id"};
     api.add(HTTPMethod::Delete, "/x/<uint>", del, [](uint64_t) { return crow::response(crow::status::OK); });
-    api.add(HTTPMethod::Get, "/y", {"t", "Lesen", nullptr, {{crow::status::OK, {{"type", "object"}}}}}, ok);
-    api.add(HTTPMethod::Put, "/y", {"t", "Schreiben", {{"type", "object"}}, {{crow::status::OK, nullptr}}},
+    api.add(HTTPMethod::Get, "/y", {"t", "Read", nullptr, {{crow::status::OK, {{"type", "object"}}}}}, ok);
+    api.add(HTTPMethod::Put, "/y", {"t", "Write", {{"type", "object"}}, {{crow::status::OK, nullptr}}},
             [](const crow::request&) { return crow::response(crow::status::OK); });
     const auto d = api.openapi("1.0", "Test");
     CHECK(d.at("openapi") == "3.1.0");
@@ -1057,7 +1057,7 @@ TEST(api_registry_openapi) {
     CHECK(d["paths"]["/y"]["put"].contains("requestBody"));
     CHECK(d["paths"]["/y"]["get"]["responses"]["200"]["content"].contains("application/json"));
 
-    // Fehlender Parametername, doppelte Route, unpassender Handler
+    // Missing parameter name, duplicate route, mismatching handler
     auto throws = [](const std::function<void()>& f) {
         try {
             f();
@@ -1091,13 +1091,13 @@ TEST(openapi_file_consistent) {
     if (!f) return;
     const auto d = nlohmann::json::parse(f);
     CHECK(!d.at("paths").empty());
-    // Jede Operation hat summary und Antworten
+    // Every operation has a summary and responses
     for (const auto& [path, item] : d.at("paths").items())
         for (const auto& [verb, op] : item.items()) {
             CHECK(!op.value("summary", std::string()).empty());
             CHECK(!op.value("responses", nlohmann::json::object()).empty());
         }
-    // Alle $ref lassen sich auflösen
+    // All $ref can be resolved
     std::function<void(const nlohmann::json&)> walk = [&](const nlohmann::json& j) {
         if (j.is_object()) {
             if (j.contains("$ref")) {
@@ -1114,7 +1114,7 @@ TEST(openapi_file_consistent) {
 
 } // namespace
 
-/// @brief Führt alle registrierten Tests aus; Exit-Code 1 bei Fehlern.
+/// @brief Runs all registered tests; exit code 1 on failures.
 int main() {
     for (const auto& tc : registry()) {
         const int before = g_fail;

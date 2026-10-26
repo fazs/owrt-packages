@@ -8,32 +8,32 @@ namespace ew {
 
 namespace {
 
-/// OpenAPI-Version des erzeugten Dokuments
+/// OpenAPI version of the generated document
 constexpr const char* kOpenApiVersion = "3.1.0";
 
-/// Präfix für Verweise auf components.schemas
+/// Prefix for references to components.schemas
 constexpr const char* kComponentPrefix = "#/components/schemas/";
 
 /**
- * @brief Beschreibung einer Antwort für die OpenAPI-Spec (Pflichtfeld "description").
- * @param code HTTP-Statuscode
- * @return Text zum Statuscode, "Antwort" bei unbekanntem Code
+ * @brief Description of a response for the OpenAPI spec (mandatory field "description").
+ * @param code HTTP status code
+ * @return text for the status code, "Response" for an unknown code
  */
 std::string response_description(int code) {
     switch (code) {
     case crow::status::OK: return "OK";
-    case crow::status::BAD_REQUEST: return "Ungültige Anfrage";
-    case crow::status::NOT_FOUND: return "Nicht gefunden";
-    case crow::status::CONFLICT: return "Im aktuellen Zustand nicht ausführbar";
-    default: return "Antwort";
+    case crow::status::BAD_REQUEST: return "Bad request";
+    case crow::status::NOT_FOUND: return "Not found";
+    case crow::status::CONFLICT: return "Not executable in the current state";
+    default: return "Response";
     }
 }
 
 /**
- * @brief Schema eines Crow-Pfadparameters.
- * @param tag Typangabe aus dem Pfad ohne spitze Klammern (uint, int, double, string, path)
- * @return JSON-Schema
- * @throws std::runtime_error bei unbekannter Typangabe
+ * @brief Schema of a Crow path parameter.
+ * @param tag type from the path without angle brackets (uint, int, double, string, path)
+ * @return JSON schema
+ * @throws std::runtime_error for an unknown type
  */
 nlohmann::json param_schema(const std::string& tag) {
     if (tag == "uint") return {{"type", "integer"}, {"minimum", 0}};
@@ -46,23 +46,23 @@ nlohmann::json param_schema(const std::string& tag) {
 } // namespace
 
 /**
- * @brief Legt ein Schema unter components.schemas ab (Verweis mit schema_ref()).
- * @param name Name der Komponente
- * @param schema JSON-Schema
+ * @brief Stores a schema under components.schemas (reference with schema_ref()).
+ * @param name name of the component
+ * @param schema JSON schema
  */
 void ApiRegistry::component(const std::string& name, nlohmann::json schema) {
     components_[name] = std::move(schema);
 }
 
 /**
- * @brief Setzt Pfad und Beschreibung in eine OpenAPI-Operation um.
+ * @brief Converts path and description into an OpenAPI operation.
  *
- * Crow-Parameter (<uint> usw.) werden zu {name} mit den Namen aus ApiDoc::params.
+ * Crow parameters (<uint> etc.) become {name} with the names from ApiDoc::params.
  *
- * @param method HTTP-Methode
- * @param path Crow-Pfad
- * @param doc Beschreibung
- * @throws std::runtime_error bei fehlendem Parameternamen oder doppelter Route
+ * @param method HTTP method
+ * @param path Crow path
+ * @param doc description
+ * @throws std::runtime_error for a missing parameter name or a duplicate route
  */
 void ApiRegistry::record(crow::HTTPMethod method, const std::string& path, ApiDoc doc) {
     std::string oa_path;
@@ -110,9 +110,9 @@ void ApiRegistry::record(crow::HTTPMethod method, const std::string& path, ApiDo
 }
 
 /**
- * @brief OpenAPI-Dokument aller registrierten Routen.
- * @param version Version der Anwendung (info.version)
- * @param description Beschreibung (info.description)
+ * @brief OpenAPI document of all registered routes.
+ * @param version version of the application (info.version)
+ * @param description description (info.description)
  * @return OpenAPI 3.1
  */
 nlohmann::json ApiRegistry::openapi(const std::string& version, const std::string& description) const {
@@ -124,14 +124,14 @@ nlohmann::json ApiRegistry::openapi(const std::string& version, const std::strin
 }
 
 /**
- * @brief Leitet ein JSON-Schema aus einem Beispielwert ab (nur Typen, ohne Werte).
+ * @brief Derives a JSON schema from an example value (types only, without values).
  *
- * Objekte werden rekursiv beschrieben; Pflichtfelder werden nicht angegeben, weil ein
- * Beispiel nicht belegt, dass ein Feld in jedem Zustand vorhanden ist. Arrays erhalten das
- * Schema ihres ersten Elements; null und leere Arrays bleiben ohne Einschränkung.
+ * Objects are described recursively; required fields are not specified, because an
+ * example does not prove that a field is present in every state. Arrays get the
+ * schema of their first element; null and empty arrays remain unconstrained.
  *
- * @param example Beispielwert, z. B. nlohmann::json(Config{})
- * @return JSON-Schema
+ * @param example example value, e.g. nlohmann::json(Config{})
+ * @return JSON schema
  */
 nlohmann::json schema_from(const nlohmann::json& example) {
     switch (example.type()) {
@@ -153,8 +153,8 @@ nlohmann::json schema_from(const nlohmann::json& example) {
 }
 
 /**
- * @brief Verweis auf ein Schema unter components.schemas.
- * @param component Name der Komponente (ApiRegistry::component)
+ * @brief Reference to a schema under components.schemas.
+ * @param component name of the component (ApiRegistry::component)
  * @return {"$ref": ...}
  */
 nlohmann::json schema_ref(const std::string& component) {
@@ -162,10 +162,10 @@ nlohmann::json schema_ref(const std::string& component) {
 }
 
 /**
- * @brief Schema eines Objekts.
- * @param properties Feldname -> Schema
- * @param required Pflichtfelder
- * @return JSON-Schema
+ * @brief Schema of an object.
+ * @param properties field name -> schema
+ * @param required required fields
+ * @return JSON schema
  */
 nlohmann::json schema_object(const nlohmann::json& properties, const std::vector<std::string>& required) {
     nlohmann::json s = {{"type", "object"}, {"properties", properties}};

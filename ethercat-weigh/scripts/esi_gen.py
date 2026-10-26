@@ -1,27 +1,27 @@
 #!/usr/bin/env python3
-"""Erzeugt die Gerätebeschreibung (JSON) eines EtherCAT-Slaves aus einer Beckhoff-ESI.
+"""Generates the device description (JSON) of an EtherCAT slave from a Beckhoff ESI.
 
-Gelesen werden alle Revisionen des Gerätetyps; Basis ist die neueste. Was nicht in jeder
-Revision vorkommt, trägt die Liste "revisions" der Revisionen, in denen es vorkommt.
+All revisions of the device type are read; the latest one is the basis. Whatever does not occur
+in every revision carries the list "revisions" of the revisions in which it occurs.
 
-Inhalt der Ausgabe:
-- device: Typ, Produktcode, Revisionen, Namen, Quelle
-- enums: Aufzählungstypen (DTxxxxENnn)
-- objects: Objektverzeichnis mit Einträgen (Typ, Bitlage, Zugriff, Default, Grenzen, Einheit)
-  und den Angaben des TwinCAT-SettingsTab (Labels, Tooltips, Skalierung, Abhängigkeiten)
-- pdos: RxPDOs/TxPDOs mit Exclude-Listen und Mapping je Revision
-- pdo_rules: bedingte PDO-Zuordnung laut SettingsTab
-- variants: AlternativeSmMapping (PDO-Zuordnung, DC-Mode, Init-Kommandos)
+Content of the output:
+- device: type, product code, revisions, names, source
+- enums: enumeration types (DTxxxxENnn)
+- objects: object dictionary with entries (type, bit position, access, default, limits, unit)
+  and the information of the TwinCAT SettingsTab (labels, tooltips, scaling, dependencies)
+- pdos: RxPDOs/TxPDOs with exclude lists and mapping per revision
+- pdo_rules: conditional PDO assignment according to the SettingsTab
+- variants: AlternativeSmMapping (PDO assignment, DC mode, init commands)
 - dc_modes: Dc/OpMode
-- commands: Kommandoknöpfe des SettingsTab und Kommandos der Zusatzdatei
-- warnings: nicht auflösbare Verweise
+- commands: command buttons of the SettingsTab and commands of the supplement file
+- warnings: references that cannot be resolved
 
-Die Zusatzdatei (--supplement) ergänzt Angaben, die die ESI nicht enthält. Jede Angabe trägt
-eine Quelle; übernommene Felder stehen im Eintrag unter "supplement".
+The supplement file (--supplement) adds information the ESI does not contain. Each item carries
+a source; fields taken over are listed in the entry under "supplement".
 
-Die Ausgabe ist stabil sortiert. --check vergleicht mit der vorhandenen Datei, ohne zu schreiben.
+The output is sorted stably. --check compares with the existing file without writing.
 
-Beispiel:
+Example:
     esi_gen.py "esi/Beckhoff EL3356-0010.xml" --type EL3356-0010 \\
         --supplement scripts/esi_supplement.el3356_0010.json -o src/generated/el3356_0010.json
 """
@@ -36,11 +36,11 @@ from pathlib import Path
 
 from esi_common import decode
 
-# LcId der Texte in der ESI
+# LcId of the texts in the ESI
 LCID_DE = '1031'
 LCID_EN = '1033'
 
-# ESI-Basistyp -> Kurzname (wie dtype_name() in src/el3356.cpp)
+# ESI base type -> short name (like dtype_name() in src/el3356.cpp)
 BASE_TYPES = {
     'BOOL': 'bool', 'BYTE': 'u8', 'USINT': 'u8', 'UINT': 'u16', 'WORD': 'u16',
     'UDINT': 'u32', 'DWORD': 'u32', 'ULINT': 'u64', 'SINT': 'i8', 'INT': 'i16',
@@ -48,9 +48,9 @@ BASE_TYPES = {
 }
 SIGNED = {'i8', 'i16', 'i32'}
 
-# Einheitencodes nach ETG.1004 (Unit Specification): Byte 3 = Zehnerexponent (vorzeichenbehaftet),
-# Byte 2 = Zählereinheit, Byte 1 = Nennereinheit. Nur die in den verwendeten ESI-Dateien
-# vorkommenden Einheiten; unbekannte Codes führen zum Abbruch.
+# Unit codes according to ETG.1004 (Unit Specification): byte 3 = decimal exponent (signed),
+# byte 2 = numerator unit, byte 1 = denominator unit. Only the units occurring in the ESI files
+# used; unknown codes lead to an abort.
 UNITS = {0x00: '', 0x03: 's', 0x20: 'Hz', 0x26: 'V', 0x55: 'm/s²'}
 UNIT_BYTE_MASK = 0xFF
 UNIT_EXP_SHIFT = 24
@@ -58,23 +58,23 @@ UNIT_NUM_SHIFT = 16
 UNIT_DEN_SHIFT = 8
 SIGN_BIT_8 = 0x80
 
-# SettingsTab: Bit 15 einer SubMode- bzw. OpMode-Referenz; die Elementnummer steht in Bit 0..14.
-# Die Bedeutung von Bit 15 ist nicht dokumentiert; beide Formen werden gleich behandelt.
+# SettingsTab: bit 15 of a SubMode or OpMode reference; the element number is in bits 0..14.
+# The meaning of bit 15 is not documented; both forms are treated the same.
 REF_MASK = 0x7FFF
-# Dialogelemente, deren einziges InitCmd den bearbeiteten Eintrag bezeichnet
+# Dialog elements whose only InitCmd denotes the edited entry
 FIELD_ELEMENTS = {'EditField', 'CheckBoxChecked', 'ComboBox', 'OnlineField', 'OutputField'}
 COMMAND_ELEMENTS = {'CmdObjectButton'}
 
 
 class EsiError(Exception):
-    """Unerwarteter Inhalt der ESI oder der Zusatzdatei."""
+    """Unexpected content of the ESI or the supplement file."""
 
 
 def num(text: str | None) -> int | None:
-    """Zahl in ESI-Schreibweise ("#x1F" oder dezimal).
+    """Number in ESI notation ("#x1F" or decimal).
 
-    @param text Text oder None
-    @return Wert oder None
+    @param text text or None
+    @return value or None
     """
     if text is None:
         return None
@@ -83,29 +83,29 @@ def num(text: str | None) -> int | None:
 
 
 def hex16(v: int) -> str:
-    """Index als "0xIIII"."""
+    """Index as "0xIIII"."""
     return f'0x{v:04X}'
 
 
 def hex8(v: int) -> str:
-    """Subindex als "0xSS"."""
+    """Subindex as "0xSS"."""
     return f'0x{v:02X}'
 
 
 def addr(index: int, sub: int) -> str:
-    """Adresse als "0xIIII:SS"."""
+    """Address as "0xIIII:SS"."""
     return f'{hex16(index)}:{sub:02X}'
 
 
 def rev_str(rev: int) -> str:
-    """Revision als "0xRRRRRRRR"."""
+    """Revision as "0xRRRRRRRR"."""
     return f'0x{rev:08X}'
 
 
 def text(el: ET.Element, tag: str, lcid: str | None = None) -> str | None:
-    """Text eines Kindelements, bei lcid das mit passendem LcId; Leerraum zusammengefasst.
+    """Text of a child element, with lcid the one with matching LcId; whitespace collapsed.
 
-    @return Text oder None
+    @return text or None
     """
     for c in el.findall(tag):
         if lcid is None or c.get('LcId') == lcid:
@@ -114,7 +114,7 @@ def text(el: ET.Element, tag: str, lcid: str | None = None) -> str | None:
 
 
 def f32_repr(v: float) -> float:
-    """Kürzeste Dezimaldarstellung, die als REAL32 denselben Wert ergibt."""
+    """Shortest decimal representation that yields the same value as REAL32."""
     if not math.isfinite(v):
         raise EsiError(f'REAL-Wert {v} nicht darstellbar')
     bits = struct.pack('<f', v)
@@ -126,9 +126,9 @@ def f32_repr(v: float) -> float:
 
 
 def decode_le(data: bytes, dtype: str):
-    """Wert aus Bytes (little endian) gemäß Kurzname.
+    """Value from bytes (little endian) according to the short name.
 
-    @return bool, int, float, str (string) oder Hex-Text (bytes)
+    @return bool, int, float, str (string) or hex text (bytes)
     """
     if dtype == 'f32':
         return f32_repr(struct.unpack('<f', data[:4])[0])
@@ -142,14 +142,14 @@ def decode_le(data: bytes, dtype: str):
 
 
 def to_signed(v: int, bits: int) -> int:
-    """Zweierkomplement für "#x"-Werte vorzeichenbehafteter Typen."""
+    """Two's complement for "#x" values of signed types."""
     return v - (1 << bits) if v >= 1 << (bits - 1) else v
 
 
 def unit_info(code: int) -> dict:
-    """Zerlegt einen Einheitencode (ETG.1004).
+    """Splits a unit code (ETG.1004).
 
-    @return {"code", "exp", "unit"}; unit z. B. "mV/V" ohne Exponent als "V/V" mit exp
+    @return {"code", "exp", "unit"}; unit e.g. "mV/V" without exponent as "V/V" with exp
     """
     exp = (code >> UNIT_EXP_SHIFT) & UNIT_BYTE_MASK
     if exp & SIGN_BIT_8:
@@ -162,19 +162,19 @@ def unit_info(code: int) -> dict:
     return {'code': f'0x{code:08X}', 'exp': exp, 'unit': unit}
 
 
-# --- Datentypen und Objekte ----------------------------------------------------------------
+# --- Data types and objects -----------------------------------------------------------------
 
 
 class Types:
-    """DataTypes eines Dictionary."""
+    """DataTypes of a Dictionary."""
 
     def __init__(self, dic: ET.Element):
         self.by_name = {t.findtext('Name'): t for t in dic.find('DataTypes')}
 
     def resolve(self, name: str) -> tuple[str, str | None]:
-        """Kurzname und Enum-Name eines Typs.
+        """Short name and enum name of a type.
 
-        @return (Kurzname, Enum-Name oder None); "string"/"bytes" für Zeichenketten/Byte-Arrays
+        @return (short name, enum name or None); "string"/"bytes" for strings/byte arrays
         """
         if name in BASE_TYPES:
             return BASE_TYPES[name], None
@@ -192,7 +192,7 @@ class Types:
         raise EsiError(f'Datentyp {name} nicht unterstützt')
 
     def enums(self) -> dict:
-        """Alle Aufzählungstypen: Name -> [{"value", "text"}]."""
+        """All enumeration types: name -> [{"value", "text"}]."""
         out = {}
         for name, t in self.by_name.items():
             items = t.findall('EnumInfo')
@@ -202,7 +202,7 @@ class Types:
 
 
 def flags(el: ET.Element | None) -> dict:
-    """Access, WriteRestrictions, PdoMapping, Setting, Backup aus Flags."""
+    """Access, WriteRestrictions, PdoMapping, Setting, Backup from flags."""
     out = {}
     if el is None:
         return out
@@ -220,7 +220,7 @@ def flags(el: ET.Element | None) -> dict:
 
 
 def apply_info(entry: dict, info: ET.Element | None):
-    """DefaultData/DefaultValue, MinValue, MaxValue, Unit eines Eintrags."""
+    """DefaultData/DefaultValue, MinValue, MaxValue, Unit of an entry."""
     if info is None:
         return
     dtype, bits = entry['type'], entry['bits']
@@ -245,9 +245,9 @@ def apply_info(entry: dict, info: ET.Element | None):
 
 
 def object_entries(obj: ET.Element, types: Types) -> list[dict]:
-    """Einträge eines Objekts; Arrays werden in Elemente aufgelöst.
+    """Entries of an object; arrays are resolved into elements.
 
-    @return Einträge mit sub, name, type, bits, bit_offset und Flags
+    @return entries with sub, name, type, bits, bit_offset and flags
     """
     tname = obj.findtext('Type')
     t = types.by_name.get(tname)
@@ -268,7 +268,7 @@ def object_entries(obj: ET.Element, types: Types) -> list[dict]:
         st = types.by_name.get(stype)
         base = {**obj_flags, **flags(si.find('Flags'))}
         if st is not None and st.find('ArrayInfo') is not None and si.findtext('SubIdx') is None:
-            # Array-Subitem (z. B. 0x1C12 "Elements"): ein Eintrag je Element ab LBound
+            # Array subitem (e.g. 0x1C12 "Elements"): one entry per element from LBound
             lb = num(st.findtext('ArrayInfo/LBound'))
             n = num(st.findtext('ArrayInfo/Elements'))
             ebits = num(si.findtext('BitSize')) // n
@@ -293,7 +293,7 @@ def object_entries(obj: ET.Element, types: Types) -> list[dict]:
 
 
 def device_objects(dev: ET.Element) -> tuple[dict, dict]:
-    """Objekte und Enums einer Revision.
+    """Objects and enums of a revision.
 
     @return ({index: {"name", "type", "access", "entries": {sub: entry}}}, enums)
     """
@@ -310,11 +310,11 @@ def device_objects(dev: ET.Element) -> tuple[dict, dict]:
     return objs, types.enums()
 
 
-# --- PDOs, Varianten, DC --------------------------------------------------------------------
+# --- PDOs, variants, DC ----------------------------------------------------------------------
 
 
 def device_pdos(dev: ET.Element) -> dict:
-    """PDOs einer Revision: {index: pdo}."""
+    """PDOs of a revision: {index: pdo}."""
     out = {}
     for tag, rx in (('RxPdo', True), ('TxPdo', False)):
         for p in dev.findall(tag):
@@ -338,7 +338,7 @@ def device_pdos(dev: ET.Element) -> dict:
 
 
 def device_variants(dev: ET.Element) -> list[dict]:
-    """AlternativeSmMapping einer Revision in ESI-Reihenfolge."""
+    """AlternativeSmMapping of a revision in ESI order."""
     out = []
     for m in dev.findall('Info/VendorSpecific/TwinCAT/AlternativeSmMapping'):
         v = {'name': text(m, 'Name'), 'default': bool(num(m.get('Default', '0')))}
@@ -362,7 +362,7 @@ def device_variants(dev: ET.Element) -> list[dict]:
 
 
 def device_dc_modes(dev: ET.Element) -> list[dict]:
-    """Dc/OpMode einer Revision."""
+    """Dc/OpMode of a revision."""
     out = []
     for op in dev.findall('Dc/OpMode'):
         m = {'name': op.findtext('Name'), 'desc': op.findtext('Desc'),
@@ -385,15 +385,15 @@ def device_dc_modes(dev: ET.Element) -> list[dict]:
 
 def settings_tab(dev: ET.Element, objs: dict, enums: dict, variants: list[dict],
                  warnings: list[str]) -> tuple[dict, list[dict], list[dict]]:
-    """Labels, Tooltips, Skalierung und Abhängigkeiten aus dem TwinCAT-SettingsTab.
+    """Labels, tooltips, scaling and dependencies from the TwinCAT SettingsTab.
 
-    Abhängigkeiten (Enable): Ein Feld ist aktiv, wenn mindestens eine Bedingung erfüllt ist.
-    - SubMode ohne Index: das referenzierte Kontrollkästchen ist gesetzt (eq true).
-    - SubMode mit Index: die referenzierte Auswahl steht auf Eintrag Index (ab 1 gezählt) der
-      Aufzählung.
-    - OpMode: die Variante (AlternativeSmMapping, ab 1 gezählt) ist gewählt.
+    Dependencies (Enable): a field is active if at least one condition is met.
+    - SubMode without Index: the referenced checkbox is set (eq true).
+    - SubMode with Index: the referenced selection is set to entry Index (counted from 1) of the
+      enumeration.
+    - OpMode: the variant (AlternativeSmMapping, counted from 1) is selected.
 
-    @return ({(index, sub): Zusatzfelder}, pdo_rules, commands)
+    @return ({(index, sub): additional fields}, pdo_rules, commands)
     """
     tab = dev.find('Info/VendorSpecific/TwinCAT/SettingsTab')
     if tab is None:
@@ -485,19 +485,19 @@ def settings_tab(dev: ET.Element, objs: dict, enums: dict, variants: list[dict],
     return fields, list(rules.values()), commands
 
 
-# --- Zusammenführen über Revisionen --------------------------------------------------------
+# --- Merging across revisions ----------------------------------------------------------------
 
 
 def presence(items: list[tuple[int, object]], all_revs: list[int]) -> list[str] | None:
-    """Revisionen, in denen ein Element vorkommt; None, wenn in allen."""
+    """Revisions in which an element occurs; None if in all."""
     revs = sorted({r for r, _ in items})
     return None if revs == all_revs else [rev_str(r) for r in revs]
 
 
 def merge_by_key(per_rev: list[tuple[int, dict]], all_revs: list[int]) -> dict:
-    """Führt {key: value} je Revision zusammen; der Wert der neuesten Revision gilt.
+    """Merges {key: value} per revision; the value of the latest revision applies.
 
-    @return {key: (value, revisions oder None)}
+    @return {key: (value, revisions or None)}
     """
     seen: dict = {}
     for rev, items in per_rev:
@@ -508,7 +508,7 @@ def merge_by_key(per_rev: list[tuple[int, dict]], all_revs: list[int]) -> dict:
 
 def build(devs: list[ET.Element], source: str, file_version: str | None, supplement: dict | None,
           supplement_name: str | None) -> dict:
-    """Gerätebeschreibung aus allen Revisionen eines Typs."""
+    """Device description from all revisions of a type."""
     devs = sorted(devs, key=lambda d: num(d.find('Type').get('RevisionNo')))
     revs = [num(d.find('Type').get('RevisionNo')) for d in devs]
     newest = devs[-1]
@@ -519,7 +519,7 @@ def build(devs: list[ET.Element], source: str, file_version: str | None, supplem
     for r, d in zip(revs, devs):
         objs, en = device_objects(d)
         per_rev_objs.append((r, objs))
-        enums.update(en)  # neueste Revision gilt
+        enums.update(en)  # latest revision applies
 
     objects = []
     for idx, (obj, obj_revs) in sorted(merge_by_key(
@@ -544,7 +544,7 @@ def build(devs: list[ET.Element], source: str, file_version: str | None, supplem
         objects.append(o)
     obj_by_index = {int(o['index'], 16): o for o in objects}
 
-    # PDOs: Mapping je Revision gruppieren
+    # PDOs: group the mapping per revision
     pdos = []
     per_rev_pdos = [(r, device_pdos(d)) for r, d in zip(revs, devs)]
     for idx in sorted({i for _, p in per_rev_pdos for i in p}):
@@ -566,7 +566,7 @@ def build(devs: list[ET.Element], source: str, file_version: str | None, supplem
                 del lay['revisions']
         pdos.append(pdo)
 
-    # Varianten: nach Name über Revisionen
+    # Variants: by name across revisions
     var_items = [(r, {v['name']: dict(v, order=i) for i, v in enumerate(device_variants(d))})
                  for r, d in zip(revs, devs)]
     variants = []
@@ -611,23 +611,23 @@ def build(devs: list[ET.Element], source: str, file_version: str | None, supplem
     return desc
 
 
-# --- Zusatzdatei -------------------------------------------------------------------------------
+# --- Supplement file ----------------------------------------------------------------------------
 
 
 def parse_addr(key: str) -> tuple[int, int | None]:
-    """"0xIIII:SS" bzw. "0xIIII" -> (index, sub oder None)."""
+    """"0xIIII:SS" or "0xIIII" -> (index, sub or None)."""
     idx, _, sub = key.partition(':')
     return int(idx, 16), int(sub, 16) if sub else None
 
 
 def apply_supplement(desc: dict, sup: dict, obj_by_index: dict):
-    """Führt die Zusatzdatei in die Beschreibung ein.
+    """Merges the supplement file into the description.
 
-    - entries: {"0xIIII:SS" oder "0xIIII": {Felder..., "source"} oder Liste solcher Objekte (je
-      Quelle eines)}; Felder werden in den Eintrag (bzw. alle Einträge des Objekts) übernommen
-      und unter "supplement" aufgeführt.
-    - commands: werden mit origin "supplement" angehängt.
-    Vorhandene ESI-Felder dürfen nicht überschrieben werden.
+    - entries: {"0xIIII:SS" or "0xIIII": {fields..., "source"} or a list of such objects (one per
+      source)}; fields are taken over into the entry (or all entries of the object)
+      and listed under "supplement".
+    - commands: are appended with origin "supplement".
+    Existing ESI fields must not be overwritten.
     """
     items = [(k, f) for k, v in sorted(sup.get('entries', {}).items())
              for f in (v if isinstance(v, list) else [v])]
@@ -659,18 +659,18 @@ def apply_supplement(desc: dict, sup: dict, obj_by_index: dict):
         raise EsiError('Kommando-IDs nicht eindeutig')
 
 
-# --- Kommandozeile ---------------------------------------------------------------------------
+# --- Command line ---------------------------------------------------------------------------
 
 
 def render(desc: dict) -> str:
-    """JSON-Text (stabil, UTF-8, Zeilenende LF)."""
+    """JSON text (stable, UTF-8, line ending LF)."""
     return json.dumps(desc, ensure_ascii=False, indent=1) + '\n'
 
 
 def main() -> int:
-    """Kommandozeile; siehe Moduldokumentation.
+    """Command line; see the module documentation.
 
-    @return Exit-Code (0 ok, 1 Fehler bzw. Abweichung bei --check, 2 ungültige Optionen)
+    @return exit code (0 ok, 1 error or deviation with --check, 2 invalid options)
     """
     ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     ap.add_argument('esi', type=Path, help='ESI-Datei')

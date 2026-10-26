@@ -6,20 +6,20 @@
 #include <nlohmann/json.hpp>
 
 namespace ew {
-    /// Kennzahlen einer Wertereihe.
+    /// Statistics of a series of values.
     struct StatSummary {
-        uint64_t n = 0;      ///< Anzahl
-        double mean = 0.0;   ///< Mittelwert
-        double stddev = 0.0; ///< Stichproben-Standardabweichung (n-1)
-        double min = 0.0;    ///< Minimum
-        double max = 0.0;    ///< Maximum
-        double range = 0.0;  ///< Spannweite max - min
-        double last = 0.0;   ///< zuletzt hinzugefügter Wert
+        uint64_t n = 0;      ///< count
+        double mean = 0.0;   ///< mean
+        double stddev = 0.0; ///< sample standard deviation (n-1)
+        double min = 0.0;    ///< minimum
+        double max = 0.0;    ///< maximum
+        double range = 0.0;  ///< range max - min
+        double last = 0.0;   ///< most recently added value
     };
 
     void to_json(nlohmann::json &j, const StatSummary &s);
 
-    /// Online-Statistik (Welford), O(1) pro Wert.
+    /// Online statistics (Welford), O(1) per value.
     class RunningStats {
     public:
         void add(double x);
@@ -35,16 +35,16 @@ namespace ew {
         double mean_ = 0.0, m2_ = 0.0, min_ = 0.0, max_ = 0.0, last_ = 0.0;
     };
 
-    /// Statistik über die letzten N Werte.
+    /// Statistics over the last N values.
     class RollingStats {
     public:
-        /// @param size Fenstergröße N
+        /// @param size window size N
         explicit RollingStats(uint32_t size) : size_(size) {
         }
 
         void add(double x);
 
-        /// Leert das Fenster.
+        /// Clears the window.
         void reset() { buf_.clear(); }
 
         void resize(uint32_t size);
@@ -58,20 +58,20 @@ namespace ew {
         std::deque<double> buf_;
     };
 
-    /// Temporäre Statistik (nur RAM): Session (seit Reset) + gleitendes Fenster.
+    /// Temporary statistics (RAM only): session (since reset) + rolling window.
     class TemporaryStatistics {
     public:
-        /// @param rolling Größe des gleitenden Fensters
+        /// @param rolling size of the rolling window
         explicit TemporaryStatistics(uint32_t rolling) : rolling_(rolling) {
         }
 
-        /// Fügt eine Messung zu Session und Fenster hinzu.
+        /// Adds a measurement to session and window.
         void add(double x) {
             session_.add(x);
             rolling_.add(x);
         }
 
-        /// Setzt Session und Fenster zurück.
+        /// Resets session and window.
         void reset() {
             session_.reset();
             rolling_.reset();
@@ -79,13 +79,13 @@ namespace ew {
 
         void remove(double x, const std::vector<double> &held);
 
-        /// Ändert die Größe des gleitenden Fensters.
+        /// Changes the size of the rolling window.
         void set_rolling_window(uint32_t n) { rolling_.resize(n); }
 
         [[nodiscard]] nlohmann::json to_json() const;
 
     private:
-        RunningStats session_;  ///< seit Reset
-        RollingStats rolling_;  ///< letzte N
+        RunningStats session_;  ///< since reset
+        RollingStats rolling_;  ///< last N
     };
 } // namespace ew

@@ -18,17 +18,17 @@ namespace ew {
     using clock_t_ = std::chrono::steady_clock;
 
     namespace {
-        constexpr size_t kTareSamples = 50U; ///< Mittelung für Tara (bei 10 ms: 0,5 s)
-        constexpr size_t kMinTareSamples = kTareSamples / 2U; ///< Mindestanzahl gültiger Werte für Tara
-        constexpr int kCalibrationTimeoutMs = 5000; ///< Kalibrierkommandos (SDO-Zugriffe) [ms]
-        constexpr size_t kSdoReadBuffer = 64U; ///< Debug: Puffer für SDO-Lesezugriffe (> Objektgröße)
-        constexpr size_t kSnapshotMeasurements = 50U; ///< Messungen im Snapshot (/api/state, init)
-        constexpr int kRetryDelayMs = 100; ///< Wartezeit zwischen Prüfungen bei Backend-Fehler [ms]
-        constexpr int kRetrySteps = 20; ///< Prüfungen bis zum nächsten Öffnungsversuch (2 s)
-        constexpr unsigned kNibbleBits = 4U; ///< Bits einer Hex-Ziffer
-        constexpr uint8_t kNibbleMask = 0x0FU; ///< Maske einer Hex-Ziffer
+        constexpr size_t kTareSamples = 50U; ///< averaging for tare (at 10 ms: 0.5 s)
+        constexpr size_t kMinTareSamples = kTareSamples / 2U; ///< minimum number of valid values for tare
+        constexpr int kCalibrationTimeoutMs = 5000; ///< calibration commands (SDO accesses) [ms]
+        constexpr size_t kSdoReadBuffer = 64U; ///< debug: buffer for SDO read accesses (> object size)
+        constexpr size_t kSnapshotMeasurements = 50U; ///< measurements in the snapshot (/api/state, init)
+        constexpr int kRetryDelayMs = 100; ///< waiting time between checks on backend error [ms]
+        constexpr int kRetrySteps = 20; ///< checks until the next open attempt (2 s)
+        constexpr unsigned kNibbleBits = 4U; ///< bits of a hex digit
+        constexpr uint8_t kNibbleMask = 0x0FU; ///< mask of a hex digit
 
-        /// @brief Statusbits als JSON für das Frontend.
+        /// @brief Status bits as JSON for the frontend.
         nlohmann::json status_json(const El3356Status &s) {
             return {
                 {"overrange", s.overrange},
@@ -40,7 +40,7 @@ namespace ew {
             };
         }
 
-        /// @brief Kennzahlen des Stabilitätsfensters als JSON.
+        /// @brief Statistics of the stability window as JSON.
         nlohmann::json window_json(const WindowStats &w) {
             return {
                 {"n", w.n},
@@ -52,8 +52,8 @@ namespace ew {
         }
 
         /**
-         * @brief Setzt SCHED_FIFO für den aufrufenden Thread.
-         * @param prio 1..99; <= 0 lässt SCHED_OTHER
+         * @brief Sets SCHED_FIFO for the calling thread.
+         * @param prio 1..99; <= 0 keeps SCHED_OTHER
          */
         void set_rt_priority(int prio) {
             if (prio <= 0) return;
@@ -67,8 +67,8 @@ namespace ew {
         }
 
         /**
-         * @brief Pflichtfeld als Zahl.
-         * @throws std::runtime_error wenn das Feld fehlt oder keine Zahl ist
+         * @brief Mandatory field as a number.
+         * @throws std::runtime_error if the field is missing or not a number
          */
         double num(const nlohmann::json &j, const char *key) {
             if (!j.contains(key) || !j[key].is_number())
@@ -76,7 +76,7 @@ namespace ew {
             return j[key].get<double>();
         }
 
-        /// @brief Bytes als Hex-Text ("01 A0 ...").
+        /// @brief Bytes as hex text ("01 A0 ...").
         std::string hex(const std::vector<uint8_t> &d) {
             static const char *digits = "0123456789ABCDEF";
             std::string out;
@@ -88,7 +88,7 @@ namespace ew {
             return out;
         }
 
-        /// @brief Wert als JSON gemäß Typ: bool, Ganzzahl oder Gleitkomma.
+        /// @brief Value as JSON according to the type: bool, integer or floating point.
         nlohmann::json typed(el3356::DType t, double v) {
             if (t == el3356::DType::Bool) return v != 0.0;
             if (t == el3356::DType::F32) return v;
@@ -97,8 +97,8 @@ namespace ew {
         }
 
         /**
-         * @brief Pflichtfeld als Text.
-         * @throws std::runtime_error wenn das Feld fehlt oder kein Text ist
+         * @brief Mandatory field as text.
+         * @throws std::runtime_error if the field is missing or not text
          */
         std::string str(const nlohmann::json &j, const char *key) {
             if (!j.contains(key) || !j[key].is_string())
@@ -108,9 +108,9 @@ namespace ew {
     } // namespace
 
     /**
-     * @param backend Prozessdatenquelle (EtherCAT oder Simulation)
-     * @param cfg Startkonfiguration
-     * @param config_path Pfad, unter dem Änderungen gespeichert werden
+     * @param backend process data source (EtherCAT or simulation)
+     * @param cfg start configuration
+     * @param config_path path under which changes are saved
      */
     Acquisition::Acquisition(std::unique_ptr<IoBackend> backend, Config cfg, std::string config_path)
         : backend_(std::move(backend)),
@@ -123,22 +123,22 @@ namespace ew {
           cal_json_(cal_.to_json()) {
     }
 
-    /// @brief Stoppt den Thread und schließt die Prozessdatenquelle.
+    /// @brief Stops the thread and closes the process data source.
     Acquisition::~Acquisition() { stop(); }
 
-    /// @brief Setzt den Empfänger der JSON-Ereignisse (nullptr = keiner).
+    /// @brief Sets the receiver of the JSON events (nullptr = none).
     void Acquisition::set_publisher(Publisher p) {
         std::lock_guard<std::mutex> lk(pub_mtx_);
         publisher_ = std::move(p);
     }
 
-    /// @brief Startet den Acquisition-Thread (mehrfacher Aufruf ohne Wirkung).
+    /// @brief Starts the acquisition thread (repeated calls have no effect).
     void Acquisition::start() {
         if (running_.exchange(true)) return;
         thread_ = std::thread([this] { run(); });
     }
 
-    /// @brief Stoppt den Thread, beantwortet offene Kommandos mit Fehler und schließt die Quelle.
+    /// @brief Stops the thread, answers pending commands with an error and closes the source.
     void Acquisition::stop() {
         if (!running_.exchange(false)) return;
         if (thread_.joinable()) thread_.join();
@@ -146,7 +146,7 @@ namespace ew {
         backend_->close();
     }
 
-    /// @brief Verteilt ein Ereignis an den Publisher.
+    /// @brief Distributes an event to the publisher.
     void Acquisition::publish(const nlohmann::json &j) {
         Publisher p;
         {
@@ -156,13 +156,13 @@ namespace ew {
         if (p) p(j.dump());
     }
 
-    // --- Request-Queue -------------------------------------------------------------
+    // --- Request queue --------------------------------------------------------------
 
     /**
-     * @brief Führt @p fn im Acquisition-Thread aus und wartet auf das Ergebnis.
-     * @param fn Kommando
-     * @param timeout_ms maximale Wartezeit
-     * @return Ergebnis von @p fn oder Fehler bei Zeitüberschreitung
+     * @brief Executes @p fn in the acquisition thread and waits for the result.
+     * @param fn command
+     * @param timeout_ms maximum waiting time
+     * @return result of @p fn or error on timeout
      */
     CalResult Acquisition::submit(std::function<CalResult()> fn, int timeout_ms) {
         auto r = std::make_shared<Request>();
@@ -178,13 +178,13 @@ namespace ew {
     }
 
     /**
-     * @brief Wie submit(), aber mit JSON-Ergebnis.
-     * @param fn Abfrage
-     * @param timeout_ms maximale Wartezeit
-     * @return Ergebnis von @p fn oder {"ok": false, "error": ...}
+     * @brief Like submit(), but with a JSON result.
+     * @param fn query
+     * @param timeout_ms maximum waiting time
+     * @return result of @p fn or {"ok": false, "error": ...}
      */
     nlohmann::json Acquisition::submit_json(std::function<nlohmann::json()> fn, int timeout_ms) {
-        auto out = std::make_shared<nlohmann::json>(); // überlebt eine Zeitüberschreitung
+        auto out = std::make_shared<nlohmann::json>(); // survives a timeout
         const auto r = submit(
             [out, fn = std::move(fn)]() -> CalResult {
                 *out = fn();
@@ -196,8 +196,8 @@ namespace ew {
     }
 
     /**
-     * @brief Arbeitet alle wartenden Kommandos ab.
-     * @param backend_ok false: Kommandos mit "Prozessdatenquelle nicht aktiv" beantworten
+     * @brief Processes all pending commands.
+     * @param backend_ok false: answer commands with "Prozessdatenquelle nicht aktiv"
      */
     void Acquisition::drain_requests(bool backend_ok) {
         std::deque<std::shared_ptr<Request> > q;
@@ -221,8 +221,8 @@ namespace ew {
     }
 
     /**
-     * @brief Setzt Tara aus dem Mittel der letzten gültigen Bruttowerte.
-     * @return Fehler, wenn der Messwert ungültig ist oder zu wenige Werte vorliegen
+     * @brief Sets the tare from the mean of the last valid gross values.
+     * @return error if the measured value is invalid or too few values are available
      */
     CalResult Acquisition::tare() {
         return submit([this]() -> CalResult {
@@ -238,7 +238,7 @@ namespace ew {
         });
     }
 
-    /// @brief Löscht Tara.
+    /// @brief Clears the tare.
     CalResult Acquisition::clear_tare() {
         return submit([this]() -> CalResult {
             std::lock_guard<std::mutex> lk(mtx_);
@@ -249,8 +249,8 @@ namespace ew {
     }
 
     /**
-     * @brief Nur Simulation: aufgelegte Masse vorgeben.
-     * @param grams Masse [g], std::nullopt = automatisches Lastprofil
+     * @brief Simulation only: set the applied mass.
+     * @param grams mass [g], std::nullopt = automatic load profile
      */
     CalResult Acquisition::set_sim_load(std::optional<double> grams) {
         return submit([this, grams]() -> CalResult {
@@ -260,12 +260,12 @@ namespace ew {
     }
 
     /**
-     * @brief Startet ein Kommando der Gerätebeschreibung (siehe README, /api/device/command).
+     * @brief Starts a command of the device description (see README, /api/device/command).
      *
-     * Der Abschluss wird als Ereignis {"type": "device_command", "id", "ok", "error"}
-     * veröffentlicht. Nicht während einer Kalibrierung.
+     * Completion is published as event {"type": "device_command", "id", "ok", "error"}.
+     * Not during a calibration.
      *
-     * @param id Kennung laut Gerätebeschreibung
+     * @param id identifier according to the device description
      */
     CalResult Acquisition::device_command(const std::string &id) {
         return submit([this, id]() -> CalResult {
@@ -279,16 +279,16 @@ namespace ew {
     }
 
     /**
-     * @brief Liest die Diagnoseeinträge der Klemme (SDO, nur auf Anfrage).
-     * @return siehe read_diagnostics()
+     * @brief Reads the diagnostic entries of the terminal (SDO, on request only).
+     * @return see read_diagnostics()
      */
     nlohmann::json Acquisition::device_diagnostics() {
         return submit_json([this] { return read_diagnostics(*backend_); });
     }
 
     /**
-     * @brief Kalibrierkommando aus der REST-API (siehe README).
-     * @param request {"action": ..., weitere Felder je Aktion}
+     * @brief Calibration command from the REST API (see README).
+     * @param request {"action": ..., further fields per action}
      */
     CalResult Acquisition::calibration(const nlohmann::json &request) {
         return submit([this, request]() -> CalResult {
@@ -300,8 +300,8 @@ namespace ew {
     // --- Debug -------------------------------------------------------------------------
 
     /**
-     * @brief Debug: PDO-Katalog mit aktuellen Werten aus dem Prozessabbild.
-     * @return {"ok", "pdos": [...], "inputs", "outputs"} (Abbild als Hex)
+     * @brief Debug: PDO catalog with current values from the process image.
+     * @return {"ok", "pdos": [...], "inputs", "outputs"} (image as hex)
      */
     nlohmann::json Acquisition::debug_pdos() {
         return submit_json([this] {
@@ -348,9 +348,9 @@ namespace ew {
     }
 
     /**
-     * @brief Debug: übersteuert ein Steuerbit 0x7000 im Prozessabbild.
-     * @param sub Subindex 1..5; std::nullopt hebt alle Übersteuerungen auf
-     * @param value Wert; std::nullopt hebt die Übersteuerung von @p sub auf
+     * @brief Debug: overrides a control bit 0x7000 in the process image.
+     * @param sub subindex 1..5; std::nullopt removes all overrides
+     * @param value value; std::nullopt removes the override of @p sub
      */
     CalResult Acquisition::debug_override(std::optional<uint8_t> sub, std::optional<bool> value) {
         if (sub.has_value()) {
@@ -369,10 +369,10 @@ namespace ew {
     }
 
     /**
-     * @brief Debug: einzelner SDO-Zugriff.
+     * @brief Debug: single SDO access.
      * @param req {"op": "read"|"write", "index", "sub", "type", "value"}
-     * @return {"ok", "value", "hex"} bzw. {"ok": false, "error"}
-     * @throws std::runtime_error bei ungültiger Anfrage
+     * @return {"ok", "value", "hex"} or {"ok": false, "error"}
+     * @throws std::runtime_error for an invalid request
      */
     nlohmann::json Acquisition::debug_sdo(const nlohmann::json &req) {
         const std::string op = str(req, "op");
@@ -413,7 +413,7 @@ namespace ew {
     }
 
     /**
-     * @brief Debug: Initialisierungssequenz mit den Werten der aktuellen Konfiguration.
+     * @brief Debug: initialization sequence with the values of the current configuration.
      * @return {"steps": [{index, sub, name, type, value, hex, pre_op_only}]}
      */
     nlohmann::json Acquisition::debug_init_sequence() const {
@@ -431,17 +431,17 @@ namespace ew {
         return {{"steps", steps}};
     }
 
-    /// @brief Schließt die Prozessdatenquelle und öffnet sie neu (INIT -> OP inkl. Initialisierungssequenz).
+    /// @brief Closes the process data source and opens it again (INIT -> OP incl. initialization sequence).
     void Acquisition::reinit() {
         log_info("Neuinitialisierung angefordert");
         reinit_ = true;
     }
 
     /**
-     * @brief Führt ein Kalibrierkommando aus (im Acquisition-Thread).
-     * @param req Anfrage mit "action"
-     * @param t aktuelle Zeit [s]
-     * @return Ergebnis; bei "commit" wird die neue Konfiguration gespeichert und veröffentlicht
+     * @brief Executes a calibration command (in the acquisition thread).
+     * @param req request with "action"
+     * @param t current time [s]
+     * @return result; for "commit" the new configuration is saved and published
      */
     CalResult Acquisition::handle_calibration(const nlohmann::json &req, double t) {
         const std::string action = str(req, "action");
@@ -481,7 +481,7 @@ namespace ew {
                 {
                     std::lock_guard<std::mutex> lk(mtx_);
                     apply_new_config_locked(next);
-                    device_pending_ = false; // Klemme ist bereits auf dem Stand der Kalibrierung
+                    device_pending_ = false; // terminal is already up to date with the calibration
                 }
                 log_info("Kalibrierung übernommen (%s)", next.calibration.mode.c_str());
                 publish({{"type", "config"}, {"config", next}, {"restart_required", false}});
@@ -501,9 +501,9 @@ namespace ew {
         return r;
     }
 
-    // --- Abfragen ------------------------------------------------------------------
+    // --- Queries ----------------------------------------------------------------------
 
-    /// @brief Letztes Sample, Statistik, letzte 50 Messungen und info().
+    /// @brief Last sample, statistics, last 50 measurements and info().
     nlohmann::json Acquisition::snapshot() const {
         nlohmann::json j;
         {
@@ -520,7 +520,7 @@ namespace ew {
         return j;
     }
 
-    /// @brief Alle gehaltenen Messungen als JSON (Massen in Gramm).
+    /// @brief All held measurements as JSON (masses in grams).
     nlohmann::json Acquisition::measurements_json() const {
         std::lock_guard<std::mutex> lk(mtx_);
         nlohmann::json a = nlohmann::json::array();
@@ -529,8 +529,8 @@ namespace ew {
     }
 
     /**
-     * @brief Alle gehaltenen Messungen als CSV (Trennzeichen ';').
-     * @param unit Einheit der Massen; ungültig = g
+     * @brief All held measurements as CSV (separator ';').
+     * @param unit unit of the masses; invalid = g
      */
     std::string Acquisition::measurements_csv(const std::string &unit) const {
         const std::string u = valid_unit(unit) ? unit : "g";
@@ -541,16 +541,16 @@ namespace ew {
     }
 
     /**
-     * @brief Übernimmt Messungen, als wären sie gerade gemessen worden (z. B. aus --sim-csv).
+     * @brief Takes over measurements as if they had just been measured (e.g. from --sim-csv).
      *
-     * Die Messungen bekommen fortlaufende Nummern und gehen in Statistik und gehaltene Messungen
-     * ein (höchstens statistics.history_size, die letzten der Liste). Die Zeitabstände bleiben
-     * erhalten; die letzte Messung liegt auf dem aktuellen Zeitpunkt.
+     * The measurements get sequential numbers and go into the statistics and held measurements
+     * (at most statistics.history_size, the last ones of the list). The time intervals are
+     * preserved; the last measurement is at the current point in time.
      *
-     * Vor start() aufrufen (liest die Zykluszeit des Threads).
+     * Call before start() (reads the cycle time of the thread).
      *
-     * @param ms Messungen in zeitlicher Reihenfolge (Massen in Gramm)
-     * @return Anzahl übernommener Messungen
+     * @param ms measurements in chronological order (masses in grams)
+     * @return number of measurements taken over
      */
     size_t Acquisition::import_measurements(const std::vector<Measurement> &ms) {
         std::lock_guard<std::mutex> lk(mtx_);
@@ -568,13 +568,13 @@ namespace ew {
         return keep;
     }
 
-    /// @brief Gespeicherte Konfiguration (inkl. Änderungen, die einen Neustart erfordern).
+    /// @brief Saved configuration (incl. changes that require a restart).
     Config Acquisition::config() const {
         std::lock_guard<std::mutex> lk(mtx_);
         return cfg_saved_;
     }
 
-    /// @brief Version, Backend-Zustand, Zyklen, Überläufe, max. Zykluszeit.
+    /// @brief Version, backend state, cycles, overruns, max. cycle time.
     nlohmann::json Acquisition::info() const {
         std::lock_guard<std::mutex> lk(mtx_);
         return {
@@ -594,13 +594,13 @@ namespace ew {
     }
 
     /**
-     * @brief Anzeigewert: gleitender Mittelwert der letzten ui.display_average gültigen
-     *        Bruttowerte minus Tara; mtx_ muss gehalten werden.
+     * @brief Display value: moving average of the last ui.display_average valid
+     *        gross values minus tare; mtx_ must be held.
      *
-     * Gemittelt wird brutto, damit Tara sofort wirkt. Nur für die Anzeige; die Erkennung
-     * gültiger Messungen arbeitet mit den ungeglätteten Werten.
+     * The gross value is averaged so that the tare takes effect immediately. For the display only;
+     * the detection of valid measurements works with the unsmoothed values.
      *
-     * @return Netto [g], null ohne gültige Werte
+     * @return net [g], null without valid values
      */
     nlohmann::json Acquisition::display_value_locked() const {
         if (display_hist_.empty()) return nullptr;
@@ -609,7 +609,7 @@ namespace ew {
         return sum / static_cast<double>(display_hist_.size()) - tare_g_.value_or(0.0);
     }
 
-    /// @brief Letztes Sample als "sample"-Nachricht; mtx_ muss gehalten werden.
+    /// @brief Last sample as "sample" message; mtx_ must be held.
     nlohmann::json Acquisition::sample_json_locked() const {
         return {
             {"type", "sample"},
@@ -631,7 +631,7 @@ namespace ew {
         };
     }
 
-    /// @brief Messung als JSON.
+    /// @brief Measurement as JSON.
     nlohmann::json Acquisition::measurement_json(const Measurement &m) const {
         return {
             {"id", m.id}, {"t", m.t}, {"value", m.value}, {"stddev", m.stddev},
@@ -639,25 +639,25 @@ namespace ew {
         };
     }
 
-    // --- Konfiguration -----------------------------------------------------------
+    // --- Configuration --------------------------------------------------------------
 
     /**
-     * @brief Übernimmt eine neue Konfiguration; mtx_ muss gehalten werden.
+     * @brief Takes over a new configuration; mtx_ must be held.
      *
-     * ethercat/http wirken erst nach Neustart. Ändert sich die PDO-Zuordnung, wird die Klemme
-     * neu initialisiert. Ändert sich die Kennlinie, werden Tara und Stabilitätsfenster verworfen.
+     * ethercat/http take effect only after a restart. If the PDO assignment changes, the terminal
+     * is reinitialized. If the characteristic changes, tare and stability window are discarded.
      *
-     * @param next neue Konfiguration
+     * @param next new configuration
      */
     void Acquisition::apply_new_config_locked(const Config &next) {
-        // ethercat/http wirken erst nach Neustart; alles andere sofort
+        // ethercat/http take effect only after a restart; everything else immediately
         Config applied = next;
         applied.ethercat = cfg_.ethercat;
         applied.http = cfg_.http;
         const bool restart = requires_restart(cfg_, next);
         restart_required_ = restart_required_ || restart;
         device_pending_ = device_pending_ || device_config_changed(cfg_, applied);
-        // Neue PDO-Zuordnung nur in PRE-OP: Klemme neu initialisieren
+        // New PDO assignment only in PRE-OP: reinitialize the terminal
         if (pdo_config_changed(cfg_, applied)) reinit_ = true;
         const bool char_changed =
                 nlohmann::json(cfg_)["calibration"] != nlohmann::json(applied)["calibration"] ||
@@ -675,9 +675,9 @@ namespace ew {
     }
 
     /**
-     * @brief Validiert, speichert und übernimmt eine neue Konfiguration.
-     * @param next neue Konfiguration
-     * @return Ergebnis; abgelehnt während einer laufenden Kalibrierung
+     * @brief Validates, saves and takes over a new configuration.
+     * @param next new configuration
+     * @return result; rejected during a running calibration
      */
     ConfigUpdateResult Acquisition::update_config(const Config &next) {
         ConfigUpdateResult r;
@@ -706,7 +706,7 @@ namespace ew {
         return r;
     }
 
-    /// @brief Setzt die Statistik zurück und löscht alle gehaltenen Messungen.
+    /// @brief Resets the statistics and deletes all held measurements.
     void Acquisition::reset_statistics() {
         nlohmann::json st;
         {
@@ -719,9 +719,9 @@ namespace ew {
     }
 
     /**
-     * @brief Löscht eine gehaltene Messung und führt die Statistik nach.
-     * @param id Nummer der Messung
-     * @return false, wenn die Messung nicht (mehr) gehalten wird
+     * @brief Deletes a held measurement and updates the statistics.
+     * @param id number of the measurement
+     * @return false if the measurement is not held (anymore)
      */
     bool Acquisition::delete_measurement(uint64_t id) {
         nlohmann::json st;
@@ -743,13 +743,13 @@ namespace ew {
         return true;
     }
 
-    // --- Zyklus --------------------------------------------------------------------
+    // --- Cycle ------------------------------------------------------------------------
 
     /**
-     * @brief Thread-Funktion: Initialisierung mit Wiederholung, danach zyklischer Betrieb.
+     * @brief Thread function: initialization with retry, then cyclic operation.
      *
-     * Je Zyklus: Konfigurationsänderungen übernehmen, Prozessdaten, Kalibrierung, Kennlinie,
-     * Tara, Messung, Statistik, Ereignisse, Kommandos.
+     * Per cycle: take over configuration changes, process data, calibration, characteristic,
+     * tare, measurement, statistics, events, commands.
      */
     void Acquisition::run() {
         set_rt_priority(config().ethercat.rt_priority);
@@ -757,7 +757,7 @@ namespace ew {
         auto secs = [&] { return std::chrono::duration<double>(clock_t_::now() - t0).count(); };
 
         while (running_) {
-            // --- Initialisierung --------------------------------------------------
+            // --- Initialization ---------------------------------------------------
             std::string err;
             Config c;
             {
@@ -794,7 +794,7 @@ namespace ew {
             publish({{"type", "backend"}, {"state", "op"}, {"error", ""}});
             log_info("Backend %s aktiv, Zyklus %u ms", backend_->name().c_str(), c.ethercat.cycle_ms);
 
-            // --- Zyklischer Betrieb ----------------------------------------------
+            // --- Cyclic operation -------------------------------------------------
             const auto period = std::chrono::milliseconds(c.ethercat.cycle_ms);
             auto next = clock_t_::now();
             double last_ui = -1.0;
@@ -842,7 +842,7 @@ namespace ew {
                 Sample s;
                 backend_->cycle(t, ctrl, s);
 
-                // Kalibrierablauf (SDO-Zugriffe ohne Lock)
+                // Calibration sequence (SDO accesses without lock)
                 const bool cal_was_active = cal_.active();
                 cal_.step(s, *backend_, c);
                 const std::string cmd_id = cmd_.id();

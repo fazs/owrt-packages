@@ -1,18 +1,18 @@
 /**
- * @file Masseneinheiten und Zahlenformatierung.
+ * @file Mass units and number formatting.
  */
 
 /**
- * Masseneinheiten; intern wird in Gramm gerechnet. 1 gr = 64,79891 mg (exakt).
+ * Mass units; calculations are done internally in grams. 1 gr = 64.79891 mg (exact).
  * @type {{id: string, label: string, g: number, title?: string}[]}
  */
-/** Gramm je Milligramm. */
+/** Grams per milligram. */
 export const G_PER_MG = 0.001;
-/** Gramm je Gramm (Basiseinheit). */
+/** Grams per gram (base unit). */
 export const G_PER_G = 1;
-/** Gramm je Kilogramm. */
+/** Grams per kilogram. */
 export const G_PER_KG = 1000;
-/** Gramm je Grain (Definition: 1 gr = 64,79891 mg). */
+/** Grams per grain (definition: 1 gr = 64.79891 mg). */
 export const G_PER_GR = 0.06479891;
 
 export const UNITS = [
@@ -24,34 +24,34 @@ export const UNITS = [
 const G = Object.fromEntries(UNITS.map((u) => [u.id, u.g]));
 
 /**
- * Rechnet Gramm in eine Einheit um.
- * @param {number|null|undefined} grams Wert in Gramm
- * @param {string} unit Zieleinheit; unbekannt = Gramm
- * @returns {number|null|undefined} Wert in `unit`; null/undefined bleiben erhalten
+ * Converts grams to a unit.
+ * @param {number|null|undefined} grams value in grams
+ * @param {string} unit target unit; unknown = grams
+ * @returns {number|null|undefined} value in `unit`; null/undefined are preserved
  */
 export const fromG = (grams, unit) => (grams == null ? grams : grams / (G[unit] ?? G_PER_G));
 /**
- * Rechnet einen Wert in Gramm um.
- * @param {number|null|undefined} value Wert in `unit`
- * @param {string} unit Einheit; unbekannt = Gramm
- * @returns {number|null|undefined} Wert in Gramm; null/undefined bleiben erhalten
+ * Converts a value to grams.
+ * @param {number|null|undefined} value value in `unit`
+ * @param {string} unit unit; unknown = grams
+ * @returns {number|null|undefined} value in grams; null/undefined are preserved
  */
 export const toG = (value, unit) => (value == null ? value : value * (G[unit] ?? G_PER_G));
 
-/** Feste Nachkommastellen je Einheit. */
+/** Fixed decimal places per unit. */
 const FIXED_DECIMALS = { g: 3, gr: 2 };
 
-/** Nachkommastellen ohne bekannte Toleranz bzw. Vorgabe von fmt(). */
+/** Decimal places without a known tolerance or default of fmt(). */
 export const DEFAULT_DECIMALS = 3;
-/** Höchstens angezeigte Nachkommastellen. */
+/** Maximum number of displayed decimal places. */
 export const MAX_DECIMALS = 6;
 
 /**
- * Nachkommastellen für die Anzeige: fest je Einheit, sonst aus der Toleranz
- * in der Anzeigeeinheit (eine Stelle feiner).
- * @param {number} toleranceG Toleranz der Messung [g]
- * @param {string} [unit='g'] Anzeigeeinheit
- * @returns {number} Nachkommastellen 0..MAX_DECIMALS
+ * Decimal places for the display: fixed per unit, otherwise from the tolerance
+ * in the display unit (one digit finer).
+ * @param {number} toleranceG tolerance of the measurement [g]
+ * @param {string} [unit='g'] display unit
+ * @returns {number} decimal places 0..MAX_DECIMALS
  */
 export function decimalsFor(toleranceG, unit = 'g') {
   if (unit in FIXED_DECIMALS) return FIXED_DECIMALS[unit];
@@ -61,10 +61,10 @@ export function decimalsFor(toleranceG, unit = 'g') {
 }
 
 /**
- * Formatiert eine Zahl deutsch mit fester Anzahl Nachkommastellen.
- * @param {number|null|undefined} v Wert
- * @param {number} [d=DEFAULT_DECIMALS] Nachkommastellen
- * @returns {string} Text, „–“ ohne Wert
+ * Formats a number in German style with a fixed number of decimal places.
+ * @param {number|null|undefined} v value
+ * @param {number} [d=DEFAULT_DECIMALS] decimal places
+ * @returns {string} text, „–“ without a value
  */
 export function fmt(v, d = DEFAULT_DECIMALS) {
   if (v === null || v === undefined || Number.isNaN(v)) return '–';
@@ -72,16 +72,16 @@ export function fmt(v, d = DEFAULT_DECIMALS) {
 }
 
 /**
- * Formatiert eine Ganzzahl deutsch mit Tausenderpunkten.
- * @param {number|null|undefined} v Wert
- * @returns {string} Text, „–“ ohne Wert
+ * Formats an integer in German style with thousands separators.
+ * @param {number|null|undefined} v value
+ * @returns {string} text, „–“ without a value
  */
 export function fmtInt(v) {
   if (v === null || v === undefined) return '–';
   return v.toLocaleString('de-DE');
 }
 
-/** Anzeigetexte der Messzustände. */
+/** Display texts of the measurement states. */
 export const STATE_TEXT = {
   idle: 'Leer',
   settling: 'Einschwingen',
@@ -89,7 +89,7 @@ export const STATE_TEXT = {
   fault: 'Störung',
 };
 
-/** Anzeigetexte der Fehlergründe (siehe sample_valid() im Backend). */
+/** Display texts of the failure reasons (see sample_valid() in the backend). */
 export const FAULT_TEXT = {
   link: 'Keine Verbindung zur Klemme',
   wkc: 'Working Counter fehlerhaft',

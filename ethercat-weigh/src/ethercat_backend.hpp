@@ -8,9 +8,9 @@
 
 namespace ew {
     /**
-     * @brief EtherCAT-Master auf Basis von SOEM (Raw Socket, benötigt root bzw. CAP_NET_RAW).
+     * @brief EtherCAT master based on SOEM (raw socket, requires root or CAP_NET_RAW).
      *
-     * Topologie: EK1100 + EL3356-0010. Der Slave wird über seinen SII-Namen gefunden.
+     * Topology: EK1100 + EL3356-0010. The slave is found by its SII name.
      */
     class EthercatBackend : public IoBackend {
     public:
@@ -47,20 +47,20 @@ namespace ew {
 
         void check_and_recover(double t);
 
-        Config cfg_; ///< stabile Kopie für den PO2SO-Hook (auch bei Rekonfiguration)
-        static constexpr size_t kIomapSize = 4096U; ///< Größe des Prozessabbilds aller Slaves [Byte]
-        std::array<uint8_t, kIomapSize> iomap_{}; ///< Prozessabbild aller Slaves
-        bool opened_ = false; ///< ec_init erfolgreich
-        uint16_t slave_ = 0; ///< Slave-Nummer der EL3356, 0 = nicht gefunden
-        uint32_t revision_ = 0; ///< Revision für die Gerätebeschreibung, 0 = neueste (unbekannte Revision)
-        int expected_wkc_ = 0; ///< erwarteter Working Counter
-        uint32_t wkc_fail_count_ = 0; ///< aufeinanderfolgende WKC-Fehler
-        uint32_t wkc_fault_cycles_ = EthercatConfig{}.wkc_fault_cycles; ///< WKC-Fehler bis Wiederanlauf
-        bool link_ok_ = false; ///< alle Slaves in OP
-        static constexpr double kNoCheck = -1.0; ///< last_check_t_: noch keine Prüfung
-        double last_check_t_ = kNoCheck; ///< letzte Zustandsprüfung [s]
-        el3356::InputLayout in_; ///< Lage der Eingänge (absolut im Slave-Abbild)
-        el3356::OutputLayout out_; ///< Lage der Steuerbits
-        std::vector<el3356::PdoInfo> pdos_; ///< PDO-Katalog (beim Hochlauf eingelesen)
+        Config cfg_; ///< stable copy for the PO2SO hook (also during reconfiguration)
+        static constexpr size_t kIomapSize = 4096U; ///< size of the process image of all slaves [bytes]
+        std::array<uint8_t, kIomapSize> iomap_{}; ///< process image of all slaves
+        bool opened_ = false; ///< ec_init successful
+        uint16_t slave_ = 0; ///< slave number of the EL3356, 0 = not found
+        uint32_t revision_ = 0; ///< revision for the device description, 0 = latest (unknown revision)
+        int expected_wkc_ = 0; ///< expected working counter
+        uint32_t wkc_fail_count_ = 0; ///< consecutive WKC errors
+        uint32_t wkc_fault_cycles_ = EthercatConfig{}.wkc_fault_cycles; ///< WKC errors until restart
+        bool link_ok_ = false; ///< all slaves in OP
+        static constexpr double kNoCheck = -1.0; ///< last_check_t_: no check yet
+        double last_check_t_ = kNoCheck; ///< last state check [s]
+        el3356::InputLayout in_; ///< position of the inputs (absolute in the slave image)
+        el3356::OutputLayout out_; ///< position of the control bits
+        std::vector<el3356::PdoInfo> pdos_; ///< PDO catalog (read during startup)
     };
 } // namespace ew

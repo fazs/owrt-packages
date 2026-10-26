@@ -8,44 +8,44 @@
 #include "sample.hpp"
 
 namespace ew {
-    /// Zustand der MeasurementEngine.
+    /// State of the MeasurementEngine.
     enum class MeasState {
-        Fault, ///< Sample ungültig (Link, WKC, Error, Overrange, Data invalid, Calibration)
-        Idle, ///< Last < min_load
-        Settling, ///< Last >= min_load, freigegeben, Stabilitätsfenster wird gefüllt
-        WaitUnload ///< Messung übernommen; Freigabe erst bei Last < zero_threshold
+        Fault, ///< sample invalid (link, WKC, error, overrange, data invalid, calibration)
+        Idle, ///< load < min_load
+        Settling, ///< load >= min_load, armed, stability window is being filled
+        WaitUnload ///< measurement captured; re-armed only when load < zero_threshold
     };
 
     const char *to_string(MeasState s);
 
-    /// Kennzahlen des aktuellen Stabilitätsfensters (Massen in Gramm).
+    /// Statistics of the current stability window (masses in grams).
     struct WindowStats {
-        uint32_t n = 0; ///< Samples im Fenster
-        double span_ms = 0.0; ///< Zeitspanne erstes bis letztes Sample
-        double mean = 0.0; ///< Mittelwert
-        double min = 0.0; ///< Minimum
-        double max = 0.0; ///< Maximum
-        double range = 0.0; ///< Spannweite max - min
-        double stddev = 0.0; ///< Standardabweichung (n-1)
+        uint32_t n = 0; ///< samples in the window
+        double span_ms = 0.0; ///< time span from first to last sample
+        double mean = 0.0; ///< mean
+        double min = 0.0; ///< minimum
+        double max = 0.0; ///< maximum
+        double range = 0.0; ///< range max - min
+        double stddev = 0.0; ///< standard deviation (n-1)
     };
 
-    /// Eine übernommene Messung (Massen in Gramm).
+    /// A captured measurement (masses in grams).
     struct Measurement {
-        uint64_t id = 0; ///< fortlaufende Nummer
-        double t = 0.0; ///< Zeitpunkt der Übernahme [s]
-        double value = 0.0; ///< Mittelwert des Stabilitätsfensters
-        double stddev = 0.0; ///< Standardabweichung im Fenster
-        double range = 0.0; ///< Spannweite im Fenster
-        uint32_t n = 0; ///< Samples im Fenster
-        double settle_ms = 0.0; ///< Zeit von Belastung bis Übernahme
+        uint64_t id = 0; ///< sequential number
+        double t = 0.0; ///< time of capture [s]
+        double value = 0.0; ///< mean of the stability window
+        double stddev = 0.0; ///< standard deviation in the window
+        double range = 0.0; ///< range in the window
+        uint32_t n = 0; ///< samples in the window
+        double settle_ms = 0.0; ///< time from loading to capture
     };
 
     /**
-     * @brief Zustandsautomat "gültige Messung" für statische Wägung.
+     * @brief State machine "valid measurement" for static weighing.
      *
-     * Übernahmebedingung (alle im Fenster der Länge stable_time_ms):
-     * max - min <= tolerance UND stddev <= sigma_max
-     * UND (optional) Steady-state-Bit 0x6000:09 gesetzt.
+     * Capture condition (all within the window of length stable_time_ms):
+     * max - min <= tolerance AND stddev <= sigma_max
+     * AND (optionally) steady state bit 0x6000:09 set.
      *
      * @see MeasState
      */
@@ -55,18 +55,18 @@ namespace ew {
 
         void set_params(const MeasurementConfig &p);
 
-        /// aktuelle Parameter
+        /// current parameters
         const MeasurementConfig &params() const { return p_; }
 
         std::optional<Measurement> process(const Sample &s);
 
-        /// aktueller Zustand
+        /// current state
         [[nodiscard]] MeasState state() const { return state_; }
-        /// Fehlergrund im Zustand Fault (siehe sample_valid())
+        /// reason for failure in state Fault (see sample_valid())
         [[nodiscard]] const std::string &fault_reason() const { return fault_reason_; }
-        /// Kennzahlen des aktuellen Fensters
+        /// statistics of the current window
         [[nodiscard]] const WindowStats &window() const { return win_; }
-        /// true, wenn eine neue Messung übernommen werden darf
+        /// true if a new measurement may be captured
         bool armed() const { return armed_; }
 
         void reset();
@@ -74,21 +74,21 @@ namespace ew {
         uint64_t get_next_id();
 
     private:
-        /// Ein Wert im Fenster
+        /// One value in the window
         struct Pt {
-            double t; ///< Zeit [s]
-            double v; ///< Nettowert [g]
+            double t; ///< time [s]
+            double v; ///< net value [g]
         };
 
         void compute_window();
 
-        MeasurementConfig p_; ///< Parameter
-        MeasState state_ = MeasState::Idle; ///< Zustand
-        std::string fault_reason_; ///< Fehlergrund bei Fault
-        bool armed_ = true; ///< Übernahme freigegeben
-        double load_since_ = -1.0; ///< Beginn der Belastung [s], -1 = unbelastet
-        std::deque<Pt> buf_; ///< Stabilitätsfenster
-        WindowStats win_; ///< Kennzahlen von buf_
-        uint64_t next_id_ = 1; ///< Nummer der nächsten Messung
+        MeasurementConfig p_; ///< parameters
+        MeasState state_ = MeasState::Idle; ///< state
+        std::string fault_reason_; ///< reason for failure in Fault
+        bool armed_ = true; ///< capture armed
+        double load_since_ = -1.0; ///< start of loading [s], -1 = unloaded
+        std::deque<Pt> buf_; ///< stability window
+        WindowStats win_; ///< statistics of buf_
+        uint64_t next_id_ = 1; ///< number of the next measurement
     };
 } // namespace ew

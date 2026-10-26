@@ -12,39 +12,39 @@ namespace ew {
 
 namespace {
 
-/// @name Zulässige Wertebereiche der Konfiguration
+/// @name Permitted value ranges of the configuration
 /// @{
 constexpr uint32_t kCycleMsMin = 1U;               ///< ethercat.cycle_ms
 constexpr uint32_t kCycleMsMax = 1000U;
 constexpr uint32_t kWkcFaultCyclesMin = 1U;        ///< ethercat.wkc_fault_cycles
 constexpr int kRtPriorityMin = 0;                  ///< ethercat.rt_priority (0 = SCHED_OTHER)
-constexpr int kRtPriorityMax = 99;                 ///< höchste SCHED_FIFO-Priorität unter Linux
+constexpr int kRtPriorityMax = 99;                 ///< highest SCHED_FIFO priority under Linux
 constexpr uint32_t kCaptureMsMin = 100U;           ///< calibration.capture_time_ms
 constexpr uint32_t kCaptureMsMax = 60000U;
 constexpr double kStableTimeSMin = 0.0;            ///< calibration.stable_time_s
 constexpr double kStableTimeSMax = 600.0;
 constexpr double kStableBandRelMax = 0.1;          ///< calibration.stable_band_rel (> 0)
-constexpr uint32_t kMinWindowCycles = 2U;          ///< measurement.stable_time_ms in Zyklen
+constexpr uint32_t kMinWindowCycles = 2U;          ///< measurement.stable_time_ms in cycles
 constexpr uint32_t kRollingWindowMin = 2U;         ///< statistics.rolling_window
 constexpr uint32_t kRollingWindowMax = 100000U;
 constexpr uint32_t kHistorySizeMin = 1U;           ///< statistics.history_size
 constexpr uint32_t kHistorySizeMax = 100000U;
 constexpr uint32_t kRateHzMin = 1U;                ///< ui.rate_hz
 constexpr uint32_t kRateHzMax = 100U;
-constexpr uint32_t kDisplayAverageMin = 1U;        ///< ui.display_average (1 = ohne Glättung)
+constexpr uint32_t kDisplayAverageMin = 1U;        ///< ui.display_average (1 = without smoothing)
 constexpr uint32_t kDisplayAverageMax = 1000U;
 constexpr uint16_t kThreadsMin = 1U;               ///< http.threads
 constexpr uint16_t kThreadsMax = 8U;
 /// @}
 
-constexpr size_t kMinCalPoints = 2U;  ///< Stützpunkte für eine Kennlinie
-constexpr int kJsonIndent = 2;        ///< Einrückung beim Speichern
-constexpr size_t kNumLen = 32U;       ///< Puffer für eine formatierte Zahl
+constexpr size_t kMinCalPoints = 2U;  ///< calibration points for a characteristic
+constexpr int kJsonIndent = 2;        ///< indentation when saving
+constexpr size_t kNumLen = 32U;       ///< buffer for a formatted number
 
 /**
- * @brief Zahl für Meldungen (Dezimalkomma, ohne überflüssige Stellen).
- * @param v Wert
- * @return Text
+ * @brief Number for messages (decimal comma, without superfluous digits).
+ * @param v value
+ * @return text
  */
 std::string num_text(double v) {
     char b[kNumLen];
@@ -55,10 +55,10 @@ std::string num_text(double v) {
 }
 
 /**
- * @brief Meldung für einen Wertebereich.
- * @param field Feldname
- * @param lo untere Grenze
- * @param hi obere Grenze
+ * @brief Message for a value range.
+ * @param field field name
+ * @param lo lower limit
+ * @param hi upper limit
  * @return "field: zulässig lo..hi"
  */
 std::string range_msg(const char* field, double lo, double hi) {
@@ -80,9 +80,9 @@ NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(StatisticsConfig, rolling_window
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(UiConfig, rate_hz, display_average, display_unit, hidden_columns)
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(HttpConfig, bind, port, web_root, threads)
 
-/// @brief JSON-Darstellung eines Stützpunkts ({"raw", "mass_g"}).
+/// @brief JSON representation of a calibration point ({"raw", "mass_g"}).
 void to_json(nlohmann::json& j, const CalPoint& p) { j = {{"raw", p.raw}, {"mass_g", p.mass_g}}; }
-/// @brief Liest einen Stützpunkt; "raw" und "mass_g" sind Pflicht.
+/// @brief Reads a calibration point; "raw" and "mass_g" are mandatory.
 void from_json(const nlohmann::json& j, CalPoint& p) {
     p.raw = j.at("raw").get<double>();
     p.mass_g = j.at("mass_g").get<double>();
@@ -91,7 +91,7 @@ void from_json(const nlohmann::json& j, CalPoint& p) {
 NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE_WITH_DEFAULT(CalibrationConfig,
     mode, device_unit, points, capture_time_ms, stable_time_s, stable_band_rel)
 
-/// @brief JSON-Darstellung der gesamten Konfiguration.
+/// @brief JSON representation of the complete configuration.
 void to_json(nlohmann::json& j, const Config& c) {
     j = nlohmann::json{{"ethercat", c.ethercat},       {"device", c.device},
                        {"calibration", c.calibration}, {"measurement", c.measurement},
@@ -99,7 +99,7 @@ void to_json(nlohmann::json& j, const Config& c) {
                        {"http", c.http}};
 }
 
-/// @brief Liest die Konfiguration; fehlende Abschnitte behalten den Default.
+/// @brief Reads the configuration; missing sections keep the default.
 void from_json(const nlohmann::json& j, Config& c) {
     const Config d;
     c.ethercat = j.value("ethercat", d.ethercat);
@@ -112,13 +112,13 @@ void from_json(const nlohmann::json& j, Config& c) {
 }
 
 /**
- * @brief Konfiguration aus JSON.
+ * @brief Configuration from JSON.
  *
- * Unbekannte Schlüssel werden ignoriert, fehlende behalten den Default.
+ * Unknown keys are ignored, missing ones keep the default.
  *
- * @param j JSON-Objekt
- * @return Konfiguration (nicht validiert)
- * @throws std::runtime_error wenn @p j kein Objekt ist oder Typen nicht passen
+ * @param j JSON object
+ * @return configuration (not validated)
+ * @throws std::runtime_error if @p j is not an object or types do not match
  */
 Config config_from_json(const nlohmann::json& j) {
     if (!j.is_object()) throw std::runtime_error("Config muss ein JSON-Objekt sein");
@@ -126,21 +126,21 @@ Config config_from_json(const nlohmann::json& j) {
 }
 
 /**
- * @brief JSON-Darstellung der Klemmenparameter (Schlüssel wie in der Konfigurationsdatei).
- * @param dc Klemmenparameter
- * @return JSON-Objekt
+ * @brief JSON representation of the terminal parameters (keys as in the configuration file).
+ * @param dc terminal parameters
+ * @return JSON object
  */
 nlohmann::json device_json(const DeviceConfig& dc) {
     return dc;
 }
 
 /**
- * @brief Prüft Stützpunkte der Kennlinie.
+ * @brief Checks the calibration points of the characteristic.
  *
- * Gefordert: mindestens 2 Punkte, raw paarweise verschieden, Masse streng monoton über raw.
+ * Required: at least 2 points, raw pairwise different, mass strictly monotonic over raw.
  *
- * @param pts Stützpunkte (beliebige Reihenfolge)
- * @return Fehlermeldungen; leer = gültig
+ * @param pts calibration points (any order)
+ * @return error messages; empty = valid
  */
 std::vector<std::string> validate_points(const std::vector<CalPoint>& pts) {
     std::vector<std::string> e;
@@ -168,8 +168,8 @@ std::vector<std::string> validate_points(const std::vector<CalPoint>& pts) {
 }
 
 /**
- * @brief Prüft Wertebereiche und Abhängigkeiten aller Parameter.
- * @return Fehlermeldungen; leer = gültig
+ * @brief Checks value ranges and dependencies of all parameters.
+ * @return error messages; empty = valid
  */
 std::vector<std::string> Config::validate() const {
     std::vector<std::string> e;
@@ -228,10 +228,10 @@ std::vector<std::string> Config::validate() const {
 }
 
 /**
- * @brief Lädt und validiert eine Konfigurationsdatei.
- * @param path Pfad zur JSON-Datei
- * @return gültige Konfiguration
- * @throws std::runtime_error bei nicht lesbarer Datei, ungültigem JSON oder ungültigen Werten
+ * @brief Loads and validates a configuration file.
+ * @param path path to the JSON file
+ * @return valid configuration
+ * @throws std::runtime_error for an unreadable file, invalid JSON or invalid values
  */
 Config load_config(const std::string& path) {
     std::ifstream f(path);
@@ -254,10 +254,10 @@ Config load_config(const std::string& path) {
 }
 
 /**
- * @brief Speichert die Konfiguration atomar (temporäre Datei + rename).
- * @param path Zielpfad
- * @param c Konfiguration
- * @throws std::runtime_error bei Schreib- oder rename-Fehler
+ * @brief Saves the configuration atomically (temporary file + rename).
+ * @param path target path
+ * @param c configuration
+ * @throws std::runtime_error for a write or rename error
  */
 void save_config(const std::string& path, const Config& c) {
     const std::string tmp = path + ".tmp";
@@ -273,10 +273,10 @@ void save_config(const std::string& path, const Config& c) {
 }
 
 /**
- * @brief Prüft, ob eine Änderung einen Neustart des Dienstes erfordert.
- * @param a bisherige Konfiguration
- * @param b neue Konfiguration
- * @return true bei Änderungen an ethercat oder http
+ * @brief Checks whether a change requires a restart of the service.
+ * @param a previous configuration
+ * @param b new configuration
+ * @return true for changes to ethercat or http
  */
 bool requires_restart(const Config& a, const Config& b) {
     return nlohmann::json(a.ethercat) != nlohmann::json(b.ethercat) ||
@@ -284,14 +284,14 @@ bool requires_restart(const Config& a, const Config& b) {
 }
 
 /**
- * @brief Prüft, ob sich die per SDO geschriebenen Klemmenparameter geändert haben.
+ * @brief Checks whether the terminal parameters written via SDO have changed.
  *
- * Zyklische Ausgänge (sample_mode, disable_calibration, filter_frequency) und die
- * Prozessdaten-Variante zählen nicht dazu.
+ * Cyclic outputs (sample_mode, disable_calibration, filter_frequency) and the
+ * process data variant do not count.
  *
- * @param a bisherige Konfiguration
- * @param b neue Konfiguration
- * @return true, wenn device neu in die Klemme geschrieben werden muss
+ * @param a previous configuration
+ * @param b new configuration
+ * @return true if device must be written to the terminal again
  */
 bool device_config_changed(const Config& a, const Config& b) {
     auto sdo_part = [](const DeviceConfig& d) {
@@ -303,10 +303,10 @@ bool device_config_changed(const Config& a, const Config& b) {
 }
 
 /**
- * @brief Prüft, ob sich die PDO-Zuordnung (0x1C12/0x1C13) ändert.
- * @param a bisherige Konfiguration
- * @param b neue Konfiguration
- * @return true, wenn die Klemme neu initialisiert werden muss
+ * @brief Checks whether the PDO assignment (0x1C12/0x1C13) changes.
+ * @param a previous configuration
+ * @param b new configuration
+ * @return true if the terminal must be reinitialized
  */
 bool pdo_config_changed(const Config& a, const Config& b) {
     const auto pa = el3356::pdo_assignment(a.device);

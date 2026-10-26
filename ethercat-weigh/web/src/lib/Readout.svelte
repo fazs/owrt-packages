@@ -13,7 +13,7 @@
   );
   const last = $derived(live.measurements[0]);
 
-  // Fortschritt des Stabilitätsfensters
+  // Progress of the stability window
   const timeFill = $derived(
     state === 'settling' && m ? Math.min(1, (s?.window?.span_ms ?? 0) / m.stable_time_ms) : 0,
   );
@@ -21,7 +21,7 @@
     state === 'settling' && m && s?.window?.n > 1 ? s.window.range / m.tolerance : 0,
   );
 
-  // Einmaliger Puls bei jeder neuen Erfassung
+  // One-time pulse on each new capture
   let pulse = $state(false);
   $effect(() => {
     if (!live.lastCapture) return;
@@ -37,7 +37,7 @@
     </output>
     <span class="unit">{unit}</span>
   </div>
-  <!-- immer vorhanden (ohne Tara leer), damit sich beim Tarieren nichts verschiebt -->
+  <!-- always present (empty without tare) so that nothing shifts when taring -->
   <div class="net">
     {#if tare != null}Netto, Tara {fmt(fromG(tare, unit), dec)} {unit}{:else}&nbsp;{/if}
   </div>

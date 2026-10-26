@@ -9,20 +9,20 @@ namespace ew {
 
 namespace {
 
-constexpr int kHexBase = 16;          ///< Basis der Hex-Texte der Gerätebeschreibung
-constexpr size_t kHexPerByte = 2U;    ///< Hex-Ziffern je Byte
-constexpr size_t kSdoReadSize = 8U;   ///< Puffer für SDO-Lesezugriffe (größter Typ: 64 Bit)
+constexpr int kHexBase = 16;          ///< base of the hex texts of the device description
+constexpr size_t kHexPerByte = 2U;    ///< hex digits per byte
+constexpr size_t kSdoReadSize = 8U;   ///< buffer for SDO read accesses (largest type: 64 bit)
 
-/// Diagnoseeinträge (Doku Kap. 4.10.6): mV/V, Diag-Bits, ADC-Rohwerte der AI-Kanäle
+/// Diagnostic entries (manual ch. 4.10.6): mV/V, diag bits, ADC raw values of the AI channels
 constexpr std::array<const char*, 10> kDiagKeys = {
     "0x9000:11", "0xA000:11", "0xA000:12", "0xA000:13", "0xA000:15",
     "0xA000:16", "0xA000:17", "0xA000:18", "0x801E:01", "0x802E:01"};
 
 /**
- * @brief Adresse "0xIIII:SS" zerlegen.
- * @param key Adresse
- * @param[out] index Objektindex
- * @param[out] sub Subindex
+ * @brief Splits the address "0xIIII:SS".
+ * @param key address
+ * @param[out] index object index
+ * @param[out] sub subindex
  */
 void parse_key(const std::string& key, uint16_t& index, uint8_t& sub) {
     const auto colon = key.find(':');
@@ -31,9 +31,9 @@ void parse_key(const std::string& key, uint16_t& index, uint8_t& sub) {
 }
 
 /**
- * @brief Hex-Text der Gerätebeschreibung als Bytes.
- * @param hex z. B. "0200"
- * @return Bytes in Textreihenfolge
+ * @brief Hex text of the device description as bytes.
+ * @param hex e.g. "0200"
+ * @return bytes in text order
  */
 std::vector<uint8_t> hex_bytes(const std::string& hex) {
     std::vector<uint8_t> out;
@@ -43,8 +43,8 @@ std::vector<uint8_t> hex_bytes(const std::string& hex) {
 }
 
 /**
- * @brief Setzt das Request-Objekt 0xFB00:01 auf kCmdNone zurück.
- * @param io Backend
+ * @brief Resets the request object 0xFB00:01 to kCmdNone.
+ * @param io backend
  */
 void reset_request(IoBackend& io) {
     std::string unused;
@@ -54,16 +54,16 @@ void reset_request(IoBackend& io) {
 } // namespace
 
 /**
- * @brief Startet ein Kommando der Gerätebeschreibung.
+ * @brief Starts a command of the device description.
  *
- * Schreibt alle schreibbaren Einträge des Kommandos (Einträge mit Zugriff "ro", z. B. Status
- * und Response im CmdObjectButton der ESI, entfallen).
+ * Writes all writable entries of the command (entries with access "ro", e.g. status
+ * and response in the CmdObjectButton of the ESI, are skipped).
  *
- * @param id Kennung laut Gerätebeschreibung (commands[].id)
- * @param io Backend
- * @param t aktuelle Zeit [s]
- * @param[out] finished true, wenn das Kommando ohne Statusabfrage abgeschlossen ist
- * @return Fehler bei unbekanntem Kommando, laufendem Kommando oder SDO-Fehler
+ * @param id identifier according to the device description (commands[].id)
+ * @param io backend
+ * @param t current time [s]
+ * @param[out] finished true if the command is completed without status polling
+ * @return error for an unknown command, a running command or an SDO error
  */
 CalResult DeviceCommandRunner::start(const std::string& id, IoBackend& io, double t, bool& finished) {
     finished = false;
@@ -97,10 +97,10 @@ CalResult DeviceCommandRunner::start(const std::string& id, IoBackend& io, doubl
 }
 
 /**
- * @brief Fragt den Status 0xFB00:02 des laufenden Kommandos ab.
- * @param io Backend
- * @param t aktuelle Zeit [s]
- * @return Ergebnis, sobald das Kommando abgeschlossen, fehlgeschlagen oder abgelaufen ist
+ * @brief Polls the status 0xFB00:02 of the running command.
+ * @param io backend
+ * @param t current time [s]
+ * @return result as soon as the command has completed, failed or timed out
  */
 std::optional<CalResult> DeviceCommandRunner::step(IoBackend& io, double t) {
     if (!active()) return std::nullopt;
@@ -123,8 +123,8 @@ std::optional<CalResult> DeviceCommandRunner::step(IoBackend& io, double t) {
 }
 
 /**
- * @brief Liest die Diagnoseeinträge der Klemme per SDO (nur auf Anfrage).
- * @param io Backend
+ * @brief Reads the diagnostic entries of the terminal via SDO (on request only).
+ * @param io backend
  * @return {"ok": true, "items": [{"key", "name", "description", "type", "value", "error"}]}
  */
 nlohmann::json read_diagnostics(IoBackend& io) {

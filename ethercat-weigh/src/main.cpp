@@ -14,11 +14,11 @@
 
 namespace {
 
-constexpr int kExitOk = EXIT_SUCCESS;     ///< reguläres Ende
-constexpr int kExitError = EXIT_FAILURE;  ///< Konfigurations- oder Schreibfehler
-constexpr int kExitUsage = 2;             ///< ungültige Optionen (Konvention der Shell-Werkzeuge)
+constexpr int kExitOk = EXIT_SUCCESS;     ///< regular exit
+constexpr int kExitError = EXIT_FAILURE;  ///< configuration or write error
+constexpr int kExitUsage = 2;             ///< invalid options (convention of shell tools)
 
-/// @brief Gibt die Aufrufsyntax auf stdout aus.
+/// @brief Prints the usage to stdout.
 void usage() {
     std::cout << "ethercat-weigh " EW_VERSION "\n"
                  "Usage: ethercat-weigh [-c <config.json>] [--sim] [--sim-csv <datei>] [--syslog]\n"
@@ -35,8 +35,8 @@ void usage() {
 } // namespace
 
 /**
- * @brief Einstieg: Optionen auswerten, Konfiguration laden, Acquisition und Webserver starten.
- * @return kExitOk, kExitError bei Konfigurationsfehler, kExitUsage bei ungültigen Optionen
+ * @brief Entry point: evaluate options, load configuration, start acquisition and web server.
+ * @return kExitOk, kExitError on configuration error, kExitUsage on invalid options
  */
 int main(int argc, char** argv) {
     std::string config_path = "/etc/ethercat-weigh/config.json";
@@ -113,7 +113,7 @@ int main(int argc, char** argv) {
         }
     }
     acq.start();
-    ew::run_web_server(acq, cfg.http);  // blockiert bis SIGINT/SIGTERM
+    ew::run_web_server(acq, cfg.http);  // blocks until SIGINT/SIGTERM
     acq.stop();
     ew::log_info("beendet");
     return kExitOk;

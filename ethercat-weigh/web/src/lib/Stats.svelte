@@ -5,14 +5,14 @@
 
   const unit = $derived(displayUnit());
   const dec = $derived(decimalsFor(live.config?.measurement?.tolerance, unit));
-  /** @param {number} v Wert [g] @param {number} d Nachkommastellen @returns {string} in der Anzeigeeinheit */
+  /** @param {number} v value [g] @param {number} d decimal places @returns {string} in the display unit */
   const f = (v, d) => fmt(fromG(v, unit), d);
   const ses = $derived(live.statistics?.session);
   const rol = $derived(live.statistics?.rolling);
 
   /**
-   * Kennwerte wie das Backend (Standardabweichung mit n − 1).
-   * @param {number[]} v Werte [g]
+   * Statistics like the backend (standard deviation with n − 1).
+   * @param {number[]} v values [g]
    * @returns {{n: number, mean: number, stddev: number, min: number, max: number, range: number}}
    */
   function summarize(v) {
@@ -24,7 +24,7 @@
     return { n, mean, stddev, min, max, range: max - min };
   }
 
-  // in der Messwerttabelle angezeigte Messungen innerhalb der Grenzen; null, solange die Grenzen dort nichts ausschließen
+  // measurements shown in the measurement table within the limits; null as long as the limits there exclude nothing
   const inRange = $derived.by(() => {
     const shown = live.measurements.slice(0, VISIBLE_MEASUREMENTS);
     const kept = shown.filter((m) => !outsideLimits(m.value));
@@ -40,7 +40,7 @@
   ]);
 
   let confirming = $state(false);
-  /** Setzt die Statistik zurück; erster Klick fragt nach (CONFIRM_MS), zweiter führt aus. */
+  /** Resets the statistics; the first click asks for confirmation (CONFIRM_MS), the second one executes. */
   async function reset() {
     if (!confirming) {
       confirming = true;

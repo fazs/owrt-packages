@@ -1,69 +1,69 @@
 /**
- * @file CoE-Objekte der EL3356: Adressformat, Auswahllisten und Einheiten aus der Gerätebeschreibung
- * (/api/device/description, erzeugt aus der ESI) und Eingabe-Parsing.
+ * @file CoE objects of the EL3356: address format, selection lists and units from the device description
+ * (/api/device/description, generated from the ESI) and input parsing.
  */
 
-/** Basis hexadezimaler Zahlen. */
+/** Base of hexadecimal numbers. */
 const HEX_RADIX = 16;
-/** Hex-Stellen eines Objektindex (UINT16). */
+/** Hex digits of an object index (UINT16). */
 export const INDEX_HEX_DIGITS = 4;
-/** Hex-Stellen eines Subindex (USINT). */
+/** Hex digits of a subindex (USINT). */
 export const SUB_HEX_DIGITS = 2;
-/** Hex-Stellen eines UDINT. */
+/** Hex digits of a UDINT. */
 const U32_HEX_DIGITS = 8;
-/** Signifikante Stellen eines REAL32 (24 Bit Mantisse). */
+/** Significant digits of a REAL32 (24-bit mantissa). */
 export const F32_DIGITS = 7;
 
-// --- Objekte (Beckhoff-ESI EL3356-0010, siehe src/el3356.hpp) ---
+// --- Objects (Beckhoff ESI EL3356-0010, see src/el3356.hpp) ---
 /** RxPDO assign (SM2). */
 export const OBJ_RX_ASSIGN = 0x1c12;
 /** TxPDO assign (SM3). */
 export const OBJ_TX_ASSIGN = 0x1c13;
-/** RMB Outputs (Steuerbits). */
+/** RMB Outputs (control bits). */
 export const OBJ_CONTROL = 0x7000;
-/** Subindex 0: Anzahl der Einträge. */
+/** Subindex 0: number of entries. */
 const SUB_COUNT = 0;
 
-/** Request-Objekt der Kommandos (0xFB00:01). */
+/** Request object of the commands (0xFB00:01). */
 const CMD_REQUEST_KEY = '0xFB00:01';
-/** 0xFB00:01 = 0: kein Kommando. */
+/** 0xFB00:01 = 0: no command. */
 const CMD_NONE = 0x0000;
-/** Erstes Konfigurationsobjekt (ETG.5001 Modular Device Profile). */
+/** First configuration object (ETG.5001 Modular Device Profile). */
 const OBJ_CONFIG_FIRST = 0x8000;
-/** Letztes Konfigurationsobjekt (ETG.5001 Modular Device Profile). */
+/** Last configuration object (ETG.5001 Modular Device Profile). */
 const OBJ_CONFIG_LAST = 0x8fff;
-/** Zehnerexponenten mit SI-Vorsatz für Einheiten der ESI. */
+/** Decimal exponents with SI prefix for units of the ESI. */
 const SI_PREFIX = { '-3': 'm', '-6': 'µ', 3: 'k' };
-/** Zehnerpotenzen als Basis. */
+/** Powers of ten as base. */
 const DECIMAL_BASE = 10;
 
 /**
- * Zahl als Hex-Text mit Präfix 0x.
- * @param {number} v Wert
- * @param {number} digits Mindeststellen
- * @returns {string} z. B. "0x1A00"
+ * Number as hex text with prefix 0x.
+ * @param {number} v value
+ * @param {number} digits minimum digits
+ * @returns {string} e.g. "0x1A00"
  */
 export const hex = (v, digits) => '0x' + Number(v).toString(HEX_RADIX).toUpperCase().padStart(digits, '0');
 /**
- * Objektadresse "0xIIII:SS".
- * @param {number} index Index
- * @param {number} sub Subindex
+ * Object address "0xIIII:SS".
+ * @param {number} index index
+ * @param {number} sub subindex
  * @returns {string}
  */
 export const objKey = (index, sub) =>
   `${hex(index, INDEX_HEX_DIGITS)}:${Number(sub).toString(HEX_RADIX).toUpperCase().padStart(SUB_HEX_DIGITS, '0')}`;
 
-/** Auswahl für BOOL-Objekte. */
+/** Selection for BOOL objects. */
 const BOOL = [
   [0, 'FALSE'],
   [1, 'TRUE'],
 ];
 
 /**
- * Eintrag der Gerätebeschreibung.
- * @param {object|null} desc Gerätebeschreibung (/api/device/description)
- * @param {string} key Adresse "0xIIII:SS"
- * @returns {object|null} Eintrag mit index (Zahl) oder null
+ * Entry of the device description.
+ * @param {object|null} desc device description (/api/device/description)
+ * @param {string} key address "0xIIII:SS"
+ * @returns {object|null} entry with index (number) or null
  */
 export function descEntry(desc, key) {
   if (!desc) return null;
@@ -74,8 +74,8 @@ export function descEntry(desc, key) {
 }
 
 /**
- * Hex-Text der Beschreibung ("0200", little endian) als Zahl.
- * @param {string} data Bytes als Hex-Text
+ * Hex text of the description ("0200", little endian) as a number.
+ * @param {string} data bytes as hex text
  * @returns {number}
  */
 function leHexValue(data) {
@@ -85,9 +85,9 @@ function leHexValue(data) {
 }
 
 /**
- * Auswahlliste eines Eintrags laut Gerätebeschreibung (Aufzählung oder Werte der Zusatzdatei).
- * @param {object|null} desc Gerätebeschreibung
- * @param {object|null} e Eintrag
+ * Selection list of an entry according to the device description (enumeration or values of the supplement file).
+ * @param {object|null} desc device description
+ * @param {object|null} e entry
  * @returns {Array<[number, string]>|null}
  */
 export function entryOptions(desc, e) {
@@ -98,8 +98,8 @@ export function entryOptions(desc, e) {
 }
 
 /**
- * Auswahlliste für das Kommando-Objekt 0xFB00:01 aus den Kommandos der Gerätebeschreibung.
- * @param {object} desc Gerätebeschreibung
+ * Selection list for the command object 0xFB00:01 from the commands of the device description.
+ * @param {object} desc device description
  * @returns {Array<[number, string]>}
  */
 function commandOptions(desc) {
@@ -114,13 +114,13 @@ function commandOptions(desc) {
 }
 
 /**
- * Auswahlliste für ein Objekt.
- * @param {number} index Index
- * @param {number} sub Subindex
- * @param {string} type Datentyp ("bool", "u16", ...)
- * @param {object[]} [pdos=[]] PDO-Katalog (für 0x1C12/0x1C13)
- * @param {object|null} [desc=null] Gerätebeschreibung (Aufzählungen, Kommandos)
- * @returns {Array<[number, string]>|null} [Wert, Text]-Paare oder null (freie Eingabe)
+ * Selection list for an object.
+ * @param {number} index index
+ * @param {number} sub subindex
+ * @param {string} type data type ("bool", "u16", ...)
+ * @param {object[]} [pdos=[]] PDO catalog (for 0x1C12/0x1C13)
+ * @param {object|null} [desc=null] device description (enumerations, commands)
+ * @returns {Array<[number, string]>|null} [value, text] pairs or null (free input)
  */
 export function enumFor(index, sub, type, pdos = [], desc = null) {
   if ((index === OBJ_RX_ASSIGN || index === OBJ_TX_ASSIGN) && sub > SUB_COUNT) {
@@ -134,9 +134,9 @@ export function enumFor(index, sub, type, pdos = [], desc = null) {
 }
 
 /**
- * Schreibbare Klemmenparameter laut Gerätebeschreibung (wie el3356::device_settings im Backend).
- * @param {object|null} desc Gerätebeschreibung
- * @returns {object[]} Einträge (siehe descEntry) nach Index und Subindex
+ * Writable terminal parameters according to the device description (like el3356::device_settings in the backend).
+ * @param {object|null} desc device description
+ * @returns {object[]} entries (see descEntry) by index and subindex
  */
 export function settingEntries(desc) {
   if (!desc) return [];
@@ -154,9 +154,9 @@ export function settingEntries(desc) {
 }
 
 /**
- * Anzeigeeinheit eines Eintrags: Einheit des TwinCAT-Dialogs, sonst Einheit der ESI.
- * @param {object} e Eintrag
- * @returns {string} z. B. "s", "mV/V"; leer ohne Einheit
+ * Display unit of an entry: unit of the TwinCAT dialog, otherwise unit of the ESI.
+ * @param {object} e entry
+ * @returns {string} e.g. "s", "mV/V"; empty without a unit
  */
 export function entryUnit(e) {
   if (e.convert?.unit) return e.convert.unit;
@@ -166,10 +166,10 @@ export function entryUnit(e) {
 }
 
 /**
- * Umrechnungsfaktor Rohwert -> Anzeige: ConvertValue des TwinCAT-Dialogs, sonst der Zehnerexponent
- * der ESI-Einheit, wenn er keinen SI-Vorsatz hat (z. B. 0x7000:11 in 0,1 Hz -> Anzeige in Hz).
- * @param {object} e Eintrag
- * @returns {number} Faktor, 1 ohne Umrechnung
+ * Conversion factor raw value -> display: ConvertValue of the TwinCAT dialog, otherwise the decimal exponent
+ * of the ESI unit if it has no SI prefix (e.g. 0x7000:11 in 0.1 Hz -> display in Hz).
+ * @param {object} e entry
+ * @returns {number} factor, 1 without conversion
  */
 export function entryFactor(e) {
   if (e.convert) return e.convert.factor ?? 1;
@@ -178,17 +178,17 @@ export function entryFactor(e) {
 }
 
 /**
- * JSON-Wert (bool/Zahl) als Zahl für Auswahllisten.
- * @param {boolean|number} v Wert
+ * JSON value (bool/number) as a number for selection lists.
+ * @param {boolean|number} v value
  * @returns {number}
  */
 export const asNum = (v) => (typeof v === 'boolean' ? Number(v) : v);
 
 /**
- * Anzeigetext eines Objektwerts.
- * @param {boolean|number|null|undefined} v Wert
- * @param {string} type Datentyp
- * @param {Array<[number, string]>|null} [opts] Auswahlliste (Text statt Zahl)
+ * Display text of an object value.
+ * @param {boolean|number|null|undefined} v value
+ * @param {string} type data type
+ * @param {Array<[number, string]>|null} [opts] selection list (text instead of number)
  * @returns {string}
  */
 export function formatValue(v, type, opts) {
@@ -204,11 +204,11 @@ export function formatValue(v, type, opts) {
 }
 
 /**
- * Wertet eine freie Eingabe aus: dezimal (Komma oder Punkt) oder hexadezimal mit 0x.
- * @param {string} text Eingabe
- * @param {string} type Datentyp; Ganzzahltypen verlangen ganze Zahlen
- * @returns {number|boolean} Wert (bool für "bool")
- * @throws {Error} bei ungültiger Eingabe
+ * Evaluates a free input: decimal (comma or point) or hexadecimal with 0x.
+ * @param {string} text input
+ * @param {string} type data type; integer types require whole numbers
+ * @returns {number|boolean} value (bool for "bool")
+ * @throws {Error} for invalid input
  */
 export function parseValue(text, type) {
   const s = String(text).trim().replace(',', '.');

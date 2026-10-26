@@ -3,16 +3,16 @@
   import { settingEntries, entryOptions, entryUnit, entryFactor, descEntry, F32_DIGITS } from './coe.js';
   import { MEASUREMENT_COLUMNS } from './constants.js';
 
-  /** @type {{open?: boolean}} Dialog geöffnet (bindbar) */
+  /** @type {{open?: boolean}} dialog open (bindable) */
   let { open = $bindable(false) } = $props();
 
   let dialog;
   let draft = $state(null);
-  // Eingabetext der Zahlenfelder (Komma oder Punkt, Zwischenstände wie "-" oder "0,")
+  // Input text of the numeric fields (comma or point, intermediate states like "-" or "0,")
   let texts = $state({});
   let errors = $state([]);
   let saving = $state(false);
-  // aufgeklappte Gruppen (id -> true)
+  // expanded groups (id -> true)
   let expanded = $state({});
 
   const unitOptions = [
@@ -22,17 +22,17 @@
     ['gr', 'gr (Grain)'],
   ];
 
-  // Bedingungen {p: Pfad der Option, h: Hinweis am Feld}; ohne h steht der Hinweis einmal
-  // an der Option selbst (off), damit er sich nicht an jedem Feld wiederholt.
-  /** Bedingung: Klemmenparameter werden nur bei „Beim Start schreiben“ beim Start übertragen. */
+  // Conditions {p: path of the option, h: hint at the field}; without h the hint appears once
+  // at the option itself (off), so that it is not repeated at every field.
+  /** Condition: terminal parameters are only transferred at startup with „Beim Start schreiben“. */
   const ON_START = { p: 'device.write_on_start' };
-  /** Bedingung: Stillstandserkennung der Klemme nur relevant, wenn das Steady-state-Bit gefordert ist. */
+  /** Condition: standstill detection of the terminal only relevant if the steady state bit is required. */
   const STEADY_ON = {
     p: 'measurement.use_device_steady_state',
     h: 'Für die Messung unwirksam, solange das Steady-state-Bit nicht gefordert ist (Abschnitt Messung).',
   };
 
-  /** Platzhalter für die aus der Gerätebeschreibung erzeugten Gruppen des Abschnitts Klemme. */
+  /** Placeholder for the groups of the terminal section generated from the device description. */
   const DEVICE_GROUPS_SLOT = { id: 'device-slot' };
 
   const staticGroups = [
@@ -110,20 +110,20 @@
     },
   ];
 
-  /** ESI-Name der Prozessdaten-Variante (AlternativeSmMapping) je device.pdo_variant. */
+  /** ESI name of the process data variant (AlternativeSmMapping) per device.pdo_variant. */
   const VARIANT_NAMES = { real: 'Standard (REAL)', int32: 'Standard (INT32)' };
-  /** Auswahl der Prozessdaten-Variante. */
+  /** Selection of the process data variant. */
   const VARIANT_OPTIONS = [
     ['real', 'Value (Real), 0x1A02'],
     ['int32', 'Value (INT32), 0x1A01 – experimentell'],
   ];
-  /** Ausgänge 0x7000, die aus der Konfiguration zyklisch geschrieben werden. */
+  /** Outputs 0x7000 that are written cyclically from the configuration. */
   const OUTPUT_KEYS = ['0x7000:04', '0x7000:02', '0x7000:11'];
-  /** Zusätzliche Bedingungen je Klemmenparameter (Abhängigkeiten der Anwendung). */
+  /** Additional conditions per terminal parameter (dependencies of the application). */
   const EXTRA_DEPS = { '0x8000:29': [STEADY_ON], '0x8000:2A': [STEADY_ON] };
   /**
-   * Gruppen des Abschnitts Klemme in der Reihenfolge des TwinCAT-Dialogs; nicht aufgeführte
-   * Parameter landen in „Weitere“, Objekte in objs als eingeklappte Gruppe je Objekt.
+   * Groups of the terminal section in the order of the TwinCAT dialog; parameters not listed
+   * end up in „Weitere“, objects in objs as a collapsed group per object.
    */
   const DEVICE_LAYOUT = [
     {
@@ -145,8 +145,8 @@
   ];
 
   /**
-   * Wert eines Klemmenparameters im Entwurf: typisiertes Feld, sonst device.coe, sonst ESI-Default.
-   * @param {object} e Eintrag der Gerätebeschreibung
+   * Value of a terminal parameter in the draft: typed field, otherwise device.coe, otherwise ESI default.
+   * @param {object} e entry of the device description
    * @returns {number|boolean|null}
    */
   function deviceValue(e) {
@@ -155,8 +155,8 @@
   }
 
   /**
-   * Bedingung aus enable_if der Gerätebeschreibung (mindestens eine Teilbedingung erfüllt).
-   * @param {object} e Eintrag
+   * Condition from enable_if of the device description (at least one partial condition met).
+   * @param {object} e entry
    * @returns {{ok: () => boolean, h: string}|null}
    */
   function enableDep(e) {
@@ -180,10 +180,10 @@
   }
 
   /**
-   * Felddefinition eines Klemmenparameters.
-   * @param {object} e Eintrag der Gerätebeschreibung
-   * @param {boolean} [onStart=true] nur bei „Beim Start schreiben“ beim Start übertragen (SDO)
-   * @returns {object} Feld (k, l, t, o, h, tip, dep, entry)
+   * Field definition of a terminal parameter.
+   * @param {object} e entry of the device description
+   * @param {boolean} [onStart=true] only transferred at startup with „Beim Start schreiben“ (SDO)
+   * @returns {object} field (k, l, t, o, h, tip, dep, entry)
    */
   function deviceField(e, onStart = true) {
     const unit = entryUnit(e);
@@ -205,7 +205,7 @@
     };
   }
 
-  /** Gruppen des Abschnitts Klemme aus der Gerätebeschreibung. */
+  /** Groups of the terminal section from the device description. */
   const deviceGroups = $derived.by(() => {
     const entries = settingEntries(live.description);
     const used = new Set();
@@ -265,9 +265,9 @@
   });
 
   /**
-   * Wert eines Felds im Entwurf (Klemmenparameter ohne typisiertes Feld: device.coe bzw. Default).
-   * @param {string} g Gruppe (Abschnitt der Konfiguration)
-   * @param {{k: string, entry?: object}} f Felddefinition
+   * Value of a field in the draft (terminal parameter without a typed field: device.coe or default).
+   * @param {string} g group (section of the configuration)
+   * @param {{k: string, entry?: object}} f field definition
    * @returns {any}
    */
   function fieldValue(g, f) {
@@ -275,10 +275,10 @@
   }
 
   /**
-   * Schreibt einen Wert in den Entwurf; Klemmenparameter ohne typisiertes Feld als Zahl in device.coe.
-   * @param {string} g Gruppe
-   * @param {{k: string, entry?: object}} f Felddefinition
-   * @param {any} v Wert
+   * Writes a value into the draft; terminal parameters without a typed field as a number in device.coe.
+   * @param {string} g group
+   * @param {{k: string, entry?: object}} f field definition
+   * @param {any} v value
    */
   function assign(g, f, v) {
     if (f.entry && !f.entry.config_key) draft.device.coe[f.entry.key] = typeof v === 'boolean' ? Number(v) : v;
@@ -286,12 +286,12 @@
   }
 
   /**
-   * Übernimmt eine Eingabe in den Entwurf; Zahlenfelder mit Komma oder Punkt,
-   * ungültige Zahlen werden als null gespeichert (Validierung beim Speichern).
-   * Klemmenparameter mit Umrechnung (ConvertValue) werden als Rohwert gespeichert.
-   * @param {string} g Gruppe (Abschnitt der Konfiguration)
-   * @param {{k: string, t: string, o?: Array, entry?: object}} f Felddefinition
-   * @param {string|boolean|string[]} raw Eingabewert
+   * Takes an input over into the draft; numeric fields with comma or point,
+   * invalid numbers are stored as null (validation when saving).
+   * Terminal parameters with conversion (ConvertValue) are stored as the raw value.
+   * @param {string} g group (section of the configuration)
+   * @param {{k: string, t: string, o?: Array, entry?: object}} f field definition
+   * @param {string|boolean|string[]} raw input value
    */
   function setField(g, f, raw) {
     if (f.t === 'bool' || f.t === 'text' || f.t === 'hide') assign(g, f, raw);
@@ -311,15 +311,15 @@
     }
   }
 
-  /** Toleranz beim Runden umgerechneter Ganzzahlen (z. B. 0,1 s / 0,01 s). */
+  /** Tolerance when rounding converted integers (e.g. 0.1 s / 0.01 s). */
   const ROUND_EPS = 1e-9;
   const NUM_PATTERN = '\\s*-?(\\d+([.,]\\d*)?|[.,]\\d+)([eE][\\-+]?\\d+)?\\s*';
   const INT_PATTERN = '\\s*-?\\d+\\s*';
   /**
-   * Anzeigetext eines Zahlenfelds: letzte Eingabe, sonst Wert mit Dezimalkomma.
-   * Gleitkommafelder zeigen immer Nachkommastellen ("20,0"), damit Bruchteile erkennbar zulässig sind.
-   * @param {string} g Gruppe
-   * @param {{k: string, t: string, entry?: object}} f Felddefinition
+   * Display text of a numeric field: last input, otherwise value with decimal comma.
+   * Floating point fields always show decimal places ("20,0") so that fractions are recognizably allowed.
+   * @param {string} g group
+   * @param {{k: string, t: string, entry?: object}} f field definition
    * @returns {string}
    */
   function numText(g, f) {
@@ -332,8 +332,8 @@
   }
 
   /**
-   * Bedingungen eines Felds, die im Entwurf nicht erfüllt sind.
-   * @param {{dep?: Array<{p?: string, ok?: () => boolean, h?: string}>}} f Felddefinition
+   * Conditions of a field that are not met in the draft.
+   * @param {{dep?: Array<{p?: string, ok?: () => boolean, h?: string}>}} f field definition
    * @returns {Array<{p?: string, h?: string}>}
    */
   function unmet(f) {
@@ -345,11 +345,11 @@
   }
 
   /**
-   * Blendet einen Eintrag einer Liste ausgeblendeter Elemente ein oder aus.
-   * @param {string} g Gruppe
-   * @param {{k: string, t: string}} f Felddefinition (Typ 'hide')
-   * @param {string} key Element
-   * @param {boolean} visible true = anzeigen
+   * Shows or hides an entry of a list of hidden elements.
+   * @param {string} g group
+   * @param {{k: string, t: string}} f field definition (type 'hide')
+   * @param {string} key element
+   * @param {boolean} visible true = show
    */
   function setVisible(g, f, key, visible) {
     const hidden = draft[g][f.k].filter((k) => k !== key);
@@ -357,8 +357,8 @@
   }
 
   /**
-   * Speichert den Entwurf; bei Fehlern bleibt der Dialog mit Fehlerliste offen.
-   * @param {SubmitEvent} e Formularereignis
+   * Saves the draft; on errors the dialog stays open with the error list.
+   * @param {SubmitEvent} e form event
    */
   async function save(e) {
     e.preventDefault();
@@ -540,7 +540,7 @@
     color: inherit;
     cursor: pointer;
   }
-  /* zusammengehörige Checkboxen als Kasten */
+  /* related checkboxes as a box */
   fieldset.checks {
     grid-column: 1 / -1;
     display: flex;
@@ -565,7 +565,7 @@
     flex-basis: 100%;
     font-size: 0.78rem;
   }
-  /* Feld durch eine ausgeschaltete Option unwirksam */
+  /* field made ineffective by a disabled option */
   .inactive {
     padding-left: 0.6rem;
     border-left: 2px dashed var(--line);

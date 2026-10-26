@@ -11,35 +11,35 @@
 #include "sample.hpp"
 
 namespace ew {
-    /// Ergebnis eines Kommandos (Kalibrierung, Tara, Debug).
+    /// Result of a command (calibration, tare, debug).
     struct CalResult {
-        bool ok = false; ///< Kommando ausgeführt
-        std::string error; ///< Fehlertext bei ok == false
+        bool ok = false; ///< command executed
+        std::string error; ///< error text if ok == false
     };
 
     /**
-     * @brief Ablaufsteuerung der Kalibrierung.
+     * @brief Sequence control of the calibration.
      *
-     * Wird ausschließlich im Acquisition-Thread verwendet.
+     * Used exclusively in the acquisition thread.
      *
-     * Anwendung ("application"):
-     * start -> capture(Masse) je Punkt (Nullpunkt = Masse 0) -> commit (>= 2 Punkte).
-     * Rohwert je Punkt = Mittelwert von Value (Real) über capture_time_ms.
+     * Application ("application"):
+     * start -> capture(mass) per point (zero point = mass 0) -> commit (>= 2 points).
+     * Raw value per point = mean of Value (Real) over capture_time_ms.
      *
-     * Klemme ("device", Beckhoff-Verfahren "Abgleich in der Anlage"):
-     * - start: Scale factor 1, Gain 1, Tara 0, Filter IIR8, Nominal load, Gravity
-     * - zero: Kommando 0x0101 nach >= stable_time_s Stillstand
-     * - ref: Reference load (>= 20 % Nennlast) schreiben, Kommando 0x0102
-     * - danach: Kommando 0x0000, Filter und Scale factor aus der Config zurück,
-     *   Rated output (0x8000:23) und Zero balance (0x8000:25) lesen
-     * - commit: Ergebnis in die Config übernehmen
+     * Terminal ("device", Beckhoff procedure "calibration in the plant"):
+     * - start: scale factor 1, gain 1, tare 0, filter IIR8, nominal load, gravity
+     * - zero: command 0x0101 after >= stable_time_s of standstill
+     * - ref: write reference load (>= 20 % of nominal load), command 0x0102
+     * - afterwards: command 0x0000, restore filter and scale factor from the config,
+     *   read rated output (0x8000:23) and zero balance (0x8000:25)
+     * - commit: take the result over into the config
      */
     class CalibrationController {
     public:
-        /// Kalibrierung in der Klemme: Referenzlast mindestens dieser Anteil der Nennlast (Beckhoff: 20 %)
+        /// Calibration in the terminal: reference load at least this fraction of the nominal load (Beckhoff: 20 %)
         static constexpr double kMinReferenceRatio = 0.2;
 
-        /// true, solange eine Kalibrierung läuft
+        /// true while a calibration is running
         [[nodiscard]] bool active() const { return kind_ != Kind::None; }
 
         CalResult start_application(const Config &cfg);
@@ -63,55 +63,55 @@ namespace ew {
 
         [[nodiscard]] nlohmann::json to_json() const;
 
-        /// Erfasster Stützpunkt (Kalibrierung in der Anwendung).
+        /// Captured calibration point (calibration in the application).
         struct AppPoint {
-            double raw = 0.0; ///< Mittelwert von Value (Real)
-            double mass_g = 0.0; ///< zugeordnete Masse [g]
-            double stddev = 0.0; ///< Standardabweichung des Rohwerts
-            uint32_t n = 0; ///< gemittelte Samples
+            double raw = 0.0; ///< mean of Value (Real)
+            double mass_g = 0.0; ///< assigned mass [g]
+            double stddev = 0.0; ///< standard deviation of the raw value
+            uint32_t n = 0; ///< averaged samples
         };
 
-        /// erfasste Stützpunkte, nach Masse sortiert
+        /// captured calibration points, sorted by mass
         [[nodiscard]] const std::vector<AppPoint> &points() const { return points_; }
         /// application: idle|capturing; device: prepared|zero_busy|zero_done|ref_busy|done
         [[nodiscard]] const std::string &phase() const { return phase_; }
 
     private:
-        /// Art der laufenden Kalibrierung
+        /// Kind of the running calibration
         enum class Kind { None, Application, Device };
 
         void reset();
 
         void finish_device(IoBackend &io, const Config &cfg);
 
-        Kind kind_ = Kind::None; ///< laufende Kalibrierung
-        std::string phase_; ///< siehe phase()
-        std::string error_; ///< letzter Fehler
-        std::string message_; ///< Hinweis für die Bedienung
+        Kind kind_ = Kind::None; ///< running calibration
+        std::string phase_; ///< see phase()
+        std::string error_; ///< last error
+        std::string message_; ///< hint for the operator
 
-        // Anwendung
-        std::vector<AppPoint> points_; ///< erfasste Stützpunkte
-        bool capturing_ = false; ///< Erfassung läuft
-        double cap_mass_g_ = 0.0; ///< Masse des laufenden Punkts [g]
-        double cap_start_ = 0.0; ///< Beginn der Erfassung [s]
-        double cap_duration_ = 0.0; ///< Erfassungsdauer [s]
-        uint32_t cap_n_ = 0; ///< bisher gemittelte Samples
-        double cap_mean_ = 0.0; ///< laufender Mittelwert (Welford)
-        double cap_m2_ = 0.0; ///< laufende Quadratsumme (Welford)
+        // Application
+        std::vector<AppPoint> points_; ///< captured calibration points
+        bool capturing_ = false; ///< capture in progress
+        double cap_mass_g_ = 0.0; ///< mass of the current point [g]
+        double cap_start_ = 0.0; ///< start of the capture [s]
+        double cap_duration_ = 0.0; ///< capture duration [s]
+        uint32_t cap_n_ = 0; ///< samples averaged so far
+        double cap_mean_ = 0.0; ///< running mean (Welford)
+        double cap_m2_ = 0.0; ///< running sum of squares (Welford)
 
-        // Klemme
-        std::string device_unit_; ///< Einheit von Nominal/Reference load
-        double nominal_ = 0.0; ///< Nennlast in device_unit
-        double reference_ = 0.0; ///< Referenzlast in device_unit
-        double band_ = 0.0; ///< Stillstandsband in device_unit
-        double stable_time_s_ = 0.0; ///< geforderter Stillstand [s]
-        double stable_ref_ = 0.0; ///< Bezugswert der Stillstandserkennung
-        double stable_since_ = -1.0; ///< Beginn des Stillstands [s], -1 = kein Stillstand
-        double last_raw_ = 0.0; ///< letzter Rohwert
-        double last_t_ = 0.0; ///< Zeit des letzten Samples [s]
-        double cmd_start_ = 0.0; ///< Start des laufenden Kommandos [s]
-        double next_poll_ = 0.0; ///< nächste Abfrage von 0xFB00:02 [s]
-        std::optional<double> rated_result_; ///< gelesenes Rated output 0x8000:23
-        std::optional<double> zero_result_; ///< gelesenes Zero balance 0x8000:25
+        // Terminal
+        std::string device_unit_; ///< unit of nominal/reference load
+        double nominal_ = 0.0; ///< nominal load in device_unit
+        double reference_ = 0.0; ///< reference load in device_unit
+        double band_ = 0.0; ///< standstill band in device_unit
+        double stable_time_s_ = 0.0; ///< required standstill [s]
+        double stable_ref_ = 0.0; ///< reference value of the standstill detection
+        double stable_since_ = -1.0; ///< start of standstill [s], -1 = no standstill
+        double last_raw_ = 0.0; ///< last raw value
+        double last_t_ = 0.0; ///< time of the last sample [s]
+        double cmd_start_ = 0.0; ///< start of the running command [s]
+        double next_poll_ = 0.0; ///< next poll of 0xFB00:02 [s]
+        std::optional<double> rated_result_; ///< rated output 0x8000:23 read back
+        std::optional<double> zero_result_; ///< zero balance 0x8000:25 read back
     };
 } // namespace ew

@@ -3,7 +3,7 @@
 
   const s = $derived(live.sample);
 
-  // Statusbits der Klemme (0x6000) und Verbindungszustand; good = grün statt rot, wenn gesetzt
+  // Status bits of the terminal (0x6000) and connection state; good = green instead of red when set
   const bits = $derived([
     { key: 'link', label: 'Link', on: s?.link_ok && s?.wkc_ok, good: true },
     { key: 'steady', label: 'Steady state', on: s?.status?.steady_state, good: true },
@@ -13,14 +13,14 @@
     { key: 'err', label: 'Error', on: s?.status?.error },
   ]);
 
-  // Kompakt (nur gesetzte Bits, ohne Link), wenn nicht alle Bits in den freien Platz passen.
-  // Die Liste füllt den Rest der Kopfzeile (Breite 0, flex-grow), ihre Breite hängt also nicht
-  // vom Inhalt ab. fullWidth ist die Breite aller Bits, gemessen, solange sie angezeigt werden.
+  // Compact (only set bits, without Link) if not all bits fit into the free space.
+  // The list fills the rest of the header (width 0, flex-grow), so its width does not depend
+  // on the content. fullWidth is the width of all bits, measured while they are shown.
   let list;
   let fullWidth = 0;
   let compact = $state(false);
 
-  /** Prüft, ob alle Bits in die verfügbare Breite passen. */
+  /** Checks whether all bits fit into the available width. */
   function fit() {
     if (!list) return;
     if (!compact) fullWidth = list.scrollWidth;
@@ -33,7 +33,7 @@
     return () => ro.disconnect();
   });
 
-  // Gesetzte Bits sind fett und damit breiter: nach jeder Änderung neu prüfen
+  // Set bits are bold and therefore wider: check again after every change
   $effect(() => {
     bits;
     requestAnimationFrame(fit);
@@ -47,13 +47,13 @@
 </ul>
 
 <style>
-  /* einzeilig, füllt den Rest der Kopfzeile; bei Platzmangel kompakt statt umgebrochen */
+  /* single line, fills the rest of the header; compact instead of wrapping when space is short */
   .bits {
     list-style: none;
     display: flex;
     flex-wrap: nowrap;
     gap: 0.35rem;
-    /* Breite 0: zählt nicht zur Breite des Titels, füllt nur den freien Rest */
+    /* Width 0: does not count towards the width of the title, only fills the remaining space */
     flex: 1 1 0;
     width: 0;
     min-width: 0;
@@ -79,7 +79,7 @@
     color: var(--st-captured);
   }
 
-  /* Kompakt: nur gesetzte Bits; Link zeigt bereits die Verbindungsanzeige */
+  /* Compact: only set bits; Link is already shown by the connection indicator */
   .compact li:not(.on),
   .compact li.link {
     display: none;

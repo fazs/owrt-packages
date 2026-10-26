@@ -282,7 +282,7 @@
     }
   },
   "info": {
-    "description": "REST-API von ethercat-weigh. Ereignisse (sample, measurement, config, ...) kommen über den WebSocket /ws; die erste Nachricht nach dem Verbindungsaufbau ist {\"type\": \"init\", \"snapshot\", \"config\"}.",
+    "description": "REST API of ethercat-weigh. Events (sample, measurement, config, ...) are sent via the WebSocket /ws; the first message after connecting is {\"type\": \"init\", \"snapshot\", \"config\"}.",
     "title": "ethercat-weigh",
     "version": "0.2.1"
   },
@@ -339,7 +339,7 @@
                 }
               }
             },
-            "description": "Ungültige Anfrage"
+            "description": "Bad request"
           },
           "409": {
             "content": {
@@ -349,12 +349,12 @@
                 }
               }
             },
-            "description": "Im aktuellen Zustand nicht ausführbar"
+            "description": "Not executable in the current state"
           }
         },
-        "summary": "Kalibrierschritt ausführen (Aktionen siehe README)",
+        "summary": "Execute a calibration step (actions see README)",
         "tags": [
-          "Kalibrierung"
+          "Calibration"
         ]
       }
     },
@@ -372,9 +372,9 @@
             "description": "OK"
           }
         },
-        "summary": "Gespeicherte Konfiguration",
+        "summary": "Saved configuration",
         "tags": [
-          "Konfiguration"
+          "Configuration"
         ]
       },
       "put": {
@@ -407,12 +407,12 @@
                 }
               }
             },
-            "description": "Ungültige Anfrage"
+            "description": "Bad request"
           }
         },
-        "summary": "Konfiguration validieren, speichern und anwenden",
+        "summary": "Validate, save and apply the configuration",
         "tags": [
-          "Konfiguration"
+          "Configuration"
         ]
       }
     },
@@ -461,7 +461,7 @@
             "description": "OK"
           }
         },
-        "summary": "Initialisierungssequenz mit den Werten der aktuellen Konfiguration",
+        "summary": "Initialization sequence with the values of the current configuration",
         "tags": [
           "Debug"
         ]
@@ -514,7 +514,7 @@
                 }
               }
             },
-            "description": "Ungültige Anfrage"
+            "description": "Bad request"
           },
           "409": {
             "content": {
@@ -524,10 +524,10 @@
                 }
               }
             },
-            "description": "Im aktuellen Zustand nicht ausführbar"
+            "description": "Not executable in the current state"
           }
         },
-        "summary": "Steuerbit 0x7000 übersteuern; value null hebt auf, clear hebt alle auf",
+        "summary": "Override control bit 0x7000; value null removes the override, clear removes all",
         "tags": [
           "Debug"
         ]
@@ -734,10 +734,10 @@
                 }
               }
             },
-            "description": "Im aktuellen Zustand nicht ausführbar"
+            "description": "Not executable in the current state"
           }
         },
-        "summary": "PDO-Katalog mit Zuordnung, Bitlage, Werten, Übersteuerungen und Prozessabbild (Hex)",
+        "summary": "PDO catalog with assignment, bit position, values, overrides and process image (hex)",
         "tags": [
           "Debug"
         ]
@@ -757,7 +757,7 @@
             "description": "OK"
           }
         },
-        "summary": "Prozessdatenquelle schließen und neu initialisieren",
+        "summary": "Close the process data source and initialize it again",
         "tags": [
           "Debug"
         ]
@@ -859,7 +859,7 @@
                 }
               }
             },
-            "description": "Ungültige Anfrage"
+            "description": "Bad request"
           },
           "409": {
             "content": {
@@ -889,10 +889,10 @@
                 }
               }
             },
-            "description": "Im aktuellen Zustand nicht ausführbar"
+            "description": "Not executable in the current state"
           }
         },
-        "summary": "Einzelner SDO-Zugriff",
+        "summary": "Single SDO access",
         "tags": [
           "Debug"
         ]
@@ -945,7 +945,7 @@
                 }
               }
             },
-            "description": "Ungültige Anfrage"
+            "description": "Bad request"
           },
           "409": {
             "content": {
@@ -955,12 +955,12 @@
                 }
               }
             },
-            "description": "Im aktuellen Zustand nicht ausführbar"
+            "description": "Not executable in the current state"
           }
         },
-        "summary": "Kommando der Gerätebeschreibung starten; Abschluss als WebSocket-Ereignis device_command",
+        "summary": "Start a command of the device description; completion as WebSocket event device_command",
         "tags": [
-          "Klemme"
+          "Terminal"
         ]
       }
     },
@@ -978,9 +978,9 @@
             "description": "OK"
           }
         },
-        "summary": "Gerätebeschreibung der Klemme (aus der ESI erzeugt)",
+        "summary": "Device description of the terminal (generated from the ESI)",
         "tags": [
-          "Klemme"
+          "Terminal"
         ]
       }
     },
@@ -1057,12 +1057,12 @@
                 }
               }
             },
-            "description": "Im aktuellen Zustand nicht ausführbar"
+            "description": "Not executable in the current state"
           }
         },
-        "summary": "Diagnose per SDO (nur auf Anfrage)",
+        "summary": "Diagnostics via SDO (on request only)",
         "tags": [
-          "Klemme"
+          "Terminal"
         ]
       }
     },
@@ -1080,9 +1080,9 @@
             "description": "OK"
           }
         },
-        "summary": "Version, Backend-Zustand, Zyklen, Überläufe, max. Zykluszeit",
+        "summary": "Version, backend state, cycles, overruns, max. cycle time",
         "tags": [
-          "Zustand"
+          "State"
         ]
       }
     },
@@ -1103,9 +1103,9 @@
             "description": "OK"
           }
         },
-        "summary": "Gehaltene Messungen (Massen in g)",
+        "summary": "Held measurements (masses in g)",
         "tags": [
-          "Messungen"
+          "Measurements"
         ]
       }
     },
@@ -1133,9 +1133,9 @@
             "description": "OK"
           }
         },
-        "summary": "Gehaltene Messungen als CSV (Trennzeichen ';')",
+        "summary": "Held measurements as CSV (separator ';')",
         "tags": [
-          "Messungen"
+          "Measurements"
         ]
       }
     },
@@ -1171,12 +1171,12 @@
                 }
               }
             },
-            "description": "Nicht gefunden"
+            "description": "Not found"
           }
         },
-        "summary": "Messung löschen",
+        "summary": "Delete a measurement",
         "tags": [
-          "Messungen"
+          "Measurements"
         ]
       }
     },
@@ -1194,9 +1194,9 @@
             "description": "OK"
           }
         },
-        "summary": "Diese OpenAPI-Spec",
+        "summary": "This OpenAPI spec",
         "tags": [
-          "Zustand"
+          "State"
         ]
       }
     },
@@ -1239,7 +1239,7 @@
                 }
               }
             },
-            "description": "Ungültige Anfrage"
+            "description": "Bad request"
           },
           "409": {
             "content": {
@@ -1249,10 +1249,10 @@
                 }
               }
             },
-            "description": "Im aktuellen Zustand nicht ausführbar"
+            "description": "Not executable in the current state"
           }
         },
-        "summary": "Nur Simulation: Last in g auflegen; null = automatisches Profil",
+        "summary": "Simulation only: apply a load in g; null = automatic profile",
         "tags": [
           "Simulation"
         ]
@@ -1446,9 +1446,9 @@
             "description": "OK"
           }
         },
-        "summary": "Snapshot: letztes Sample, Statistik, letzte Messungen, info",
+        "summary": "Snapshot: last sample, statistics, latest measurements, info",
         "tags": [
-          "Zustand"
+          "State"
         ]
       }
     },
@@ -1466,9 +1466,9 @@
             "description": "OK"
           }
         },
-        "summary": "Statistik und Messungen löschen",
+        "summary": "Delete statistics and measurements",
         "tags": [
-          "Messungen"
+          "Measurements"
         ]
       }
     },
@@ -1493,12 +1493,12 @@
                 }
               }
             },
-            "description": "Im aktuellen Zustand nicht ausführbar"
+            "description": "Not executable in the current state"
           }
         },
-        "summary": "Tara (Software) aus dem Mittel der letzten 0,5 s setzen",
+        "summary": "Set the tare (software) from the mean of the last 0.5 s",
         "tags": [
-          "Kalibrierung"
+          "Calibration"
         ]
       }
     },
@@ -1523,12 +1523,12 @@
                 }
               }
             },
-            "description": "Im aktuellen Zustand nicht ausführbar"
+            "description": "Not executable in the current state"
           }
         },
-        "summary": "Tara (Software) löschen",
+        "summary": "Clear the tare (software)",
         "tags": [
-          "Kalibrierung"
+          "Calibration"
         ]
       }
     }

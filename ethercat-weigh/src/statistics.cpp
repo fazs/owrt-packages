@@ -5,9 +5,9 @@
 
 namespace ew {
     /**
-     * @brief JSON-Darstellung für nlohmann::json.
-     * @param[out] j Ziel
-     * @param s Kennzahlen
+     * @brief JSON representation for nlohmann::json.
+     * @param[out] j target
+     * @param s statistics
      */
     void to_json(nlohmann::json &j, const StatSummary &s) {
         j = {
@@ -17,8 +17,8 @@ namespace ew {
     }
 
     /**
-     * @brief Fügt einen Wert hinzu (Welford).
-     * @param x Wert
+     * @brief Adds a value (Welford).
+     * @param x value
      */
     void RunningStats::add(double x) {
         ++n_;
@@ -35,13 +35,13 @@ namespace ew {
     }
 
     /**
-     * @brief Entfernt einen Wert (Welford rückwärts).
+     * @brief Removes a value (Welford backwards).
      *
-     * Anzahl, Mittelwert und Standardabweichung sind exakt. Minimum, Maximum und
-     * letzter Wert werden aus @p held bestimmt.
+     * Count, mean and standard deviation are exact. Minimum, maximum and
+     * last value are determined from @p held.
      *
-     * @param x zu entfernender Wert
-     * @param held verbliebene gehaltene Werte in zeitlicher Reihenfolge
+     * @param x value to remove
+     * @param held remaining held values in chronological order
      */
     void RunningStats::remove(double x, const std::vector<double> &held) {
         if (n_ <= 1 || held.empty()) {
@@ -59,12 +59,12 @@ namespace ew {
         last_ = held.back();
     }
 
-    /// @brief Setzt alle Kennzahlen zurück.
+    /// @brief Resets all statistics.
     void RunningStats::reset() { *this = RunningStats{}; }
 
     /**
-     * @brief Aktuelle Kennzahlen.
-     * @return Kennzahlen; bei n = 0 alle Werte 0
+     * @brief Current statistics.
+     * @return statistics; all values 0 for n = 0
      */
     StatSummary RunningStats::summary() const {
         StatSummary s;
@@ -80,8 +80,8 @@ namespace ew {
     }
 
     /**
-     * @brief Fügt einen Wert hinzu; der älteste fällt bei vollem Fenster heraus.
-     * @param x Wert
+     * @brief Adds a value; the oldest one drops out when the window is full.
+     * @param x value
      */
     void RollingStats::add(double x) {
         buf_.push_back(x);
@@ -89,8 +89,8 @@ namespace ew {
     }
 
     /**
-     * @brief Ändert die Fenstergröße; überzählige älteste Werte werden verworfen.
-     * @param size neue Fenstergröße (mindestens 1)
+     * @brief Changes the window size; surplus oldest values are discarded.
+     * @param size new window size (at least 1)
      */
     void RollingStats::resize(uint32_t size) {
         size_ = std::max<uint32_t>(1, size);
@@ -98,16 +98,16 @@ namespace ew {
     }
 
     /**
-     * @brief Baut das Fenster aus den letzten N gehaltenen Werten neu auf.
-     * @param held gehaltene Werte in zeitlicher Reihenfolge
+     * @brief Rebuilds the window from the last N held values.
+     * @param held held values in chronological order
      */
     void RollingStats::rebuild(const std::vector<double> &held) {
         buf_.assign(held.size() > size_ ? held.end() - size_ : held.begin(), held.end());
     }
 
     /**
-     * @brief Kennzahlen über das Fenster.
-     * @return Kennzahlen der letzten N Werte
+     * @brief Statistics over the window.
+     * @return statistics of the last N values
      */
     StatSummary RollingStats::summary() const {
         RunningStats r;
@@ -116,13 +116,13 @@ namespace ew {
     }
 
     /**
-     * @brief Entfernt einen einzelnen Wert aus Session und Fenster.
+     * @brief Removes a single value from session and window.
      *
-     * Sind alle Werte seit Reset noch gehalten, wird die Session exakt neu berechnet;
-     * sonst sind Minimum/Maximum nur über die gehaltenen Werte bestimmt.
+     * If all values since the reset are still held, the session is recomputed exactly;
+     * otherwise minimum/maximum are only determined over the held values.
      *
-     * @param x zu entfernender Wert
-     * @param held verbliebene gehaltene Werte in zeitlicher Reihenfolge
+     * @param x value to remove
+     * @param held remaining held values in chronological order
      */
     void TemporaryStatistics::remove(double x, const std::vector<double> &held) {
         if (session_.summary().n == held.size() + 1) {
@@ -135,7 +135,7 @@ namespace ew {
     }
 
     /**
-     * @brief JSON mit Session- und Fensterstatistik.
+     * @brief JSON with session and window statistics.
      * @return {"session": ..., "rolling": ...}
      */
     nlohmann::json TemporaryStatistics::to_json() const {

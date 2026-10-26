@@ -10,45 +10,45 @@
 
 namespace ew {
 
-/// Beschreibung einer REST-Route für die OpenAPI-Spec.
+/// Description of a REST route for the OpenAPI spec.
 struct ApiDoc {
     /**
-     * @param tag_ Gruppe (OpenAPI-Tag)
-     * @param summary_ Kurzbeschreibung
-     * @param request_ Schema des JSON-Body; null = kein Body
-     * @param responses_ HTTP-Statuscode -> Schema der Antwort
+     * @param tag_ group (OpenAPI tag)
+     * @param summary_ short description
+     * @param request_ schema of the JSON body; null = no body
+     * @param responses_ HTTP status code -> schema of the response
      */
     ApiDoc(std::string tag_, std::string summary_, nlohmann::json request_,
            std::map<int, nlohmann::json> responses_)
         : tag(std::move(tag_)), summary(std::move(summary_)), request(std::move(request_)),
           responses(std::move(responses_)) {}
 
-    std::string tag;                              ///< Gruppe (OpenAPI-Tag)
-    std::string summary;                          ///< Kurzbeschreibung
-    nlohmann::json request;                       ///< Schema des JSON-Body; null = kein Body
-    std::map<int, nlohmann::json> responses;      ///< HTTP-Statuscode -> Schema der Antwort
-    std::vector<std::string> params;              ///< Namen der Pfadparameter in Reihenfolge
-    std::map<std::string, nlohmann::json> query;  ///< Query-Parameter -> Schema
-    std::string media = "application/json";       ///< Content-Type der Antworten
+    std::string tag;                              ///< group (OpenAPI tag)
+    std::string summary;                          ///< short description
+    nlohmann::json request;                       ///< schema of the JSON body; null = no body
+    std::map<int, nlohmann::json> responses;      ///< HTTP status code -> schema of the response
+    std::vector<std::string> params;              ///< names of the path parameters in order
+    std::map<std::string, nlohmann::json> query;  ///< query parameter -> schema
+    std::string media = "application/json";       ///< content type of the responses
 };
 
 /**
- * @brief Registriert REST-Routen bei Crow und zeichnet sie für die OpenAPI-Spec auf.
+ * @brief Registers REST routes with Crow and records them for the OpenAPI spec.
  *
- * Crow selbst kennt keine Metadaten zu Routen; jede Route wird daher hier zusammen mit
- * ihrer Beschreibung registriert, damit Pfad, Methode und Parameter nur an einer Stelle stehen.
+ * Crow itself has no metadata about routes; each route is therefore registered here together
+ * with its description, so that path, method and parameters are defined in one place only.
  */
 class ApiRegistry {
 public:
     explicit ApiRegistry(crow::SimpleApp& app) : app_(app) {}
 
     /**
-     * @brief Registriert eine Route und ihre Beschreibung.
-     * @param method HTTP-Methode
-     * @param path Crow-Pfad, Parameter als <uint>, <int>, <double>, <string>, <path>
-     * @param doc Beschreibung
-     * @param handler Crow-Handler (Lambda); Parameter müssen zu @p path passen
-     * @throws std::runtime_error bei unpassendem Handler oder fehlendem Parameternamen
+     * @brief Registers a route and its description.
+     * @param method HTTP method
+     * @param path Crow path, parameters as <uint>, <int>, <double>, <string>, <path>
+     * @param doc description
+     * @param handler Crow handler (lambda); parameters must match @p path
+     * @throws std::runtime_error for a mismatching handler or a missing parameter name
      */
     template <class H>
     void add(crow::HTTPMethod method, const std::string& path, ApiDoc doc, H&& handler) {
@@ -63,7 +63,7 @@ public:
 private:
     void record(crow::HTTPMethod method, const std::string& path, ApiDoc doc);
 
-    crow::SimpleApp& app_;              ///< Crow-Anwendung
+    crow::SimpleApp& app_;              ///< Crow application
     nlohmann::json paths_ = nlohmann::json::object();       ///< OpenAPI "paths"
     nlohmann::json components_ = nlohmann::json::object();  ///< OpenAPI "components.schemas"
 };
